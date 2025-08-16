@@ -1,0 +1,37 @@
+name: headscalemanager
+description: A new Flutter project.
+
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  yaml_edit: ^2.1.0
+
+  # UI & UX
+  eva_icons_flutter: ^3.1.0
+  
+  # Functionality
+  http: ^1.1.0
+  provider: ^6.0.5
+  flutter_secure_storage: ^9.0.0
+  qr_flutter: ^4.1.0
+  url_launcher: ^6.1.14
+  share_plus: ^7.2.2
+  path_provider: ^2.1.1
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

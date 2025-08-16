@@ -1,0 +1,125 @@
+Récapitulatif des Commandes Headscale (API RESTful vs. CLI)
+Ce document centralise les informations essentielles pour interagir avec un serveur Headscale, en distinguant les opérations réalisables via son API HTTP RESTful et celles qui nécessitent l'interface en ligne de commande (CLI). Il est conçu pour servir de référence rapide pour le développement de votre application de gestion Headscale.
+I. Accès et Authentification
+Pour interagir avec Headscale, que ce soit via l'API HTTP ou la CLI distante, une clé API est nécessaire pour l'authentification.
+A. Création et Gestion des Clés API (CLI Uniquement)
+Les clés API sont générées via la CLI de Headscale. Elles sont utilisées pour authentifier les requêtes programmatiques ou les appels CLI distants.
+ * headscale apikeys create
+   * Fonction : Génère une nouvelle clé API.
+   * Options :
+     * --expiration <DUREE> : (Optionnel) Définit la période de validité de la clé API (ex: 90d, 999d).
+   * Explication : La clé générée est affichée une seule fois et doit être sauvegardée en toute sécurité. Elle ne peut pas être récupérée ultérieurement.
+   * Exemple (Docker) : docker exec headscale headscale apikeys create --expiration 999d
+ * headscale apikeys list
+   * Fonction : Liste toutes les clés API actuellement associées au serveur Headscale.
+   * Explication : Utile pour l'audit et la gestion de la sécurité.
+ * headscale apikeys expire --prefix "<PREFIXE>"
+   * Fonction : Invalide une clé API spécifique.
+   * Options :
+     * --prefix "<PREFIXE>" : Le préfixe unique de la clé API à expirer.
+   * Explication : Important pour révoquer les clés compromises ou inutilisées.
+B. Authentification de l'API HTTP (RESTful)
+Pour les requêtes API HTTP, la clé API est généralement incluse dans l'en-tête Authorization.
+ * En-tête : Authorization: Bearer <VOTRE_CLE_API>
+   * Explication : Cette méthode d'authentification est standard pour les API RESTful et est requise pour la plupart des endpoints de l'API Headscale.
+II. Opérations via l'API HTTP (RESTful)
+Ces opérations peuvent être effectuées directement depuis votre application mobile en envoyant des requêtes HTTP.
+A. Gestion des Utilisateurs (/api/v1/users)
+| Méthode | Endpoint | Fonction | Corps de la Requête (Exemple) | Explication |
+|---|---|---|---|---|
+| POST | /api/v1/users | Crée un nouvel utilisateur. | {"name": "nouvel_utilisateur"} | Permet d'ajouter un compte utilisateur à Headscale. |
+| GET | /api/v1/users | Liste tous les utilisateurs enregistrés. | N/A | Récupère un tableau de tous les utilisateurs. |
+| GET | /api/v1/users/{name} | Récupère les détails d'un utilisateur spécifique. | N/A | Remplacez {name} par le nom de l'utilisateur. |
+| DELETE | /api/v1/users/{name} | Supprime un utilisateur et tous ses nœuds associés. | N/A | Remplacez {name} par le nom de l'utilisateur à supprimer. |
+B. Gestion des Nœuds (Périphériques) (/api/v1/nodes)
+| Méthode | Endpoint | Fonction | Corps de la Requête (Exemple) | Explication |
+|---|---|---|---|---|
+| GET | /api/v1/nodes | Liste tous les nœuds connectés à Headscale. | N/A | Récupère un tableau de tous les appareils enregistrés.  |
+| GET | /api/v1/nodes/{id} | Récupère les détails d'un nœud spécifique. | N/A | Remplacez {id} par l'ID du nœud.  |
+| DELETE | /api/v1/nodes/{id} | Déconnecte et supprime un nœud de Headscale. | N/A | Remplacez {id} par l'ID du nœud à supprimer. |
+| POST | /api/v1/nodes/{user_name}/register | Enregistre un nœud qui a déjà été authentifié par une clé de pré-inscription. | N/A (géré par le client Tailscale) | Important : Cette commande n'est pas pour "créer" un nœud, mais pour finaliser son enregistrement après qu'il ait utilisé une clé de pré-inscription. Le client Tailscale effectue cette étape. |
+| PUT | /api/v1/nodes/{id} | Modifie le nom d'un nœud. | {"name": "nouveau_nom_du_noeud"} | Remplacez {id} par l'ID du nœud. |
+| POST | /api/v1/nodes/{node_id}/user/{user_name} | Déplace un nœud vers un autre utilisateur. | N/A | Remplacez {node_id} par l'ID du nœud et {user_name} par le nom du nouvel utilisateur.  |
+C. Gestion des Clés de Pré-inscription (/api/v1/preauthkeys)
+| Méthode | Endpoint | Fonction | Corps de la Requête (Exemple) | Explication |
+|---|---|---|---|---|
+| POST | /api/v1/preauthkeys | Génère une nouvelle clé de pré-inscription. | {"user": "utilisateur_cible", "reusable": true, "expiration": "2025-12-31T23:59:59Z"} | Crée une clé que les clients Tailscale peuvent utiliser pour s'enregistrer sans approbation manuelle.  |
+| GET | /api/v1/preauthkeys | Liste toutes les clés de pré-inscription existantes. | N/A | Récupère un tableau de toutes les clés de pré-inscription. |
+| DELETE | /api/v1/preauthkeys/{key_id} | Invalide et supprime une clé de pré-inscription. | N/A | Remplacez {key_id} par l'ID de la clé à supprimer. |
+D. Gestion des ACLs (/api/v1/acls)
+ * Fonction : La gestion des ACL est possible via l'API.
+ * Explication : Bien que les endpoints spécifiques ne soient pas détaillés dans les extraits, la capacité existe pour mettre à jour et récupérer les politiques de contrôle d'accès. Les ACL sont écrites en huJSON.
+ * Exemple (Conceptuel) : PUT /api/v1/acls (pour mettre à jour la politique), GET /api/v1/acls (pour récupérer la politique actuelle).
+III. Opérations via la Ligne de Commande (CLI)
+Ces commandes sont exécutées directement sur le serveur Headscale (ou via docker exec si Headscale est en conteneur). Votre application peut générer ces commandes pour un copier-coller facile.
+A. Utilisation Générale de la CLI
+ * headscale help
+   * Fonction : Affiche une liste des commandes disponibles et leur utilisation générale.
+   * Exemple (Docker) : docker exec -it headscale headscale help
+ * headscale <COMMANDE> --help
+   * Fonction : Fournit une aide détaillée pour une commande spécifique, y compris ses fonctions, options et arguments.
+   * Exemple (Docker) : docker exec -it headscale headscale users --help
+ * headscale configtest
+   * Fonction : Valide la syntaxe et la structure du fichier config.yaml.
+   * Explication : Indispensable pour détecter les erreurs de configuration avant de démarrer ou de recharger le service.
+B. Gestion des Utilisateurs (headscale users)
+ * headscale users create <NOM_UTILISATEUR>
+   * Fonction : Crée un nouvel utilisateur dans Headscale.
+   * Explication : Chaque nœud doit être attribué à un utilisateur.
+   * Exemple (Docker) : docker exec -it headscale headscale users create monutilisateur
+ * headscale users list
+   * Fonction : Liste tous les utilisateurs Headscale existants.
+ * headscale users rename <ANCIEN_NOM> <NOUVEAU_NOM>
+   * Fonction : Renomme un utilisateur.
+ * headscale users delete <NOM_UTILISATEUR>
+   * Fonction : Supprime un utilisateur et tous ses nœuds.
+C. Gestion des Clés de Pré-inscription (headscale preauthkeys)
+ * headscale preauthkeys create --user <ID_UTILISATEUR> [--reusable]
+   * Fonction : Génère une clé de pré-authentification pour l'enregistrement non interactif des nœuds.
+   * Options :
+     * --user <ID_UTILISATEUR> : L'utilisateur Headscale pour lequel la clé est générée.
+     * --reusable : (Optionnel) Permet d'utiliser la clé plusieurs fois.
+     * --expiration <DUREE> : (Optionnel) Définit la période de validité (ex: 24h, 90d). Par défaut, la clé est valide 1 heure et pour une seule utilisation.
+   * Explication : La clé retournée est utilisée par le client Tailscale (tailscale up --authkey <CLE>).
+   * Exemple (Docker) : docker exec -it headscale headscale preauthkeys create --user monutilisateur --reusable --expiration 24h
+ * headscale preauthkeys list
+   * Fonction : Liste toutes les clés de pré-inscription.
+ * headscale preauthkeys expire <CLE>
+   * Fonction : Invalide une clé de pré-inscription spécifique.
+D. Gestion des Nœuds (headscale nodes)
+ * headscale nodes register --user <UTILISATEUR> --key <CLE_MACHINE>
+   * Fonction : Approuve et enregistre un nœud client Tailscale après une connexion interactive.
+   * Options :
+     * --user <UTILISATEUR> : L'utilisateur Headscale auquel le nœud sera attribué.
+     * --key <CLE_MACHINE> : La clé de machine fournie par le client Tailscale.
+   * Explication : C'est l'étape côté serveur pour autoriser un nouveau nœud après qu'il a tenté de se connecter via tailscale up --login-server.
+   * Exemple (Docker) : docker exec -it headscale headscale nodes register --user monutilisateur --key <VOTRE_CLE_MACHINE>
+ * headscale nodes list
+   * Fonction : Affiche une liste de tous les nœuds enregistrés dans le tailnet.
+   * Explication : Inclut l'ID, le nom d'hôte, les adresses IP, le statut en ligne et l'expiration.
+   * Exemple (Docker) : docker exec -it headscale headscale nodes list
+ * headscale nodes delete <ID_NOEUD>
+   * Fonction : Supprime un nœud spécifique.
+ * headscale nodes rename <ID_NOEUD> <NOUVEAU_NOM>
+   * Fonction : Renomme un nœud.
+ * headscale nodes move --user <NOUVEL_UTILISATEUR> --node <ID_NOEUD>
+   * Fonction : Déplace un nœud enregistré de son utilisateur actuel vers un autre utilisateur Headscale.
+   * Explication : Utile pour réorganiser les appareils sans réinscription.
+ * headscale nodes approve-routes --identifier <ID> --routes <PREFIXE_IP>
+   * Fonction : Approuve les routes de sous-réseau ou les routes de nœud de sortie annoncées par un nœud.
+   * Options :
+     * --identifier <ID> : L'ID du nœud.
+     * --routes <PREFIXE_IP> : Liste de préfixes IP séparés par des virgules (ex: 10.0.0.0/8,192.168.0.0/24 pour les sous-réseaux, ou 0.0.0.0/0 pour un nœud de sortie IPv4).
+   * Explication : Cette approbation côté serveur est nécessaire pour que les routeurs de sous-réseau et les nœuds de sortie deviennent actifs.
+E. Gestion des Routes (headscale routes)
+ * headscale routes list
+   * Fonction : Affiche toutes les routes configurées sur votre réseau.
+ * headscale routes enable --node-id <ID> --route <ADRESSE>
+   * Fonction : Active une route de subnet ou un exit-node pour un nœud spécifique.
+ * headscale routes disable --route <ADRESSE>
+   * Fonction : Désactive une route.
+IV. Stratégie d'Implémentation pour votre Application
+Votre approche est efficace :
+ * Requêtes API HTTP depuis l'application : Utilisez les endpoints GET, POST, PUT, DELETE pour la gestion des utilisateurs et des clés de pré-inscription, ainsi que pour la lecture des informations sur les nœuds.
+ * Génération de commandes CLI par l'application : Pour les opérations non disponibles via l'API HTTP (comme l'approbation de routes ou le déplacement de nœuds), votre application peut construire la commande CLI exacte (avec docker exec si nécessaire) et la présenter à l'utilisateur pour un copier-coller manuel dans le terminal de votre NAS.
+Cette combinaison vous permet de tirer parti de la simplicité de l'API pour les tâches courantes et de la puissance de la CLI pour les configurations plus avancées, tout en évitant la complexité d'une passerelle intermédiaire ou d'une interaction gRPC directe.
