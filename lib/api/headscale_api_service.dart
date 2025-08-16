@@ -277,7 +277,7 @@ class HeadscaleApiService {
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       final List<dynamic> keysJson = data['preAuthKeys']; // Assuming 'preAuthKeys' is the key
-      return keysJson.map((json) => PreAuthKey.fromJson(json)).toList();
+      return keysJson.map((json) => PreAuthKey.fromJson({'preAuthKey': json})).toList();
     } else {
       throw Exception(_handleError('load pre-auth keys', response));
     }
