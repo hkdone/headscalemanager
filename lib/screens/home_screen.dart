@@ -4,6 +4,7 @@ import 'package:headscalemanager/screens/dashboard_screen.dart';
 import 'package:headscalemanager/screens/settings_screen.dart';
 import 'package:headscalemanager/screens/users_screen.dart';
 import 'package:eva_icons_flutter/eva_icons_flutter.dart';
+import 'package:headscalemanager/screens/help_screen.dart'; // New import for HelpScreen
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,6 +34,14 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Gestionnaire Headscale'),
         actions: [
+          // Bouton d'aide
+          IconButton(
+            icon: const Icon(Icons.help_outline), // Using Material Icons for simplicity
+            onPressed: () {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HelpScreen()));
+            },
+          ),
+          // Bouton des paramètres
           IconButton(
             icon: const Icon(EvaIcons.settings),
             onPressed: () {
