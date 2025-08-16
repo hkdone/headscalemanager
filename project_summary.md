@@ -1,37 +1,74 @@
-# Résumé du Projet HeadscaleManager
+# Project Summary: HeadscaleManager
 
-Ce document récapitule les travaux effectués sur l'application HeadscaleManager, les fichiers clés impliqués, et le fonctionnement détaillé de ses fonctionnalités principales.
+This document summarizes the HeadscaleManager application, its core functionalities, architectural overview, and key files.
 
-## Vue d'ensemble de l'application
+## Application Overview
 
-HeadscaleManager est une application mobile (Flutter) conçue pour faciliter la gestion d'un serveur Headscale. Elle permet aux utilisateurs d'interagir avec leur instance Headscale via son API REST, offrant une interface conviviale pour des tâches telles que la gestion des nœuds (appareils), des utilisateurs et des politiques de contrôle d'accès (ACL).
+HeadscaleManager is a Flutter mobile application designed to provide a user-friendly interface for managing a Headscale server. It interacts with the Headscale REST API to offer functionalities related to node, user, pre-authentication key, and Access Control List (ACL) policy management.
 
-## Fonctionnalités Clés
+## Architectural Overview
 
-### Gestion des Nœuds et Utilisateurs
-*   Visualisation de la liste des utilisateurs et de leurs nœuds respectifs.
-*   Affichage des détails des nœuds, incluant les adresses IP, le statut, les routes partagées et les tags.
-*   Création de clés de pré-authentification pour l'enregistrement de nouveaux nœuds.
-*   Interface pour l'édition des tags des nœuds via la génération de commandes CLI `headscale`.
+The application follows a Provider-based state management pattern.
 
-### Gestion des Politiques ACL (Access Control List)
+*   **`lib/main.dart`**: The application's entry point, responsible for setting up the `ChangeNotifierProvider` for `AppProvider` and defining the basic application theme. It navigates to `SplashScreen` initially.
+*   **`lib/providers/app_provider.dart`**: Acts as a central hub for accessing core services. It provides instances of `HeadscaleApiService` (for API interactions) and `StorageService` (for secure local storage). It also manages a global loading state.
+*   **`lib/api/headscale_api_service.dart`**: Handles all communication with the Headscale REST API. It includes methods for:
+    *   Fetching and managing Tailscale nodes.
+    *   Fetching and managing Headscale users.
+    *   Creating and managing pre-authentication keys.
+    *   Retrieving and setting ACL policies.
+    It manages authentication headers and constructs API request URLs.
+*   **`lib/services/storage_service.dart`**: Utilizes `flutter_secure_storage` to securely store sensitive information such as the Headscale API key and server URL. It provides methods for saving, retrieving, checking existence, and clearing these credentials.
 
-La gestion des ACL a été entièrement revue pour s'adapter au comportement spécifique de l'instance Headscale cible. La nouvelle approche est basée exclusivement sur les **tags**.
+## Core Functionalities
 
-*   **Principe Fondamental du "Tout-Tag" :** Le fonctionnement repose sur une règle simple mais stricte : **pour qu'un nœud puisse communiquer, il doit obligatoirement avoir au moins un tag**. Un nœud qui n'est pas tagué sera, par défaut, isolé du réseau une fois la politique appliquée.
+### 1. Authentication & Setup
+*   **Splash Screen (`lib/screens/splash_screen.dart`)**: Checks for existing API credentials. If found, navigates to the main application (`HomeScreen`); otherwise, directs the user to the `SettingsScreen` for configuration.
+*   **Settings Screen (`lib/screens/settings_screen.dart`)**: Allows users to configure the Headscale server URL and API key, and to clear saved credentials.
 
-*   **Bouton "Générer la configuration de base" :** Le bouton sur l'écran ACL (`AclScreen`) est le cœur de cette fonctionnalité. Il ne génère pas un modèle statique, mais inspecte l'ensemble de vos nœuds et génère dynamiquement une politique ACL complète et fonctionnelle basée sur les tags existants.
-    1.  Il identifie tous les tags appartenant à un utilisateur donné.
-    2.  Il génère une règle de "flotte" qui autorise tous les tags d'un même utilisateur à communiquer librement entre eux.
-    3.  Il étend cette règle pour donner à la flotte l'accès à toutes les ressources partagées par ses membres (sous-réseaux et exit nodes).
-    4.  Il génère des règles spécifiques pour les nœuds "routeurs" (ceux avec des tags fournissant des routes ou un service d'exit node), leur donnant explicitement la permission de communiquer avec la flotte de l'utilisateur et de contacter les destinations qu'ils partagent.
+### 2. User Management (`lib/screens/users_screen.dart`)
+*   Displays a list of all registered Headscale users.
+*   Provides functionality to create new users.
+*   Allows deletion of existing users.
+*   Includes a dialog for generating pre-authentication keys for users.
 
-*   **Abandon des Alias d'Utilisateurs/Groupes dans les Règles :** Suite à un débogage approfondi, il a été déterminé que la version de Headscale utilisée interprétait mal les règles de communication basées sur les alias d'utilisateurs (ex: `jean@...`) ou les groupes (`group:jean@...`) dès que des tags étaient présents. La logique actuelle n'utilise donc que les **tags** comme source (`src`) et destination (`dst`) dans les règles de communication, ce qui garantit un fonctionnement stable et prévisible.
+### 3. Node Management (`lib/screens/dashboard_screen.dart` & `lib/screens/node_detail_screen.dart`)
+*   **Dashboard**: Presents a grouped view of Tailscale nodes by their associated Headscale user. Each group can be expanded to show individual nodes.
+*   **Node Details**: Provides detailed information about a selected node, including its online status, IP addresses, advertised routes, and tags.
+*   **Node Actions**: Supports actions like renaming nodes, moving nodes between users, and setting machine tags.
 
-## Fichiers Clés
+### 4. Pre-Authentication Key Generation
+*   Integrated within the `UsersScreen`, a dialog (`_showCreatePreAuthKeyDialog`) facilitates the creation of new pre-authentication keys.
+*   Users can specify the associated user, reusability, ephemerality, and an optional expiration date for the key.
+*   Upon successful creation, it provides the full `tailscale up` command, including the generated key, for easy node registration.
 
-*   `lib/screens/acl_screen.dart` : Contient toute la logique de génération de la politique ACL "tout-tag".
-*   `lib/screens/node_detail_screen.dart` : Permet de visualiser les informations d'un nœud et de générer la commande pour modifier ses tags.
-*   `lib/models/node.dart` / `lib/models/user.dart` : Modèles de données pour les objets retournés par l'API Headscale.
-*   `lib/api/headscale_api_service.dart` : Service de communication avec l'API REST de Headscale.
-*   `project_summary.md` : Ce document.
+### 5. ACL Policy Management (`lib/screens/acl_screen.dart`)
+The ACL management is designed around a "Tag-Everything" principle, where nodes must have at least one tag to communicate.
+
+*   **Policy Display**: Shows the current ACL policy in a JSON editor.
+*   **Dynamic Generation (`_initializeAcl`)**: A key feature that dynamically generates a comprehensive ACL policy based on existing users and their associated nodes and tags. This includes:
+    *   Identifying all tags belonging to a given user.
+    *   Generating "fleet" rules allowing communication between tags of the same user.
+    *   Extending rules to grant access to user-owned resources (subnets, exit nodes).
+    *   Generating specific rules for "router" nodes (those providing routes or exit node services).
+*   **Rule Addition**: Allows adding individual ACL rules via a dedicated dialog (`AclGeneratorDialog`).
+*   **Sharing**: Enables sharing the generated ACL policy as a JSON file.
+
+## Key Files
+
+*   `lib/main.dart`: Application entry point and root widget setup.
+*   `lib/api/headscale_api_service.dart`: Handles all Headscale API calls.
+*   `lib/models/user.dart`: Data model for Headscale users.
+*   `lib/models/node.dart`: Data model for Tailscale nodes.
+*   `lib/models/pre_auth_key.dart`: Data model for pre-authentication keys.
+*   `lib/providers/app_provider.dart`: Central state management and service provider.
+*   `lib/screens/splash_screen.dart`: Initial loading and credential check.
+*   `lib/screens/home_screen.dart`: Main application navigation.
+*   `lib/screens/settings_screen.dart`: Server configuration and credential management.
+*   `lib/screens/users_screen.dart`: User listing, creation, deletion, and pre-auth key generation.
+*   `lib/screens/dashboard_screen.dart`: Node listing and overview.
+*   `lib/screens/node_detail_screen.dart`: Detailed node information and actions.
+*   `lib/screens/acl_screen.dart`: ACL policy viewing, generation, and sharing.
+*   `lib/services/storage_service.dart`: Secure local storage for credentials.
+*   `lib/widgets/acl_generator_dialog.dart`: Dialog for generating individual ACL rules.
+*   `project_summary.md`: This document.
