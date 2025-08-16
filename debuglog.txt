@@ -1,23 +1,20 @@
-List the preauthkeys for this user
+The specific RenderFlex in question is: RenderFlex#feda4 OVERFLOWING
+...  parentData: offset=Offset(0.0, 0.0) (can use size)
+...  constraints: BoxConstraints(w=232.0, h=24.0)
+...  size: Size(232.0, 24.0)
+...  direction: horizontal
+...  mainAxisAlignment: spaceBetween
+...  mainAxisSize: min
+...  crossAxisAlignment: center
+...  textDirection: ltr
+...  verticalDirection: down
+...  spacing: 0.0
+◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤
+====================================================================================================
 
-Usage:
-headscale preauthkeys list [flags]
+======== Exception caught by rendering library =====================================================
+The following assertion was thrown during layout:
+A RenderFlex overflowed by 58 pixels on the right.
 
-Aliases:
-list, ls, show
-
-Flags:
--h, -- help
-
-Global Flags:
--c, -- config string
--- force
--0, -- output string
--u, -- user uint
-
-help for list
-
-config file (default is /etc/headscale/config.yaml)
-Disable prompts and forces the execution
-Output format. Empty for human-readable, 'json', 'json-line' or 'yaml'
-User identifier (ID)
+The relevant error-causing widget was: 
+  DropdownButtonFormField<User> DropdownButtonFormField:file:///C:/Users/dkdone/StudioProjects/headscaleManager/lib/screens/users_screen.dart:169:32

@@ -133,19 +133,23 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           content: SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
-                const Text(
-                    'Copiez et exécutez cette commande dans votre terminal où la CLI `headscale` est configurée :'),
-                const SizedBox(height: 10),
-                SelectableText(
-                  command,
-                  style: const TextStyle(fontFamily: 'monospace'),
-                ),
+                Text('La commande pour modifier les tags a été générée.'),
+                const SizedBox(height: 16),
+                Text('Veuillez copier cette commande et l\'exécuter dans votre terminal où la CLI `headscale` est configurée.'),
+                const SizedBox(height: 16),
               ],
             ),
           ),
           actions: <Widget>[
             TextButton(
-              child: const Text('Copier'),
+              child: const Text('Fermer'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            ElevatedButton.icon( // Use ElevatedButton for more prominence
+              icon: const Icon(Icons.copy),
+              label: const Text('Copier la commande CLI'),
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: command));
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -154,12 +158,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                     backgroundColor: Colors.blue,
                   ),
                 );
-              },
-            ),
-            TextButton(
-              child: const Text('Fermer'),
-              onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(context).pop(); // Close dialog after copying
               },
             ),
           ],

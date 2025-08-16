@@ -167,6 +167,7 @@ class _UsersScreenState extends State<UsersScreen> {
                           selectedUser = users.first;
                         }
                         return DropdownButtonFormField<User>(
+                          isExpanded: true, // Add this line
                           value: selectedUser,
                           items: users.map((user) {
                             return DropdownMenuItem<User>(
@@ -246,12 +247,10 @@ class _UsersScreenState extends State<UsersScreen> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Utilisez la commande suivante pour enregistrer votre appareil :'),
-                            const SizedBox(height: 8),
-                            SelectableText(
-                              fullCommand,
-                              style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-                            ),
+                            Text('La commande d\'enregistrement de l\'appareil a été générée.'),
+                            const SizedBox(height: 16),
+                            Text('Veuillez copier cette commande et l\'envoyer au client pour qu\'il l\'exécute sur son appareil.'),
+                            const SizedBox(height: 16),
                           ],
                         ),
                         actions: [
@@ -259,13 +258,15 @@ class _UsersScreenState extends State<UsersScreen> {
                             child: const Text('Fermer'),
                             onPressed: () => Navigator.of(context).pop(),
                           ),
-                          TextButton(
-                            child: const Text('Copier la commande'),
+                          ElevatedButton.icon( // Use ElevatedButton for more prominence
+                            icon: const Icon(Icons.copy),
+                            label: const Text('Copier la commande pour le client'),
                             onPressed: () async {
                               await Clipboard.setData(ClipboardData(text: fullCommand));
                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                                 content: Text('Commande copiée dans le presse-papiers !'),
                               ));
+                              Navigator.of(context).pop(); // Close dialog after copying
                             },
                           ),
                         ],
