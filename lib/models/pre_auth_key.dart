@@ -16,10 +16,9 @@ class PreAuthKey {
   });
 
   factory PreAuthKey.fromJson(Map<String, dynamic> json) {
-    final keyData = json['preAuthKey'] as Map<String, dynamic>?;
-    if (keyData == null) {
-      throw Exception('preAuthKey object not found in API response');
-    }
+    // Directly use the json map as the keyData
+    // No need to check for 'preAuthKey' key here, as the map itself is the PreAuthKey data
+    final keyData = json;
 
     DateTime parsedExpiration;
     try {

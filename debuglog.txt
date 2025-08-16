@@ -1,3 +1,23 @@
-error: The getter 'givenName' isn't defined for the type 'Node'. (undefined_getter at [headscalemanager] lib\screens\dashboard_screen.dart:72)
-error: The getter 'givenName' isn't defined for the type 'Node'. (undefined_getter at [headscalemanager] lib\widgets\acl_generator_dialog.dart:56)
-error: The getter 'givenName' isn't defined for the type 'Node'. (undefined_getter at [headscalemanager] lib\widgets\acl_generator_dialog.dart:72)
+List the preauthkeys for this user
+
+Usage:
+headscale preauthkeys list [flags]
+
+Aliases:
+list, ls, show
+
+Flags:
+-h, -- help
+
+Global Flags:
+-c, -- config string
+-- force
+-0, -- output string
+-u, -- user uint
+
+help for list
+
+config file (default is /etc/headscale/config.yaml)
+Disable prompts and forces the execution
+Output format. Empty for human-readable, 'json', 'json-line' or 'yaml'
+User identifier (ID)

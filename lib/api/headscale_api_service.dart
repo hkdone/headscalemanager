@@ -265,4 +265,34 @@ class HeadscaleApiService {
     }
     // No specific return value needed, just confirmation of success or failure.
   }
+
+  // Get all pre-authenticated keys
+  Future<List<PreAuthKey>> getPreAuthKeys() async {
+    final baseUrl = await _getBaseUrl();
+    final response = await http.get(
+      Uri.parse('${baseUrl}api/v1/preauthkey'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final List<dynamic> keysJson = data['preAuthKeys']; // Assuming 'preAuthKeys' is the key
+      return keysJson.map((json) => PreAuthKey.fromJson(json)).toList();
+    } else {
+      throw Exception(_handleError('load pre-auth keys', response));
+    }
+  }
+
+  // Delete a pre-authenticated key
+  Future<void> deletePreAuthKey(String keyId) async {
+    final baseUrl = await _getBaseUrl();
+    final response = await http.delete(
+      Uri.parse('${baseUrl}api/v1/preauthkey/$keyId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(_handleError('delete pre-auth key', response));
+    }
+  }
 }
