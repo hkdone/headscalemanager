@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart';
-import 'package:headscalemanager/providers/app_provider.dart';
-import 'package:provider/provider.dart';
-import 'package:yaml/yaml.dart';
-import 'package:headscalemanager/widgets/acl_generator_dialog.dart';
 import 'dart:convert';
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+
+import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/user.dart';
+import 'package:headscalemanager/providers/app_provider.dart';
+import 'package:headscalemanager/widgets/acl_generator_dialog.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class AclScreen extends StatefulWidget {
   const AclScreen({super.key});
@@ -19,6 +19,7 @@ class AclScreen extends StatefulWidget {
 class _AclScreenState extends State<AclScreen> {
   final TextEditingController _aclController = TextEditingController();
   bool _isLoading = true;
+  Map<String, dynamic> _currentAclPolicy = {}; // Nouvelle source de vérité
 
   @override
   void initState() {
@@ -26,28 +27,42 @@ class _AclScreenState extends State<AclScreen> {
     _loadAcl();
   }
 
-  void _loadAcl() {
-    // Initialize with an empty ACL structure
-    final Map<String, dynamic> initialAclMap = {
-      'acl': {
-        'policy': [],
-      },
-    };
-    final String initialYaml = jsonEncode(initialAclMap);
+  void _updateAclControllerText() {
+    const JsonEncoder encoder = JsonEncoder.withIndent('  ');
+    _aclController.text = encoder.convert(_currentAclPolicy);
+    setState(() {}); // Rafraîchir l'UI si le texte du contrôleur est lié
+  }
 
+  void _loadAcl() {
+    // Initialise avec une structure JSON par défaut pour Headscale
+    // Headscale v0.22.0+ utilise 'acls' directement.
+    _currentAclPolicy = {
+      'acls': [],
+      'groups': {},
+      'tagOwners': {},
+      'autoApprovers': {'routes': <String, List<String>>{}, 'exitNodes': <String>[]},
+      'tests': [],
+      'hosts': {},
+      // 'dns': {}, // Optionnel, peut être ajouté par l'utilisateur
+    };
+
+    _updateAclControllerText();
     setState(() {
-      _aclController.text = initialYaml;
       _isLoading = false;
     });
   }
 
-  void _saveAcl() {
-    // The content is already in _aclController.text, which is what the user will copy.
-    // We just need to provide feedback.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Contenu ACL mis à jour. Copiez le texte ci-dessus pour l\'utiliser.')),
-    );
-  }
+  // void _saveAcl() {
+  //   // Sera réimplémenté si la sauvegarde SharedPreferences est nécessaire
+  //   // avec _currentAclPolicy comme source.
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     const SnackBar(content: Text('Contenu ACL mis à jour. Copiez le texte ci-dessus pour l\'utiliser.')),
+  //   );
+  // }
+
+  // void _removeGeneratedRules() {
+  //   // Sera réimplémenté pour fonctionner avec _currentAclPolicy['acls']
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +77,11 @@ class _AclScreenState extends State<AclScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Text(
-                        'Pour définir des serveurs DNS globaux, ajoutez une section \'dns\' à votre politique.\n\nExemple :\n' 'dns :\n' '  serveurs :\n' '    - 8.8.8.8\n' '    - 1.1.1.1\n' '  magicDNS : true',
+                        'Pour définir des serveurs DNS globaux, ajoutez une section \'dns\' à votre politique (format JSON).\n\nExemple :\n'
+                        '"dns": {\n'
+                        '  "servers": ["8.8.8.8", "1.1.1.1"],\n'
+                        '  "magicDNS": true\n'
+                        '}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -71,11 +90,11 @@ class _AclScreenState extends State<AclScreen> {
                   Expanded(
                     child: TextField(
                       controller: _aclController,
-                      maxLines: null, // Permet une saisie sur plusieurs lignes
+                      maxLines: null,
                       expands: true,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
-                        labelText: 'Politique ACL (format YAML)',
+                        labelText: 'Politique ACL (format JSON)', // Changé en JSON
                       ),
                     ),
                   ),
@@ -88,13 +107,15 @@ class _AclScreenState extends State<AclScreen> {
           FloatingActionButton(
             onPressed: _shareAclFile,
             heroTag: 'shareAclFile',
-            child: const Icon(Icons.share), // Icon for sharing the file
+            tooltip: 'Partager le fichier ACL',
+            child: const Icon(Icons.share),
           ),
           const SizedBox(height: 16),
           FloatingActionButton(
-            onPressed: _initializeAcl, // This is now "base configuration"
+            onPressed: _initializeAcl,
             heroTag: 'initializeAcl',
-            child: const Icon(Icons.settings_backup_restore), // Icon for base config
+            tooltip: 'Générer la configuration de base',
+            child: const Icon(Icons.settings_backup_restore),
           ),
           const SizedBox(height: 16),
           FloatingActionButton(
@@ -102,76 +123,41 @@ class _AclScreenState extends State<AclScreen> {
               showDialog(
                 context: context,
                 builder: (context) => AclGeneratorDialog(
-                  onRuleGenerated: (rule) {
-                    _addGeneratedRule(rule);
+                  onRuleGenerated: (ruleJson) { // Attend une chaîne JSON
+                    _addGeneratedRule(ruleJson);
                   },
                 ),
               );
             },
             heroTag: 'generateAcl',
-            child: const Icon(Icons.add), // Icon for generating new rules
+            tooltip: 'Ajouter une règle ACL',
+            child: const Icon(Icons.add),
           ),
         ],
       ),
     );
   }
 
-  void _addGeneratedRule(String rule) {
-    Map<dynamic, dynamic> aclMap = {};
-    if (_aclController.text.isNotEmpty) {
-      aclMap = loadYaml(_aclController.text);
-    }
+  void _addGeneratedRule(String ruleJson) { // Accepte une chaîne JSON
+    try {
+      final newRule = jsonDecode(ruleJson);
 
-    // Ensure 'acl' and 'policy' nodes exist
-    if (!aclMap.containsKey('acl')) {
-      aclMap['acl'] = {};
-    }
-    if (!aclMap['acl'].containsKey('policy')) {
-      aclMap['acl']['policy'] = [];
-    }
-
-    final List<dynamic> policyList = aclMap['acl']['policy'];
-    final newRule = loadYaml(rule);
-    policyList.add(newRule);
-
-    final String generatedYaml = jsonEncode(aclMap);
-
-    setState(() {
-      _aclController.text = generatedYaml;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Règle ACL ajoutée. Copiez le texte ci-dessus pour l\'utiliser.')),
-    );
-  }
-
-  void _removeGeneratedRules() {
-    Map<dynamic, dynamic> aclMap = {};
-    if (_aclController.text.isNotEmpty) {
-      aclMap = loadYaml(_aclController.text);
-    }
-
-    if (!aclMap.containsKey('acl') || !aclMap['acl'].containsKey('policy')) {
-      return; // No policy to remove rules from
-    }
-
-    final List<dynamic> policyList = aclMap['acl']['policy'];
-    final List<dynamic> rulesToKeep = [];
-
-    for (var item in policyList) {
-      if (item is Map && item.containsKey('_generated') && item['_generated'] == true) {
-        // This is a generated rule, skip it (don't add to rulesToKeep)
-      } else {
-        rulesToKeep.add(item);
+      if (_currentAclPolicy['acls'] == null || !(_currentAclPolicy['acls'] is List)) {
+        _currentAclPolicy['acls'] = [];
       }
+
+      (_currentAclPolicy['acls'] as List).add(newRule);
+      _updateAclControllerText();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Règle ACL ajoutée.')),
+      );
+    } catch (e) {
+      print('Erreur lors de l\'ajout de la règle ACL : $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur d\'ajout de la règle : $e. Assurez-vous que la règle est un JSON valide.')),
+      );
     }
-
-    aclMap['acl']['policy'] = rulesToKeep;
-
-    setState(() {
-      _aclController.text = jsonEncode(aclMap);
-    });
-    _saveAcl(); // Save the ACL after removing rules
   }
 
   Future<void> _initializeAcl() async {
@@ -180,120 +166,164 @@ class _AclScreenState extends State<AclScreen> {
       final users = await apiService.getUsers();
       final nodes = await apiService.getNodes();
 
-      Map<String, dynamic> aclMap = {
-        'acl': {
-          'policy': [],
-        },
-        'autoApprovers': {
-          'routes': <String, List<String>>{},
-          'exitNodes': <String>[], // Initialize as a List<String>
-        },
-        'exitNode': {}, // Initialize exitNode map
-        'groups': {}, // Initialize groups map
-      };
+      // --- Étape 1: Extraire toutes les informations des noeuds ---
+      final groups = <String, List<String>>{};
+      users.forEach((user) => groups['group:${user.name}'] = [user.name]);
 
-      // Add a base rule for autogroup:self (as requested by user)
-      aclMap['acl']['policy'].add({
-        'action': 'accept',
-        'src': ['autogroup:self'],
-        'dst': ['autogroup:self'],
-      });
+      final tagOwners = <String, List<String>>{};
+      final autoApprovers = {'routes': <String, List<String>>{}, 'exitNodes': <String>[]};
+      
+      final tagsByUser = <String, Set<String>>{};
+      final routesByUser = <String, Set<String>>{};
+      final userOwnsExitNode = <String, bool>{};
 
-      // Iterate through users to create intra-user communication rules
-      for (User user in users) {
-        // Define the group for the user
-        aclMap['groups']['group:${user.name}'] = ['user:${user.name}'];
+      for (var node in nodes) {
+        final groupName = 'group:${node.user}';
+        final userName = node.user;
 
-        // Rule for all nodes of a user to communicate with each other
-        aclMap['acl']['policy'].add({
-          'action': 'accept',
-          'src': ['group:${user.name}'],
-          'dst': ['group:${user.name}'],
-        });
+        if (node.tags.isNotEmpty) {
+          if (!tagsByUser.containsKey(userName)) tagsByUser[userName] = <String>{};
+          tagsByUser[userName]!.addAll(node.tags);
 
-        // Process nodes for routes and exit nodes for this user
-        final userNodes = nodes.where((node) => node.user == user.name).toList();
-        for (var node in userNodes) {
-          // Subnet Routes
-          if (node.advertisedRoutes.isNotEmpty) {
-            // Allow other nodes of the same user to access these routes
-            aclMap['acl']['policy'].add({
-              'action': 'accept',
-              'src': ['group:${user.name}'],
-              'dst': List<String>.from(node.advertisedRoutes),
-            });
-            // Auto-approve routes for the user's nodes
-            for (var route in node.advertisedRoutes) {
-              if (!aclMap['autoApprovers']['routes'].containsKey(route)) { // Key is the route
-                aclMap['autoApprovers']['routes'][route] = <String>[]; // Value is a list of aliases
-              }
-              if (!aclMap['autoApprovers']['routes'][route]!.contains('group:${user.name}')) { // Add alias to the list
-                aclMap['autoApprovers']['routes'][route]!.add('group:${user.name}');
+          for (var tag in node.tags) {
+            if (!tagOwners.containsKey(tag)) tagOwners[tag] = [];
+            if (!tagOwners[tag]!.contains(groupName)) tagOwners[tag]!.add(groupName);
+          }
+        }
+
+        final isExitNode = node.advertisedRoutes.contains('0.0.0.0/0') || node.advertisedRoutes.contains('::/0');
+        if (isExitNode) userOwnsExitNode[userName] = true;
+
+        final subnetRoutes = node.advertisedRoutes.where((r) => r != '0.0.0.0/0' && r != '::/0').toList();
+        if (subnetRoutes.isNotEmpty) {
+          if (!routesByUser.containsKey(userName)) routesByUser[userName] = <String>{};
+          routesByUser[userName]!.addAll(subnetRoutes);
+
+          if (node.tags.isNotEmpty) {
+            final routesMap = autoApprovers['routes'] as Map<String, List<String>>;
+            for (var tag in node.tags) {
+              for (var route in subnetRoutes) {
+                if (!routesMap.containsKey(route)) routesMap[route] = [];
+                if (!routesMap[route]!.contains(tag)) routesMap[route]!.add(tag);
               }
             }
           }
-
-          // Exit Nodes
-          if (node.advertisedRoutes.contains('0.0.0.0/0') || node.advertisedRoutes.contains('::/0')) {
-            // Define the exit node
-            if (!aclMap['exitNode'].containsKey(node.givenName)) {
-              aclMap['exitNode'][node.givenName] = {
-                'users': [],
-              };
-            }
-            // Allow other nodes of the same user to use this exit node
-            if (!aclMap['exitNode'][node.givenName]['users'].contains('group:${user.name}')) {
-              aclMap['exitNode'][node.givenName]['users'].add('group:${user.name}');
-            }
-
-            // Auto-approve exit nodes for the user's nodes
-            // Corrected logic: add alias to the list, not a map
-            if (!aclMap['autoApprovers']['exitNodes'].contains('group:${user.name}')) {
-              aclMap['autoApprovers']['exitNodes'].add('group:${user.name}');
-            }
+        }
+        
+        if (isExitNode && node.tags.isNotEmpty) {
+          final exitNodesList = autoApprovers['exitNodes'] as List<String>;
+          for (var tag in node.tags) {
+            if (!exitNodesList.contains(tag)) exitNodesList.add(tag);
           }
         }
       }
 
-      const JsonEncoder encoder = JsonEncoder.withIndent('  '); // 2 spaces for indentation
-      final String generatedYaml = encoder.convert(aclMap);
+      // --- Étape 2: Construire les règles ACL "Tout-Tag" ---
+      final acls = <Map<String, dynamic>>[];
 
-      print('Generated ACL YAML:\n$generatedYaml');
+      // Règle pour chaque utilisateur, basée sur l'ensemble de ses tags
+      tagsByUser.forEach((userName, userTags) {
+        if (userTags.isEmpty) return; // Ne rien faire pour les utilisateurs sans tags
 
+        final userTagList = userTags.toList();
+        final destinations = <String>{};
+        // Les tags d'un utilisateur peuvent communiquer entre eux
+        destinations.addAll(userTagList.map((t) => '$t:*'));
 
-      setState(() {
-        _aclController.text = generatedYaml;
+        // Ajouter l'accès aux routes possédées par l'utilisateur
+        if (routesByUser.containsKey(userName)) {
+          destinations.addAll(routesByUser[userName]!.map((r) => '$r:*'));
+        }
+        // Ajouter l'accès à internet si l'utilisateur possède un exit node
+        if (userOwnsExitNode[userName] == true) {
+          destinations.add('autogroup:internet:*');
+        }
+
+        acls.add({
+          'action': 'accept',
+          'src': userTagList,
+          'dst': destinations.toList(),
+        });
       });
 
+      // Règle pour les tags "routeurs" eux-mêmes
+      final allRouterTags = <String>{};
+      (autoApprovers['routes'] as Map<String, List<String>>).values.forEach(allRouterTags.addAll);
+      allRouterTags.addAll(autoApprovers['exitNodes'] as List<String>);
+
+      allRouterTags.forEach((tag) {
+        final destinations = <String>{};
+        // Le routeur peut parler aux autres tags de son propriétaire
+        tagOwners[tag]?.forEach((ownerGroup) {
+          final ownerName = ownerGroup.replaceFirst('group:', '');
+          if (tagsByUser.containsKey(ownerName)) {
+            destinations.addAll(tagsByUser[ownerName]!.map((t) => '$t:*'));
+          }
+        });
+
+        // Le routeur peut parler aux routes qu'il annonce
+        (autoApprovers['routes'] as Map<String, List<String>>).forEach((route, tags) {
+          if (tags.contains(tag)) destinations.add('$route:*');
+        });
+
+        // Le routeur peut parler à internet s'il est un exit node
+        if ((autoApprovers['exitNodes'] as List<String>).contains(tag)) {
+          destinations.add('autogroup:internet:*');
+        }
+
+        if (destinations.isNotEmpty) {
+          acls.add({
+            'action': 'accept',
+            'src': [tag],
+            'dst': destinations.toList(),
+          });
+        }
+      });
+
+      // --- Étape 3: Assemblage final ---
+      _currentAclPolicy = {
+        'groups': groups,
+        'tagOwners': tagOwners,
+        'autoApprovers': autoApprovers,
+        'acls': acls,
+        'hosts': <String, dynamic>{},
+        'tests': <Map<String, dynamic>>[],
+      };
+
+      _updateAclControllerText();
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Politique ACL générée dynamiquement. Copiez le texte ci-dessus.')),
+        const SnackBar(content: Text('Politique ACL "Tout-Tag" générée.')),
       );
     } catch (e) {
-      print('Erreur lors de la génération dynamique de la politique ACL : $e');
+      print('Erreur lors de la génération de la politique ACL : $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Échec de la génération dynamique de la politique ACL : $e')),
+        SnackBar(content: Text('Échec de la génération de la politique ACL : $e')),
       );
     }
   }
 
   Future<void> _shareAclFile() async {
     try {
-      if (_aclController.text.isEmpty) {
+      const JsonEncoder encoder = JsonEncoder.withIndent('  ');
+      final String aclJsonString = encoder.convert(_currentAclPolicy);
+
+      if (aclJsonString.isEmpty || aclJsonString == encoder.convert({})) { // Vérifie si la politique est vide ou structure par défaut non remplie
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Le contenu ACL est vide. Générez d\'abord une politique.')),
+          const SnackBar(content: Text('Le contenu ACL est vide ou non initialisé. Générez d\'abord une politique.')),
         );
         return;
       }
 
       final directory = await getTemporaryDirectory();
-      final file = File('${directory.path}/acl.yaml');
-      await file.writeAsString(_aclController.text);
+      final file = File('${directory.path}/acl.json'); // Changé en acl.json
+      await file.writeAsString(aclJsonString);
 
       await Share.shareXFiles([XFile(file.path)], text: 'Voici votre politique ACL Headscale.');
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Fichier ACL partagé avec succès.')),
-      );
+      //ScaffoldMessenger.of(context).showSnackBar(
+      //  const SnackBar(content: Text('Fichier ACL partagé avec succès.')),
+      //);
     } catch (e) {
       print('Erreur lors du partage du fichier ACL : $e');
       ScaffoldMessenger.of(context).showSnackBar(

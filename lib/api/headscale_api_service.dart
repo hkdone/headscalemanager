@@ -216,4 +216,20 @@ class HeadscaleApiService {
       throw Exception(_handleError('move node', response));
     }
   }
+
+  // Set tags for a machine
+  Future<void> setMachineTags(String machineId, List<String> tags) async {
+    final baseUrl = await _getBaseUrl();
+    // Headscale API endpoint: POST /api/v1/machine/{machineId}/tags
+    // Body should be a JSON array of strings: e.g., ["tag:prod", "tag:db"]
+    final response = await http.post(
+      Uri.parse('${baseUrl}api/v1/machine/$machineId/tags'),
+      headers: await _getHeaders(),
+      body: jsonEncode(tags),
+    );
+    if (response.statusCode != 200) {
+      throw Exception(_handleError('set machine tags', response));
+    }
+    // No specific return value needed, just confirmation of success or failure.
+  }
 }

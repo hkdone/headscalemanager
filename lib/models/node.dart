@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 
 class Node {
@@ -11,6 +10,7 @@ class Node {
   final DateTime lastSeen;
   final List<String> advertisedRoutes; // New field
   final String fqdn;
+  final List<String> tags; // Added tags field
 
   Node({
     required this.id,
@@ -22,11 +22,12 @@ class Node {
     required this.lastSeen,
     required this.advertisedRoutes,
     required this.fqdn,
+    required this.tags, // Added tags to constructor
   });
 
   factory Node.fromJson(Map<String, dynamic> json) {
     final userMap = json['user'] as Map<String, dynamic>?;
-    
+
     return Node(
       id: json['id'] ?? '',
       machineKey: json['machineKey'] ?? '',
@@ -39,6 +40,9 @@ class Node {
           : DateTime.now(),
       advertisedRoutes: List<String>.from(json['subnetRoutes'] ?? []),
       fqdn: json['fqdn'] ?? '',
+      tags: List<String>.from(
+          json['forcedTags'] ?? json['validTags'] ?? json['tags'] ??
+              []), // Added tags from JSON
     );
   }
 
