@@ -69,8 +69,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     title: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(node.givenName),
-                        Text(node.name, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text(node.name),
+                        Text(node.hostname, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                       ],
                     ),
                     subtitle: Column( // Utiliser une colonne pour empiler plusieurs lignes

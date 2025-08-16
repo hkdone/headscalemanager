@@ -53,7 +53,7 @@ class _AclGeneratorDialogState extends State<AclGeneratorDialog> {
                   items: nodes.map((node) {
                     return DropdownMenuItem<Node>(
                       value: node,
-                      child: Text('${node.givenName} (${node.fqdn})'),
+                      child: Text('${node.name} (${node.fqdn})'),
                     );
                   }).toList(),
                   onChanged: (node) {
@@ -69,7 +69,7 @@ class _AclGeneratorDialogState extends State<AclGeneratorDialog> {
                   items: nodes.map((node) {
                     return DropdownMenuItem<Node>(
                       value: node,
-                      child: Text('${node.givenName} (${node.fqdn})'),
+                      child: Text('${node.name} (${node.fqdn})'),
                     );
                   }).toList(),
                   onChanged: (node) {

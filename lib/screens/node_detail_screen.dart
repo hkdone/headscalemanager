@@ -172,7 +172,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.node.givenName),
+        title: Text(widget.node.name),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -185,8 +185,8 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            _buildDetailRow('Nom : ', widget.node.givenName),
-            _buildDetailRow('Nom d\'hôte : ', widget.node.name),
+            _buildDetailRow('Nom : ', widget.node.name),
+            _buildDetailRow('Hostname : ', widget.node.hostname),
             _buildDetailRow('Nom de domaine complet (FQDN) : ', widget.node.fqdn),
             _buildDetailRow('ID : ', widget.node.id),
             _buildDetailRow('Clé machine : ', widget.node.machineKey),

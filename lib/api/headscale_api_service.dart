@@ -30,7 +30,7 @@ class HeadscaleApiService {
     return 'Failed to $functionName. Status: ${response.statusCode}, Body: ${response.body}';
   }
 
-  // Get all nodes
+  // Get all nodes (now fetches full details for each)
   Future<List<Node>> getNodes() async {
     final baseUrl = await _getBaseUrl();
     final response = await http.get(
@@ -41,9 +41,42 @@ class HeadscaleApiService {
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       final List<dynamic> nodesJson = data['nodes'];
-      return nodesJson.map((json) => Node.fromJson(json)).toList();
+
+      // Fetch full details for each node
+      final List<Node> detailedNodes = [];
+      for (var nodeJson in nodesJson) {
+        // The basic nodeJson from the list might not have all fields,
+        // so we only extract the ID and then fetch full details.
+        final nodeId = nodeJson['id'];
+        if (nodeId != null) {
+          try {
+            final detailedNode = await getNodeDetails(nodeId);
+            detailedNodes.add(detailedNode);
+          } catch (e) {
+            print('Error fetching details for node $nodeId: $e');
+            // Optionally, add a placeholder node or skip
+          }
+        }
+      }
+      return detailedNodes;
     } else {
       throw Exception(_handleError('load nodes', response));
+    }
+  }
+
+  // Get details for a single node
+  Future<Node> getNodeDetails(String nodeId) async {
+    final baseUrl = await _getBaseUrl();
+    final response = await http.get(
+      Uri.parse('${baseUrl}api/v1/node/$nodeId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return Node.fromJson(data['node']); // Assuming 'node' is the key for the single node object
+    } else {
+      throw Exception(_handleError('load node details', response));
     }
   }
 

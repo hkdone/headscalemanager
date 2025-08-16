@@ -46,10 +46,18 @@ class _UsersScreenState extends State<UsersScreen> {
             TextButton(
               child: const Text('Créer'),
               onPressed: () async {
-                if (nameController.text.isNotEmpty) {
+                final String name = nameController.text.trim();
+                const String suffix = '@nasfilecloud.synology.me';
+
+                if (name.isNotEmpty) {
+                  String finalName = name;
+                  if (!name.endsWith(suffix)) {
+                    finalName = '$name$suffix';
+                  }
+
                   final provider = context.read<AppProvider>();
                   try {
-                    await provider.apiService.createUser(nameController.text);
+                    await provider.apiService.createUser(finalName);
                     Navigator.of(dialogContext).pop();
                     _refreshUsers();
                   } catch (e) {
