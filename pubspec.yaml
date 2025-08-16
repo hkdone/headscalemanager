@@ -27,6 +27,7 @@ dependencies:
   path_provider: ^2.1.1
 
 
+  yaml: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

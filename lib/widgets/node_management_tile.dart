@@ -80,7 +80,7 @@ class NodeManagementTile extends StatelessWidget {
                                   'Sur votre appareil Windows, activez le transfert IP et le NAT (partage de connexion Internet), puis exécutez la commande Tailscale :'),
                               const SizedBox(height: 8),
                               const SelectableText(
-                                  '# Activer le transfert IP (PowerShell en tant qu\'administrateur)\nSet-NetIPInterface -InterfaceAlias \"Ethernet\" -Forwarding Enabled\n\n# Activer le NAT (partage de connexion Internet) - nécessite une configuration GUI ou PowerShell plus complexe\n# Pour un NAT simple, vous pouvez utiliser `netsh routing ip nat install` et configurer les interfaces.',
+                                  '# Activer le transfert IP (PowerShell en tant qu\'administrateur)\nSet-NetIPInterface -InterfaceAlias "Ethernet" -Forwarding Enabled\n\n# Activer le NAT (partage de connexion Internet) - nécessite une configuration GUI ou PowerShell plus complexe\n# Pour un NAT simple, vous pouvez utiliser `netsh routing ip nat install` et configurer les interfaces.',
                                   style: TextStyle(fontFamily: 'monospace', fontSize: 14)),
                               const SizedBox(height: 8),
                               SelectableText(
@@ -290,8 +290,9 @@ class NodeManagementTile extends StatelessWidget {
                     decoration: const InputDecoration(
                         labelText: 'Sous-réseau (format CIDR)'),
                     validator: (value) {
-                      if (value == null || value.isEmpty)
+                      if (value == null || value.isEmpty) {
                         return 'Veuillez entrer un sous-réseau';
+                      }
                       final regex = RegExp(r'^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}');
                       if (!regex.hasMatch(value)) return 'Format CIDR invalide';
                       return null;
@@ -392,7 +393,7 @@ class NodeManagementTile extends StatelessWidget {
                                   'Sur votre appareil Windows, assurez-vous que le transfert IP est activé si vous souhaitez acheminer le trafic d\'autres appareils via ce nœud de sortie. Exécutez ensuite la commande Tailscale :'),
                               const SizedBox(height: 8),
                               const SelectableText(
-                                  '# Activer le transfert IP (PowerShell en tant qu\'administrateur)\nSet-NetIPInterface -InterfaceAlias \"Ethernet\" -Forwarding Enabled', // Note: The original string had \n, which is correct for a Dart string literal representing a newline.
+                                  '# Activer le transfert IP (PowerShell en tant qu\'administrateur)\nSet-NetIPInterface -InterfaceAlias "Ethernet" -Forwarding Enabled', // Note: The original string had \n, which is correct for a Dart string literal representing a newline.
                                   style: TextStyle(fontFamily: 'monospace', fontSize: 14)),
                               const SizedBox(height: 8),
                               SelectableText(
@@ -552,54 +553,54 @@ class NodeManagementTile extends StatelessWidget {
           },
           itemBuilder: (BuildContext context) =>
           <PopupMenuEntry<String>>[
-            PopupMenuItem<String>(
+            const PopupMenuItem<String>(
               value: 'rename',
               child: ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('Renommer l\'appareil'),
+                leading: Icon(Icons.edit),
+                title: Text('Renommer l\'appareil'),
               ),
             ),
-            PopupMenuItem<String>(
+            const PopupMenuItem<String>(
               value: 'move',
               child: ListTile(
-                leading: const Icon(Icons.move_up),
-                title: const Text('Déplacer l\'appareil'),
+                leading: Icon(Icons.move_up),
+                title: Text('Déplacer l\'appareil'),
               ),
             ),
-            PopupMenuItem<String>(
+            const PopupMenuItem<String>(
               value: 'enable_exit_node',
               child: ListTile(
-                leading: const Icon(Icons.exit_to_app),
-                title: const Text('Activer le nœud de sortie'),
+                leading: Icon(Icons.exit_to_app),
+                title: Text('Activer le nœud de sortie'),
               ),
             ),
-            PopupMenuItem<String>(
+            const PopupMenuItem<String>(
               value: 'disable_exit_node',
               child: ListTile(
-                leading: const Icon(Icons.remove_circle_outline),
-                title: const Text('Désactiver le nœud de sortie'),
+                leading: Icon(Icons.remove_circle_outline),
+                title: Text('Désactiver le nœud de sortie'),
               ),
             ),
-            PopupMenuItem<String>(
+            const PopupMenuItem<String>(
               value: 'share_subnet',
               child: ListTile(
-                leading: const Icon(Icons.router_outlined),
-                title: const Text('Partager le sous-réseau local'),
+                leading: Icon(Icons.router_outlined),
+                title: Text('Partager le sous-réseau local'),
               ),
             ),
-            PopupMenuItem<String>( // Nouvel élément
+            const PopupMenuItem<String>( // Nouvel élément
               value: 'disable_subnet',
               child: ListTile(
-                leading: const Icon(Icons.router_outlined), // Réutilisation de l\'icône pour l\'instant
-                title: const Text('Désactiver les routes de sous-réseau'),
+                leading: Icon(Icons.router_outlined), // Réutilisation de l\'icône pour l\'instant
+                title: Text('Désactiver les routes de sous-réseau'),
               ),
             ),
             const PopupMenuDivider(),
-            PopupMenuItem<String>(
+            const PopupMenuItem<String>(
               value: 'delete_device',
               child: ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Supprimer l\'appareil'),
+                leading: Icon(Icons.delete, color: Colors.red),
+                title: Text('Supprimer l\'appareil'),
               ),
             ),
           ],

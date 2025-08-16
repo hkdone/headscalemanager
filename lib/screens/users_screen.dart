@@ -321,8 +321,8 @@ class _UsersScreenState extends State<UsersScreen> {
                             child: const Text('Copier la commande'),
                             onPressed: () async {
                               await Clipboard.setData(ClipboardData(text: fullCommand));
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: const Text('Commande copiée dans le presse-papiers !'),
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                content: Text('Commande copiée dans le presse-papiers !'),
                               ));
                             },
                           ),

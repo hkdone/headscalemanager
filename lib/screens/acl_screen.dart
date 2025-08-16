@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:yaml/yaml.dart';
-import 'package:yaml_edit/yaml_edit.dart';
 import 'package:headscalemanager/widgets/acl_generator_dialog.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -203,33 +202,33 @@ class _AclScreenState extends State<AclScreen> {
       // Iterate through users to create intra-user communication rules
       for (User user in users) {
         // Define the group for the user
-        aclMap['groups']['group:' + user.name] = ['user:' + user.name];
+        aclMap['groups']['group:${user.name}'] = ['user:${user.name}'];
 
         // Rule for all nodes of a user to communicate with each other
         aclMap['acl']['policy'].add({
           'action': 'accept',
-          'src': ['group:' + user.name],
-          'dst': ['group:' + user.name],
+          'src': ['group:${user.name}'],
+          'dst': ['group:${user.name}'],
         });
 
         // Process nodes for routes and exit nodes for this user
         final userNodes = nodes.where((node) => node.user == user.name).toList();
         for (var node in userNodes) {
           // Subnet Routes
-          if (node.advertisedRoutes != null && node.advertisedRoutes!.isNotEmpty) {
+          if (node.advertisedRoutes.isNotEmpty) {
             // Allow other nodes of the same user to access these routes
             aclMap['acl']['policy'].add({
               'action': 'accept',
-              'src': ['group:' + user.name],
-              'dst': List<String>.from(node.advertisedRoutes!),
+              'src': ['group:${user.name}'],
+              'dst': List<String>.from(node.advertisedRoutes),
             });
             // Auto-approve routes for the user's nodes
-            for (var route in node.advertisedRoutes!) {
+            for (var route in node.advertisedRoutes) {
               if (!aclMap['autoApprovers']['routes'].containsKey(route)) { // Key is the route
                 aclMap['autoApprovers']['routes'][route] = <String>[]; // Value is a list of aliases
               }
-              if (!aclMap['autoApprovers']['routes'][route]!.contains('group:' + user.name)) { // Add alias to the list
-                aclMap['autoApprovers']['routes'][route]!.add('group:' + user.name);
+              if (!aclMap['autoApprovers']['routes'][route]!.contains('group:${user.name}')) { // Add alias to the list
+                aclMap['autoApprovers']['routes'][route]!.add('group:${user.name}');
               }
             }
           }
@@ -243,20 +242,20 @@ class _AclScreenState extends State<AclScreen> {
               };
             }
             // Allow other nodes of the same user to use this exit node
-            if (!aclMap['exitNode'][node.givenName]['users'].contains('group:' + user.name)) {
-              aclMap['exitNode'][node.givenName]['users'].add('group:' + user.name);
+            if (!aclMap['exitNode'][node.givenName]['users'].contains('group:${user.name}')) {
+              aclMap['exitNode'][node.givenName]['users'].add('group:${user.name}');
             }
 
             // Auto-approve exit nodes for the user's nodes
             // Corrected logic: add alias to the list, not a map
-            if (!aclMap['autoApprovers']['exitNodes'].contains('group:' + user.name)) {
-              aclMap['autoApprovers']['exitNodes'].add('group:' + user.name);
+            if (!aclMap['autoApprovers']['exitNodes'].contains('group:${user.name}')) {
+              aclMap['autoApprovers']['exitNodes'].add('group:${user.name}');
             }
           }
         }
       }
 
-      final JsonEncoder encoder = JsonEncoder.withIndent('  '); // 2 spaces for indentation
+      const JsonEncoder encoder = JsonEncoder.withIndent('  '); // 2 spaces for indentation
       final String generatedYaml = encoder.convert(aclMap);
 
       print('Generated ACL YAML:\n$generatedYaml');

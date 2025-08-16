@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
-import 'package:flutter/services.dart'; // Importation pour le presse-papiers
-import 'package:headscalemanager/models/pre_auth_key.dart';
+// Importation pour le presse-papiers
 import 'package:provider/provider.dart';
-import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/widgets/node_management_tile.dart';
 import 'package:headscalemanager/widgets/registration_dialogs.dart';
 
