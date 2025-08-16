@@ -1,20 +1,11 @@
-The specific RenderFlex in question is: RenderFlex#feda4 OVERFLOWING
-...  parentData: offset=Offset(0.0, 0.0) (can use size)
-...  constraints: BoxConstraints(w=232.0, h=24.0)
-...  size: Size(232.0, 24.0)
-...  direction: horizontal
-...  mainAxisAlignment: spaceBetween
-...  mainAxisSize: min
-...  crossAxisAlignment: center
-...  textDirection: ltr
-...  verticalDirection: down
-...  spacing: 0.0
-◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤
-====================================================================================================
+WindowOnBackDispatcher(11137): Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
 
 ======== Exception caught by rendering library =====================================================
 The following assertion was thrown during layout:
-A RenderFlex overflowed by 58 pixels on the right.
+A RenderFlex overflowed by 174 pixels on the right.
 
-The relevant error-causing widget was: 
-  DropdownButtonFormField<User> DropdownButtonFormField:file:///C:/Users/dkdone/StudioProjects/headscaleManager/lib/screens/users_screen.dart:169:32
+The relevant error-causing widget was:
+  DropdownButtonFormField<Node> DropdownButtonFormField:file:///C:/Users/dkdone/StudioProjects/headscaleManager/lib/widgets/acl_generator_dialog.dart:50:17
+I/VRI[MainActivity]@8059cd6(11137): call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@8059cd6
+I/VRI[MainActivity]@8059cd6(11137): call setFrameRateCategory for touch hint category=high hint, reason=touch, vri=VRI[MainActivity]@8059cd6
+I/VRI[MainActivity]@8059cd6(11137): call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@8059cd6
