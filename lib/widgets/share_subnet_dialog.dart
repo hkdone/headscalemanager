@@ -72,23 +72,47 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
           child: const Text('Partager'),
           onPressed: () async {
             if (_formKey.currentState!.validate()) {
-              Navigator.of(context).pop(); // Fermer la boîte de dialogue de saisie du sous-réseau
-              final serverUrl = await appProvider.storageService.getServerUrl();
-              if (serverUrl == null) {
-                showSafeSnackBar(
-                    context, 'Erreur : URL du serveur non configurée.');
-                return;
-              }
-              final String loginServer = serverUrl.endsWith('/')
-                  ? serverUrl.substring(0, serverUrl.length - 1)
-                  : serverUrl;
+              final String newSubnet = _subnetController.text;
+              final List<String> combinedRoutes = List.from(widget.node.advertisedRoutes);
 
-              // Affiche le dialogue de commande Tailscale pour le sous-réseau.
-              showDialog(
-                context: context,
-                builder: (ctx) => SubnetCommandDialog(
-                  title: 'Étape 1 : Configurer le routage de sous-réseau',
-                  tailscaleCommand: 'tailscale up --advertise-routes=${_subnetController.text} --login-server=$loginServer',
-                  linuxInstructions: 'Sur votre appareil Linux, activez le transfert IP et le NAT, puis exécutez la commande Tailscale :',
-                  windowsInstructions: 'Sur votre appareil Windows, activez le transfert IP et le NAT (partage de connexion Internet), puis exécutez la commande Tailscale :',
-                  mobileInstructions: 'Sur Android/iOS, le routage de sous-réseau est configuré directement dans les paramètres de l\'application Tailscale. Assurez-vous que l\'appareil est connecté à Tailscale, puis activez \
+              if (!combinedRoutes.contains(newSubnet)) {
+                combinedRoutes.add(newSubnet);
+              }
+
+              try {
+                await appProvider.apiService.setNodeRoutes(widget.node.id, combinedRoutes);
+                showSafeSnackBar(context, 'Route de sous-réseau activée.');
+                widget.onSubnetShared(); // Appelle le callback pour rafraîchir
+
+                // Fermer la boîte de dialogue de saisie du sous-réseau
+                Navigator.of(context).pop();
+
+                // Afficher le dialogue de commande Tailscale pour le sous-réseau.
+                final serverUrl = await appProvider.storageService.getServerUrl();
+                final String loginServer = serverUrl?.endsWith('/') == true
+                    ? serverUrl!.substring(0, serverUrl.length - 1)
+                    : serverUrl ?? '';
+
+                showDialog(
+                  context: context,
+                  builder: (ctx) => SubnetCommandDialog(
+                    title: 'Étape 1 : Configurer le routage de sous-réseau',
+                    tailscaleCommand: 'tailscale up --advertise-routes=$newSubnet --login-server=$loginServer',
+                    linuxInstructions: 'Sur votre appareil Linux, activez le transfert IP et le NAT, puis exécutez la commande Tailscale :',
+                    windowsInstructions: 'Sur votre appareil Windows, activez le transfert IP et le NAT (partage de connexion Internet), puis exécutez la commande Tailscale :',
+                    mobileInstructions: 'Sur Android/iOS, le routage de sous-réseau est configuré directement dans les paramètres de l\'application Tailscale. Assurez-vous que l\'appareil est connecté à Tailscale, puis activez "Annoncer les routes" pour les sous-réseaux souhaités dans les paramètres de l\'application.',
+                  ),
+                );
+              } catch (e) {
+                debugPrint('Erreur lors de l\'activation de la route de sous-réseau : $e');
+                if (!mounted) return;
+                Navigator.of(context).pop(); // Fermer la boîte de dialogue même en cas d'erreur
+                showSafeSnackBar(context, 'Échec de l\'activation de la route de sous-réseau : $e');
+              }
+            }
+          },
+        ),
+      ],
+    );
+  }
+}

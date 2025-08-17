@@ -23,12 +23,6 @@ class SubnetCommandDialog extends StatelessWidget {
   /// Instructions spécifiques pour Mobile.
   final String mobileInstructions;
 
-  /// Fonction de rappel optionnelle pour l'action de confirmation.
-  final VoidCallback? onConfirm;
-
-  /// Texte du bouton de confirmation optionnel.
-  final String? confirmButtonText;
-
   const SubnetCommandDialog({
     super.key,
     required this.title,
@@ -36,8 +30,6 @@ class SubnetCommandDialog extends StatelessWidget {
     required this.linuxInstructions,
     required this.windowsInstructions,
     required this.mobileInstructions,
-    this.onConfirm,
-    this.confirmButtonText,
   });
 
   @override
@@ -122,14 +114,6 @@ class SubnetCommandDialog extends StatelessWidget {
               showSafeSnackBar(context, 'Commande Tailscale copiée dans le presse-papiers !');
             },
           ),
-          if (onConfirm != null)
-            ElevatedButton(
-              child: Text(confirmButtonText ?? 'Procéder à la confirmation'),
-              onPressed: () {
-                Navigator.of(context).pop(); // Fermer la boîte de dialogue actuelle
-                onConfirm!(); // Exécuter l'action de confirmation
-              },
-            ),
         ],
       ),
     );
