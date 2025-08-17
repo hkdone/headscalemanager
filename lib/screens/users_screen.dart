@@ -6,10 +6,16 @@ import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/pre_auth_key.dart';
 import 'package:headscalemanager/services/storage_service.dart';
-import 'package:headscalemanager/utils/string_utils.dart'; // New import
-import 'package:flutter/foundation.dart'; // Import for debugPrint
+import 'package:headscalemanager/utils/string_utils.dart';
+import 'package:flutter/foundation.dart'; // For debugPrint
+import 'package:headscalemanager/widgets/create_user_dialog.dart'; // New import
+import 'package:headscalemanager/widgets/delete_user_dialog.dart'; // New import
+import 'package:headscalemanager/widgets/create_pre_auth_key_dialog.dart'; // Extracted earlier
 
-
+/// Écran de gestion des utilisateurs Headscale.
+///
+/// Permet de visualiser, créer et supprimer des utilisateurs, ainsi que de
+/// générer des clés de pré-authentification.
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
 
@@ -18,6 +24,7 @@ class UsersScreen extends StatefulWidget {
 }
 
 class _UsersScreenState extends State<UsersScreen> {
+  /// Future qui contiendra la liste des utilisateurs récupérés depuis l'API.
   late Future<List<User>> _usersFuture;
 
   @override
@@ -26,282 +33,11 @@ class _UsersScreenState extends State<UsersScreen> {
     _refreshUsers();
   }
 
+  /// Rafraîchit la liste des utilisateurs en effectuant un nouvel appel API.
   void _refreshUsers() {
     setState(() {
       _usersFuture = context.read<AppProvider>().apiService.getUsers();
     });
-  }
-
-  void _showCreateUserDialog() {
-    final nameController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Créer un utilisateur'),
-          content: TextField(
-            controller: nameController,
-            decoration: const InputDecoration(hintText: "Nom de l'utilisateur"),
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Annuler'),
-              onPressed: () => Navigator.of(dialogContext).pop(),
-            ),
-            TextButton(
-              child: const Text('Créer'),
-              onPressed: () async {
-                final String name = nameController.text.trim();
-                final appProvider = context.read<AppProvider>();
-                final serverUrl = await appProvider.storageService.getServerUrl();
-                final String? baseDomain = serverUrl?.extractBaseDomain();
-
-                String suffix = '';
-                if (baseDomain != null && baseDomain.isNotEmpty) {
-                  suffix = '@$baseDomain';
-                } else {
-                  // Fallback if base domain cannot be extracted
-                  suffix = '@headscale.local'; // A generic fallback
-                }
-
-                if (name.isNotEmpty) {
-                  String finalName = name;
-                  if (!name.contains('@')) { // Only append suffix if no @ is present
-                    finalName = '$name$suffix';
-                  }
-
-                  try {
-                    await appProvider.apiService.createUser(finalName);
-                    Navigator.of(dialogContext).pop();
-                    _refreshUsers();
-                  } catch (e) {
-                    debugPrint('Erreur lors de la création de l\'utilisateur : $e');
-                    if (!mounted) return;
-                    Navigator.of(dialogContext).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text('Échec de la création de l\'utilisateur : $e'),
-                      behavior: SnackBarBehavior.floating,
-                      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ));
-                  }
-                }
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showDeleteUserDialog(User user) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Supprimer l\'utilisateur ?'),
-          content: Text(
-              'Êtes-vous sûr de vouloir supprimer ${user.name} ?\n\nNote : La suppression échouera si l\'utilisateur possède encore des appareils.'),
-          actions: [
-            TextButton(
-              child: const Text('Annuler'),
-              onPressed: () => Navigator.of(dialogContext).pop(),
-            ),
-            TextButton(
-              child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-              onPressed: () async {
-                final provider = context.read<AppProvider>();
-                try {
-                  await provider.apiService.deleteUser(user.id);
-                  Navigator.of(dialogContext).pop();
-                  _refreshUsers();
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('Utilisateur ${user.name} supprimé.'),
-                    behavior: SnackBarBehavior.floating,
-                    margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ));
-                } catch (e) {
-                  debugPrint('Erreur lors de la suppression de l\'utilisateur : $e');
-                  if (!mounted) return;
-                  Navigator.of(dialogContext).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('Échec de la suppression de l\'utilisateur : $e'),
-                    behavior: SnackBarBehavior.floating,
-                    margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ));
-                }
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showCreatePreAuthKeyDialog(BuildContext context) {
-    final provider = context.read<AppProvider>();
-    User? selectedUser;
-    bool isReusable = false;
-    bool isEphemeral = false;
-    final expirationController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Créer une clé de pré-authentification'),
-          content: StatefulBuilder(
-            builder: (context, setState) {
-              return SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FutureBuilder<List<User>>(
-                      future: provider.apiService.getUsers(),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return const CircularProgressIndicator();
-                        }
-                        final users = snapshot.data!;
-                        if (selectedUser == null && users.isNotEmpty) {
-                          selectedUser = users.first;
-                        }
-                        return DropdownButtonFormField<User>(
-                          isExpanded: true, // Add this line
-                          value: selectedUser,
-                          items: users.map((user) {
-                            return DropdownMenuItem<User>(
-                              value: user,
-                              child: Text(user.name),
-                            );
-                          }).toList(),
-                          onChanged: (user) {
-                            setState(() {
-                              selectedUser = user;
-                            });
-                          },
-                          decoration: const InputDecoration(
-                            labelText: 'Sélectionner un utilisateur',
-                            border: OutlineInputBorder(),
-                          ),
-                        );
-                      },
-                    ),
-                    CheckboxListTile(
-                      title: const Text('Réutilisable'),
-                      value: isReusable,
-                      onChanged: (value) {
-                        setState(() {
-                          isReusable = value!;
-                        });
-                      },
-                    ),
-                    CheckboxListTile(
-                      title: const Text('Éphémère'),
-                      value: isEphemeral,
-                      onChanged: (value) {
-                        setState(() {
-                          isEphemeral = value!;
-                        });
-                      },
-                    ),
-                    TextFormField(
-                      controller: expirationController,
-                      decoration: const InputDecoration(
-                        labelText: 'Expiration en jours (facultatif)',
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Annuler'),
-              onPressed: () => Navigator.of(dialogContext).pop(),
-            ),
-            TextButton(
-              child: const Text('Créer'),
-              onPressed: () async {
-                if (selectedUser != null) {
-                  final expirationDays = int.tryParse(expirationController.text);
-                  final expiration = expirationDays != null ? DateTime.now().add(Duration(days: expirationDays)) : null;
-                  try {
-                                        final key = await provider.apiService.createPreAuthKey(
-                      selectedUser!.id,
-                      isReusable,
-                      isEphemeral,
-                      expiration: expiration,
-                    );
-                    final serverUrl = await provider.storageService.getServerUrl();
-                    final fullCommand = 'tailscale up --login-server=${serverUrl ?? ''} --authkey=${key.key}';
-
-                    Navigator.of(dialogContext).pop();
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Clé de pré-authentification créée'),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('La commande d\'enregistrement de l\'appareil a été générée.'),
-                            const SizedBox(height: 16),
-                            Text('Veuillez copier cette commande et l\'envoyer au client pour qu\'il l\'exécute sur son appareil.'),
-                            const SizedBox(height: 16),
-                          ],
-                        ),
-                        actions: [
-                          TextButton(
-                            child: const Text('Fermer'),
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                          ElevatedButton.icon( // Use ElevatedButton for more prominence
-                            icon: const Icon(Icons.copy),
-                            label: const Text('Copier la commande pour le client'),
-                            onPressed: () async {
-                              await Clipboard.setData(ClipboardData(text: fullCommand));
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                                content: Text('Commande copiée dans le presse-papiers !'),
-                              ));
-                              Navigator.of(context).pop(); // Close dialog after copying
-                            },
-                          ),
-                        ],
-                      ),
-                    );
-                    // _refreshPreAuthKeys(); // Refresh the list after creating a key - This line is not needed here
-                    _refreshUsers(); // Refresh the user list after creating a key
-                  } catch (e) {
-                    debugPrint('Erreur lors de la création de la clé : $e');
-                    Navigator.of(dialogContext).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text('Échec de la création de la clé : $e'),
-                      behavior: SnackBarBehavior.floating,
-                      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ));
-                  }
-                }
-              },
-            ),
-          ],
-        );
-      },
-    );
   }
 
   @override
@@ -310,19 +46,23 @@ class _UsersScreenState extends State<UsersScreen> {
       body: FutureBuilder<List<User>>(
         future: _usersFuture,
         builder: (context, snapshot) {
+          // Affiche un indicateur de chargement pendant la récupération des utilisateurs.
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+          // Affiche un message d'erreur si la récupération des utilisateurs échoue.
           if (snapshot.hasError) {
             debugPrint('Erreur lors du chargement des utilisateurs : ${snapshot.error}');
             return Center(child: Text('Erreur : ${snapshot.error}'));
           }
+          // Affiche un message si aucun utilisateur n'est trouvé.
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(child: Text('Aucun utilisateur trouvé.'));
           }
 
           final users = snapshot.data!;
 
+          // Construit une liste déroulante des utilisateurs.
           return ListView.builder(
             itemCount: users.length,
             itemBuilder: (context, index) {
@@ -333,7 +73,14 @@ class _UsersScreenState extends State<UsersScreen> {
                 trailing: PopupMenuButton<String>(
                   onSelected: (value) {
                     if (value == 'delete') {
-                      _showDeleteUserDialog(user);
+                      // Affiche le dialogue de suppression d'utilisateur.
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => DeleteUserDialog(
+                          user: user,
+                          onUserDeleted: _refreshUsers, // Rafraîchit la liste après suppression
+                        ),
+                      );
                     }
                   },
                   itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -347,9 +94,10 @@ class _UsersScreenState extends State<UsersScreen> {
                   ],
                 ),
                 onTap: () {
+                  // Navigue vers l'écran de détails de l'utilisateur au tap.
                   Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => UserDetailScreen(user: user),
-                  )).then((_) => _refreshUsers());
+                  )).then((_) => _refreshUsers()); // Rafraîchit la liste après le retour.
                 },
               );
             },
@@ -359,14 +107,30 @@ class _UsersScreenState extends State<UsersScreen> {
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          // Bouton flottant pour créer un nouvel utilisateur.
           FloatingActionButton(
-            onPressed: _showCreateUserDialog,
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => CreateUserDialog(
+                  onUserCreated: _refreshUsers, // Rafraîchit la liste après création
+                ),
+              );
+            },
             heroTag: 'createUser',
             child: const Icon(Icons.add),
           ),
           const SizedBox(height: 16),
+          // Bouton flottant pour créer une clé de pré-authentification.
           FloatingActionButton(
-            onPressed: () => _showCreatePreAuthKeyDialog(context),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => CreatePreAuthKeyDialog(
+                  onKeyCreated: _refreshUsers, // Rafraîchit la liste après création de clé
+                ),
+              );
+            },
             heroTag: 'createKey',
             child: const Icon(Icons.vpn_key),
           ),
