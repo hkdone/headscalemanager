@@ -1,467 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/node.dart';
-import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/screens/node_detail_screen.dart';
+import 'package:flutter/foundation.dart'; // For debugPrint
 
+// Import the new extracted dialogs
+import 'package:headscalemanager/widgets/rename_node_dialog.dart';
+import 'package:headscalemanager/widgets/move_node_dialog.dart';
+import 'package:headscalemanager/widgets/exit_node_command_dialog.dart';
+import 'package:headscalemanager/widgets/share_subnet_dialog.dart';
+
+/// Un widget réutilisable pour afficher un nœud et fournir des actions de gestion.
+///
+/// Cette tuile affiche les informations clés d'un nœud et permet d'effectuer
+/// diverses opérations (renommer, déplacer, activer/désactiver nœud de sortie,
+/// partager/désactiver sous-réseau, supprimer) via un menu contextuel.
 class NodeManagementTile extends StatelessWidget {
+  /// Le nœud à gérer.
   final Node node;
+
+  /// Fonction de rappel appelée après une mise à jour du nœud (ex: renommage, déplacement).
   final VoidCallback onNodeUpdate;
 
   const NodeManagementTile({super.key, required this.node, required this.onNodeUpdate});
 
+  /// Exécute une action asynchrone et affiche un SnackBar de succès ou d'erreur.
+  ///
+  /// [context] : Le contexte de construction du widget.
+  /// [action] : La fonction asynchrone à exécuter.
+  /// [successMessage] : Le message à afficher en cas de succès.
   Future<void> _runAction(BuildContext context, Future<void> Function() action,
       String successMessage) async {
     try {
       await action();
       showSafeSnackBar(context, successMessage);
-      onNodeUpdate();
+      onNodeUpdate(); // Rafraîchit la liste des nœuds après l'action.
     } catch (e) {
-      print('Action échouée : $e');
+      debugPrint('Action échouée : $e');
       showSafeSnackBar(context, 'Erreur : $e');
     }
   }
 
-  void _showSubnetCommandDialog(BuildContext context, String subnetCidr,
-      String loginServer, Node node, AppProvider provider) {
-    final String tailscaleCommand = 'tailscale up --advertise-routes=$subnetCidr --login-server=$loginServer';
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return DefaultTabController(
-          length: 3, // Linux, Windows, Mobile
-          child: AlertDialog(
-            title: const Text('Étape 1 : Configurer le routage de sous-réseau'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const TabBar(
-                    tabs: [
-                      Tab(text: 'Linux'),
-                      Tab(text: 'Windows'),
-                      Tab(text: 'Mobile'),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: TabBarView(
-                      children: [
-                        // Instructions Linux
-                        SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                  'Sur votre appareil Linux, activez le transfert IP et le NAT, puis exécutez la commande Tailscale :'),
-                              const SizedBox(height: 8),
-                              const SelectableText(
-                                  'sudo sysctl -w net.ipv4.ip_forward=1\nsudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE', // Note : La chaîne originale contenait \n, ce qui est correct pour un littéral de chaîne Dart représentant un saut de ligne.
-                                  style: TextStyle(fontFamily: 'monospace', fontSize: 14)),
-                              const SizedBox(height: 8),
-                              SelectableText(
-                                tailscaleCommand,
-                                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Instructions Windows
-                        SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                  'Sur votre appareil Windows, activez le transfert IP et le NAT (partage de connexion Internet), puis exécutez la commande Tailscale :'),
-                              const SizedBox(height: 8),
-                              const SelectableText(
-                                  '# Activer le transfert IP (PowerShell en tant qu\'administrateur)\nSet-NetIPInterface -InterfaceAlias "Ethernet" -Forwarding Enabled\n\n# Activer le NAT (partage de connexion Internet) - nécessite une configuration GUI ou PowerShell plus complexe\n# Pour un NAT simple, vous pouvez utiliser `netsh routing ip nat install` et configurer les interfaces.',
-                                  style: TextStyle(fontFamily: 'monospace', fontSize: 14)),
-                              const SizedBox(height: 8),
-                              SelectableText(
-                                tailscaleCommand,
-                                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Instructions mobiles
-                        SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                  'Sur Android/iOS, le routage de sous-réseau est configuré directement dans les paramètres de l\'application Tailscale. Assurez-vous que l\'appareil est connecté à Tailscale, puis activez "Annoncer les routes" pour les sous-réseaux souhaités dans les paramètres de l\'application.'),
-                              const SizedBox(height: 8),
-                              SelectableText(
-                                tailscaleCommand,
-                                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                child: const Text('Fermer'),
-                onPressed: () => Navigator.of(dialogContext).pop(),
-              ),
-              TextButton(
-                child: const Text('Copier la commande Tailscale'),
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: tailscaleCommand));
-                  showSafeSnackBar(context, 'Commande Tailscale copiée dans le presse-papiers !');
-                },
-              ),
-              ElevatedButton(
-                child: const Text('Procéder à la confirmation'),
-                onPressed: () {
-                  Navigator.of(dialogContext).pop(); // Fermer la boîte de dialogue actuelle
-                  _runAction(context,
-                          () =>
-                          provider.apiService.setNodeRoutes(
-                          node.id, [subnetCidr]),
-                      'Route de sous-réseau activée.'
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showRenameNodeDialog(BuildContext context) {
-    final formKey = GlobalKey<FormState>();
-    final newNameController = TextEditingController(text: node.name);
-    final provider = context.read<AppProvider>();
-
-    showDialog(
-      context: context,
-      builder: (ctx) =>
-          AlertDialog(
-            title: const Text('Renommer l\'appareil'),
-            content: Form(
-              key: formKey,
-              child: TextFormField(
-                controller: newNameController,
-                decoration: const InputDecoration(labelText: 'Nouveau nom d\'appareil'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer un nouveau nom';
-                  }
-                  return null;
-                },
-              ),
-            ),
-            actions: <Widget>[
-              TextButton(child: const Text('Annuler'),
-                  onPressed: () => Navigator.of(ctx).pop()),
-              TextButton(
-                child: const Text('Renommer'),
-                onPressed: () {
-                  if (formKey.currentState!.validate()) {
-                    final newName = newNameController.text.toLowerCase();
-                    Navigator.of(ctx).pop();
-                    _runAction(context,
-                            () =>
-                            provider.apiService.renameNode(node.id, newName),
-                        'Appareil renommé avec succès.'
-                    );
-                  }
-                },
-              ),
-            ],
-          ),
-    );
-  }
-
-  void _showMoveNodeDialog(BuildContext context, AppProvider provider) {
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return FutureBuilder<List<User>>(
-          future: provider.apiService.getUsers(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const AlertDialog(
-                title: Text('Déplacer l\'appareil'),
-                content: Center(child: CircularProgressIndicator()),
-              );
-            }
-            if (snapshot.hasError) {
-              return AlertDialog(
-                title: const Text('Erreur'),
-                content: Text('Échec du chargement des utilisateurs : ${snapshot.error}'),
-                actions: [
-                  TextButton(child: const Text('Fermer'),
-                      onPressed: () => Navigator.of(context).pop()),
-                ],
-              );
-            }
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return AlertDialog(
-                title: const Text('Déplacer l\'appareil'),
-                content: const Text(
-                    'Aucun autre utilisateur disponible pour déplacer l\'appareil.'),
-                actions: [
-                  TextButton(child: const Text('Fermer'),
-                      onPressed: () => Navigator.of(context).pop()),
-                ],
-              );
-            }
-
-            final users = snapshot.data!;
-            User? selectedUser = users.isNotEmpty ? users.first : null;
-
-            return AlertDialog(
-              title: const Text('Déplacer l\'appareil'),
-              content: DropdownButtonFormField<User>(
-                value: selectedUser,
-                items: users.map((user) {
-                  return DropdownMenuItem<User>(
-                    value: user,
-                    child: Text(user.name),
-                  );
-                }).toList(),
-                onChanged: (user) {
-                  selectedUser = user;
-                },
-                decoration: const InputDecoration(
-                  labelText: 'Sélectionner un utilisateur',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              actions: <Widget>[
-                TextButton(child: const Text('Annuler'),
-                    onPressed: () => Navigator.of(ctx).pop()),
-                TextButton(
-                  child: const Text('Déplacer'),
-                  onPressed: () {
-                    if (selectedUser != null) {
-                      Navigator.of(ctx).pop();
-                      _runAction(context,
-                              () =>
-                              provider.apiService.moveNode(node.id,
-                                  selectedUser!.name),
-                          'Appareil déplacé avec succès.'
-                      );
-                    }
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showSubnetDialog(BuildContext context, AppProvider provider) {
-    final formKey = GlobalKey<FormState>();
-    final subnetController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) =>
-          AlertDialog(
-            title: const Text('Partager le sous-réseau local'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                    'Entrez le sous-réseau à annoncer (par exemple, 192.168.1.0/24).\n\nNote : L\'appareil doit être configuré pour annoncer cette route.'),
-                const SizedBox(height: 16),
-                Form(
-                  key: formKey,
-                  child: TextFormField(
-                    controller: subnetController,
-                    decoration: const InputDecoration(
-                        labelText: 'Sous-réseau (format CIDR)'),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer un sous-réseau';
-                      }
-                      final regex = RegExp(r'^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}');
-                      if (!regex.hasMatch(value)) return 'Format CIDR invalide';
-                      return null;
-                    },
-                  ),
-                ),
-              ],
-            ),
-            actions: <Widget>[
-              TextButton(child: const Text('Annuler'),
-                  onPressed: () => Navigator.of(ctx).pop()),
-              TextButton(
-                child: const Text('Partager'),
-                onPressed: () async { // Rendre asynchrone
-                  if (formKey.currentState!.validate()) {
-                    Navigator.of(ctx).pop(); // Fermer la boîte de dialogue de saisie du sous-réseau
-                    final appProvider = context.read<AppProvider>();
-                    final serverUrl = await appProvider.storageService
-                        .getServerUrl();
-                    if (serverUrl == null) {
-                      showSafeSnackBar(
-                          context, 'Erreur : URL du serveur non configurée.');
-                      return;
-                    }
-                    final String loginServer = serverUrl.endsWith('/')
-                        ? serverUrl.substring(0, serverUrl.length - 1)
-                        : serverUrl;
-
-                    _showSubnetCommandDialog(
-                        context, subnetController.text, loginServer, node,
-                        provider);
-                  }
-                },
-              ),
-            ],
-          ),
-    );
-  }
-
-  void _showExitNodeCommandDialog(BuildContext context, Node node, AppProvider provider) async {
-    final appProvider = context.read<AppProvider>();
-    final serverUrl = await appProvider.storageService.getServerUrl();
-    if (serverUrl == null) {
-      showSafeSnackBar(context, 'Erreur : URL du serveur non configurée.');
-      return;
-    }
-    final String loginServer = serverUrl.endsWith('/') ? serverUrl.substring(0, serverUrl.length - 1) : serverUrl;
-    final String tailscaleCommand = 'tailscale up --advertise-exit-node --login-server=$loginServer';
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return DefaultTabController(
-          length: 3, // Linux, Windows, Mobile
-          child: AlertDialog(
-            title: const Text('Étape 1 : Configurer le nœud de sortie'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const TabBar(
-                    tabs: [
-                      Tab(text: 'Linux'),
-                      Tab(text: 'Windows'),
-                      Tab(text: 'Mobile'),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: TabBarView(
-                      children: [
-                        // Instructions Linux
-                        SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                  'Sur votre appareil Linux, assurez-vous que le transfert IP est activé si vous souhaitez acheminer le trafic d\'autres appareils via ce nœud de sortie. Exécutez ensuite la commande Tailscale :'),
-                              const SizedBox(height: 8),
-                              const SelectableText(
-                                  'sudo sysctl -w net.ipv4.ip_forward=1', // Note: The original string had \n, which is correct for a Dart string literal representing a newline.
-                                  style: TextStyle(fontFamily: 'monospace', fontSize: 14)),
-                              const SizedBox(height: 8),
-                              SelectableText(
-                                tailscaleCommand,
-                                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Instructions Windows
-                        SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                  'Sur votre appareil Windows, assurez-vous que le transfert IP est activé si vous souhaitez acheminer le trafic d\'autres appareils via ce nœud de sortie. Exécutez ensuite la commande Tailscale :'),
-                              const SizedBox(height: 8),
-                              const SelectableText(
-                                  '# Activer le transfert IP (PowerShell en tant qu\'administrateur)\nSet-NetIPInterface -InterfaceAlias "Ethernet" -Forwarding Enabled', // Note: The original string had \n, which is correct for a Dart string literal representing a newline.
-                                  style: TextStyle(fontFamily: 'monospace', fontSize: 14)),
-                              const SizedBox(height: 8),
-                              SelectableText(
-                                tailscaleCommand,
-                                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Instructions mobiles
-                        SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                  'Sur Android/iOS, la fonctionnalité de nœud de sortie est configurée directement dans les paramètres de l\'application Tailscale. Assurez-vous que l\'appareil est connecté à Tailscale, puis activez "Utiliser comme nœud de sortie" dans les paramètres de l\'application.'),
-                              const SizedBox(height: 8),
-                              SelectableText(
-                                tailscaleCommand,
-                                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                child: const Text('Fermer'),
-                onPressed: () => Navigator.of(dialogContext).pop(),
-              ),
-              TextButton(
-                child: const Text('Copier la commande Tailscale'),
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: tailscaleCommand));
-                  showSafeSnackBar(context, 'Commande Tailscale copiée dans le presse-papiers !');
-                },
-              ),
-              ElevatedButton(
-                child: const Text('Procéder à la confirmation'),
-                onPressed: () {
-                  Navigator.of(dialogContext).pop(); // Fermer la boîte de dialogue actuelle
-                  final List<String> combinedRoutes = List.from(node.advertisedRoutes);
-                  if (!combinedRoutes.contains('0.0.0.0/0')) {
-                    combinedRoutes.add('0.0.0.0/0');
-                  }
-                  if (!combinedRoutes.contains('::/0')) {
-                    combinedRoutes.add('::/0');
-                  }
-                  _runAction(context,
-                          () =>
-                          provider.apiService.setNodeRoutes(
-                          node.id, combinedRoutes),
-                      'Nœud de sortie activé.'
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
+  /// Getter pour vérifier si le nœud est un nœud de sortie.
   bool get _isExitNode => node.advertisedRoutes.contains('0.0.0.0/0') || node.advertisedRoutes.contains('::/0');
 
   @override
@@ -471,15 +54,18 @@ class NodeManagementTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: ListTile(
+        // Navigue vers l'écran de détails du nœud au tap.
         onTap: () {
           Navigator.of(context).push(MaterialPageRoute(builder: (_) => NodeDetailScreen(node: node)));
         },
+        // Icône indiquant le statut en ligne/hors ligne du nœud.
         leading: Icon(
             Icons.circle, color: node.online ? Colors.green : Colors.grey,
             size: 18),
         title: Row(
           children: [
             Text(node.name),
+            // Affiche une icône si le nœud est un nœud de sortie.
             if (_isExitNode)
               const Padding(
                 padding: EdgeInsets.only(left: 8.0),
@@ -494,35 +80,56 @@ class NodeManagementTile extends StatelessWidget {
             Text('Dernière connexion : ${node.lastSeen.toLocal()}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
+        // Menu contextuel pour les actions de gestion du nœud.
         trailing: PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert),
           onSelected: (String value) {
             switch (value) {
               case 'rename':
-                _showRenameNodeDialog(context);
+                // Affiche le dialogue pour renommer le nœud.
+                showDialog(
+                  context: context,
+                  builder: (ctx) => RenameNodeDialog(node: node, onNodeRenamed: onNodeUpdate),
+                );
                 break;
               case 'move':
-                _showMoveNodeDialog(context, provider);
+                // Affiche le dialogue pour déplacer le nœud.
+                showDialog(
+                  context: context,
+                  builder: (ctx) => MoveNodeDialog(node: node, onNodeMoved: onNodeUpdate),
+                );
                 break;
               case 'enable_exit_node':
-                _showExitNodeCommandDialog(context, node, provider);
+                // Affiche le dialogue pour activer le nœud de sortie.
+                showDialog(
+                  context: context,
+                  builder: (ctx) => ExitNodeCommandDialog(node: node, onExitNodeEnabled: onNodeUpdate),
+                );
                 break;
               case 'disable_exit_node':
+                // Désactive le nœud de sortie via l'API.
                 _runAction(context,
                         () => provider.apiService.setNodeRoutes(node.id, []),
                     'Nœud de sortie désactivé.'
                 );
                 break;
               case 'share_subnet':
-                _showSubnetDialog(context, provider);
+                // Affiche le dialogue pour partager un sous-réseau.
+                showDialog(
+                  context: context,
+                  builder: (ctx) => ShareSubnetDialog(node: node, onSubnetShared: onNodeUpdate),
+                );
                 break;
-              case 'disable_subnet': // Nouveau cas
-                _runAction(context,
+              case 'disable_subnet':
+                // Désactive les routes de sous-réseau via l'API.
+                _runAction(
+                  context,
                   () => provider.apiService.setNodeRoutes(node.id, []),
                   'Routes de sous-réseau désactivées.'
                 );
                 break;
               case 'delete_device':
+                // Affiche le dialogue de confirmation de suppression.
                 showDialog(
                   context: context,
                   builder: (dialogCtx) =>
@@ -588,10 +195,10 @@ class NodeManagementTile extends StatelessWidget {
                 title: Text('Partager le sous-réseau local'),
               ),
             ),
-            const PopupMenuItem<String>( // Nouvel élément
+            const PopupMenuItem<String>(
               value: 'disable_subnet',
               child: ListTile(
-                leading: Icon(Icons.router_outlined), // Réutilisation de l\'icône pour l\'instant
+                leading: Icon(Icons.router_outlined), // Réutilisation de l'icône pour l'instant
                 title: Text('Désactiver les routes de sous-réseau'),
               ),
             ),
