@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:http/http.dart' as http;
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
@@ -50,6 +51,9 @@ class HeadscaleApiService {
   Future<List<Node>> getNodes() async {
     // Récupère l'URL de base du serveur.
     final baseUrl = await _getBaseUrl();
+    final serverUrl = await _storageService.getServerUrl(); // Get server URL for base domain
+    final String baseDomain = serverUrl?.extractBaseDomain() ?? 'headscale.local'; // Extract base domain
+
     // Effectue la requête GET pour obtenir la liste sommaire des nœuds.
     final response = await http.get(
       Uri.parse('${baseUrl}api/v1/node'),
@@ -73,7 +77,8 @@ class HeadscaleApiService {
         if (nodeId != null) {
           try {
             // Récupère les détails complets du nœud en utilisant son ID.
-            final detailedNode = await getNodeDetails(nodeId);
+            // Passe le baseDomain au constructeur fromJson du Node.
+            final detailedNode = await getNodeDetails(nodeId); // getNodeDetails already passes baseDomain
             detailedNodes.add(detailedNode);
           } catch (e) {
             // Affiche une erreur si la récupération des détails d'un nœud échoue.
@@ -92,8 +97,11 @@ class HeadscaleApiService {
 
   /// Récupère les détails complets d'un seul nœud en utilisant son ID.
   Future<Node> getNodeDetails(String nodeId) async {
-    // Récupère l'URL de base du serveur.
+    // Récupère l\'URL de base du serveur.
     final baseUrl = await _getBaseUrl();
+    final serverUrl = await _storageService.getServerUrl(); // Get server URL for base domain
+    final String baseDomain = serverUrl?.extractBaseDomain() ?? 'headscale.local'; // Extract base domain
+
     // Effectue la requête GET pour obtenir les détails du nœud spécifique.
     final response = await http.get(
       Uri.parse('${baseUrl}api/v1/node/$nodeId'),
@@ -103,7 +111,8 @@ class HeadscaleApiService {
     // Vérifie si la requête a réussi.
     if (response.statusCode == 200) {
       // Décode la réponse JSON et construit un objet Node à partir des données.
-      return Node.fromJson(json.decode(response.body)['node']); // Supposant que 'node' est la clé pour l'objet nœud unique
+      // Passe le baseDomain au constructeur fromJson du Node.
+      return Node.fromJson(json.decode(response.body)['node'], baseDomain); // Supposant que 'node' est la clé pour l'objet nœud unique
     } else {
       // Lève une exception si la requête a échoué.
       throw Exception(_handleError('charger les détails du nœud', response));

@@ -93,45 +93,84 @@ class HelpScreen extends StatelessWidget {
               padding: const EdgeInsets.all(8.0),
               color: Colors.grey[200],
               child: const Text(
-                '''server_url: http://<VOTRE_FQDN_PUBLIC>:8080
+                '''server_url: https://<VOTRE_FQDN_PUBLIC>:8081
 listen_addr: 0.0.0.0:8080
-metrics_listen_addr: 0.0.0.0:9090
-grpc_listen_addr: 0.0.0.0:50443
-db_path: /var/lib/headscale/db.sqlite
-private_key_path: /var/lib/headscale/private.key
-noise_private_key_path: /var/lib/headscale/noise_private.key
-log_level: info
-dns_config:
-  override_local_dns: true
-  nameservers:
-    - 8.8.8.8
-    - 1.1.1.1
-  magic_dns: true
+metrics_listen_addr: 127.0.0.1:9090
+grpc_listen_addr: 127.0.0.1:50443
+grpc_allow_insecure: false
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+  allocation: sequential
 derp:
+  server:
+    enabled: false
+    region_id: 999
+    region_code: "headscale"
+    region_name: "Headscale Embedded DERP"
+    verify_clients: true
+    stun_listen_addr: "0.0.0.0:3478"
+    private_key_path: /var/lib/headscale/derp_server_private.key
+    automatically_add_embedded_derp_region: true
+    ipv4: 1.2.3.4
+    ipv6: 2001:db8::1
   urls:
     - https://controlplane.tailscale.com/derpmap/default
-  auto_update: true
-acls:
-  enabled: true
-  file: /etc/headscale/acl.yaml
-oauth2:
+  paths: []
+  auto_update_enabled: true
+  update_frequency: 24h
+disable_check_updates: false
+ephemeral_node_inactivity_timeout: 30m
+database:
+  type: sqlite
+  debug: false
+  gorm:
+    prepare_stmt: true
+    parameterized_queries: true
+    skip_err_record_not_found: true
+    slow_threshold: 1000
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+    write_ahead_log: true
+    wal_autocheckpoint: 1000
+acme_url: https://acme-v02.api.letsencrypt.org/directory
+acme_email: ""
+tls_letsencrypt_hostname: ""
+tls_letsencrypt_cache_dir: /var/lib/headscale/cache
+tls_letsencrypt_challenge_type: HTTP-01
+tls_letsencrypt_listen: ":http"
+tls_cert_path: ""
+tls_key_path: ""
+log:
+  level: info
+  format: text
+policy:
+   mode: file
+   path: /etc/headscale/acl.yaml
+dns:
+  magic_dns: true
+  base_domain: <VOTRE_DOMAINE_DE_BASE>.com
+  override_local_dns: false
+  nameservers:
+    global:
+      - 1.1.1.1
+      - 1.0.0.1
+      - 2606:4700:4700::1111
+      - 2606:4700:4700::1001
+    split:
+      {}
+  search_domains: []
+  extra_records: []
+unix_socket: /var/run/headscale/headscale.sock
+unix_socket_permission: "0770"
+logtail:
   enabled: false
-  issuer: ""
-  client_id: ""
-  client_secret: ""
-  scopes: []
-  allowed_domains: []
-  extra_params: {}
-users:
-  - name: admin
-    create_if_not_exists: true
-    roles:
-      - admin
-    api_keys:
-      - name: initial-api-key
-        expiration: 2030-01-01T00:00:00Z
-        permissions:
-          - all
+randomize_client_port: false
+preauthkey_expiry: 5m
+routes:
+   enabled: true
 ''',
                 style: TextStyle(fontFamily: 'monospace', fontSize: 12),
               ),
@@ -284,7 +323,7 @@ users:
             ),
             const SizedBox(height: 4),
             Text(
-              '- **Ajouter Utilisateur (icône '+' en bas à droite) :** Ouvre un dialogue pour créer un nouvel utilisateur. Entrez simplement le nom d\'utilisateur souhaité. L\'application ajoutera automatiquement `@nasfilecloud.synology.me` au nom d\'utilisateur si non présent.',
+              '- **Ajouter Utilisateur (icône '+' en bas à droite) :** Ouvre un dialogue pour créer un nouvel utilisateur. Entrez simplement le nom d\'utilisateur souhaité. L\'application ajoutera automatiquement `le suffixe de domaine de votre serveur Headscale (par exemple, `@votre_domaine.com`)` au nom d\'utilisateur si non présent.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 4),
@@ -362,7 +401,7 @@ users:
             ),
             const SizedBox(height: 8),
             Text(
-              'Cet écran affiche toutes les informations détaillées d\'un nœud spécifique, y compris son FQDN, ses adresses IP, ses routes annoncées et ses tags.',
+              'Cet écran affiche toutes les informations détaillées d\'un nœud spécifique, y compris son FQDN (construit dynamiquement à partir du nom du nœud et du domaine de base de votre serveur Headscale), ses adresses IP, ses routes annoncées et ses tags.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 8),

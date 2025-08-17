@@ -29,6 +29,9 @@ class Node {
   /// Liste des tags associés à ce nœud.
   final List<String> tags;
 
+  /// Le domaine de base du serveur Headscale, utilisé pour construire le FQDN.
+  final String baseDomain;
+
   /// Constructeur de la classe Node.
   ///
   /// Tous les champs sont requis pour la création d'une instance de Node.
@@ -43,13 +46,15 @@ class Node {
     required this.lastSeen,
     required this.advertisedRoutes,
     required this.tags,
+    required this.baseDomain, // Nouveau champ
   });
 
   /// Constructeur d'usine (factory constructor) pour créer une instance de Node à partir d'un Map JSON.
   ///
   /// Cette méthode gère la désérialisation des données JSON provenant de l'API Headscale
   /// en un objet Node, en assurant la gestion des valeurs par défaut et des mappings spécifiques.
-  factory Node.fromJson(Map<String, dynamic> json) {
+  /// Le [baseDomain] est nécessaire pour construire le FQDN du nœud.
+  factory Node.fromJson(Map<String, dynamic> json, String baseDomain) { // Ajout de baseDomain
     // Extrait les informations de l'utilisateur, qui peuvent être imbriquées.
     final userMap = json['user'] as Map<String, dynamic>?;
 
@@ -87,14 +92,12 @@ class Node {
       // avec un fallback à une liste vide.
       tags: List<String>.from(
           json['forcedTags'] ?? json['validTags'] ?? json['tags'] ?? []),
+      baseDomain: baseDomain, // Passage du nouveau champ
     );
   }
 
   /// Getter pour le Fully Qualified Domain Name (FQDN) du nœud.
   ///
-  /// Construit le FQDN en utilisant le nom du nœud et un domaine codé en dur.
-  /// ATTENTION : Le domaine 'nasfilecloud.synology.me' est codé en dur.
-  /// Il est recommandé de rendre ce domaine configurable si l'application
-  /// doit être déployée dans différents environnements.
-  String get fqdn => '$name.nasfilecloud.synology.me';
+  /// Construit le FQDN en utilisant le nom du nœud et le domaine de base du serveur.
+  String get fqdn => '$name.$baseDomain'; // Utilisation du nouveau champ
 }

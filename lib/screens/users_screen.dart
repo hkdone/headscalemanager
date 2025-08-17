@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/user_detail_screen.dart';
@@ -7,7 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/pre_auth_key.dart';
 import 'package:headscalemanager/services/storage_service.dart';
-
+import 'package:headscalemanager/utils/string_utils.dart'; // New import
+import 'package:flutter/foundation.dart'; // Import for debugPrint
 
 
 class UsersScreen extends StatefulWidget {
@@ -52,21 +52,30 @@ class _UsersScreenState extends State<UsersScreen> {
               child: const Text('Créer'),
               onPressed: () async {
                 final String name = nameController.text.trim();
-                const String suffix = '@nasfilecloud.synology.me';
+                final appProvider = context.read<AppProvider>();
+                final serverUrl = await appProvider.storageService.getServerUrl();
+                final String? baseDomain = serverUrl?.extractBaseDomain();
+
+                String suffix = '';
+                if (baseDomain != null && baseDomain.isNotEmpty) {
+                  suffix = '@$baseDomain';
+                } else {
+                  // Fallback if base domain cannot be extracted
+                  suffix = '@headscale.local'; // A generic fallback
+                }
 
                 if (name.isNotEmpty) {
                   String finalName = name;
-                  if (!name.endsWith(suffix)) {
+                  if (!name.contains('@')) { // Only append suffix if no @ is present
                     finalName = '$name$suffix';
                   }
 
-                  final provider = context.read<AppProvider>();
                   try {
-                    await provider.apiService.createUser(finalName);
+                    await appProvider.apiService.createUser(finalName);
                     Navigator.of(dialogContext).pop();
                     _refreshUsers();
                   } catch (e) {
-                    print('Erreur lors de la création de l\'utilisateur : $e');
+                    debugPrint('Erreur lors de la création de l\'utilisateur : $e');
                     if (!mounted) return;
                     Navigator.of(dialogContext).pop();
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -118,7 +127,7 @@ class _UsersScreenState extends State<UsersScreen> {
                     ),
                   ));
                 } catch (e) {
-                  print('Erreur lors de la suppression de l\'utilisateur : $e');
+                  debugPrint('Erreur lors de la suppression de l\'utilisateur : $e');
                   if (!mounted) return;
                   Navigator.of(dialogContext).pop();
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -275,7 +284,7 @@ class _UsersScreenState extends State<UsersScreen> {
                     // _refreshPreAuthKeys(); // Refresh the list after creating a key - This line is not needed here
                     _refreshUsers(); // Refresh the user list after creating a key
                   } catch (e) {
-                    print('Erreur lors de la création de la clé : $e');
+                    debugPrint('Erreur lors de la création de la clé : $e');
                     Navigator.of(dialogContext).pop();
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('Échec de la création de la clé : $e'),
@@ -305,7 +314,7 @@ class _UsersScreenState extends State<UsersScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            print('Erreur lors du chargement des utilisateurs : ${snapshot.error}');
+            debugPrint('Erreur lors du chargement des utilisateurs : ${snapshot.error}');
             return Center(child: Text('Erreur : ${snapshot.error}'));
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -365,6 +374,4 @@ class _UsersScreenState extends State<UsersScreen> {
       ),
     );
   }
-
-
 }

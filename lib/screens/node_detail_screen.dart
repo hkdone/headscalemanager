@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Added for Clipboard
 import 'package:headscalemanager/models/node.dart';
-// import 'package:headscalemanager/api/headscale_api_service.dart'; // Commented out
-// import 'dart:developer' as developer; // Commented out
+import 'package:headscalemanager/widgets/cli_command_display_dialog.dart'; // New import
+import 'package:headscalemanager/widgets/edit_tags_dialog.dart'; // New import
+import 'package:flutter/foundation.dart'; // For debugPrint
 
+/// Écran affichant les détails d'un nœud Headscale spécifique.
+///
+/// Permet de visualiser les informations du nœud et de gérer ses tags.
 class NodeDetailScreen extends StatefulWidget {
+  /// Le nœud dont les détails doivent être affichés.
   final Node node;
 
   const NodeDetailScreen({super.key, required this.node});
@@ -14,8 +19,8 @@ class NodeDetailScreen extends StatefulWidget {
 }
 
 class _NodeDetailScreenState extends State<NodeDetailScreen> {
+  /// Liste des tags actuels du nœud.
   late List<String> _currentTags;
-  // final HeadscaleApiService _apiService = HeadscaleApiService(); // Commented out
 
   @override
   void initState() {
@@ -23,147 +28,32 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     _currentTags = List<String>.from(widget.node.tags);
   }
 
-  Future<void> _showEditTagsDialog() async {
-    final TextEditingController tagsController =
-        TextEditingController(text: _currentTags.join(', '));
-
-    final newTagsList = await showDialog<List<String>>(
+  /// Affiche un dialogue pour modifier les tags du nœud.
+  ///
+  /// Le dialogue permet à l'utilisateur de saisir de nouveaux tags et génère
+  /// une commande CLI correspondante. Cette commande doit être exécutée
+  /// manuellement par l'utilisateur.
+  void _showEditTagsFlow() {
+    showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Modifier les tags'),
-          content: TextField(
-            controller: tagsController,
-            decoration: const InputDecoration(
-                hintText: 'Tags (minuscules, sans chiffres/espaces/spéciaux)'), // Updated hint
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Annuler'),
-              onPressed: () => Navigator.of(context).pop(),
+      builder: (context) => EditTagsDialog(
+        node: widget.node,
+        onCliCommandGenerated: (command) {
+          // Affiche le dialogue de commande CLI après la génération.
+          showDialog(
+            context: context,
+            builder: (ctx) => CliCommandDisplayDialog(command: command),
+          );
+          // Affiche un SnackBar pour informer l'utilisateur.
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Commande CLI générée. Exécutez-la et actualisez la page pour voir les changements.'),
+              backgroundColor: Colors.orange,
             ),
-            TextButton(
-              child: const Text('Générer Commande CLI'),
-              onPressed: () {
-                final tagsString = tagsController.text.trim();
-                final rawTags = tagsString.isNotEmpty
-                    ? tagsString
-                        .split(',')
-                        .map((t) => t.trim())
-                        .toList()
-                    : <String>[];
-
-                List<String> validTags = [];
-                List<String> invalidTagsExamples = [];
-                bool allTagsValid = true;
-                final RegExp validTagPattern = RegExp(r'^[a-z]+$');
-
-                if (rawTags.isNotEmpty) {
-                  for (String tag in rawTags) {
-                    if (tag.isNotEmpty) { // Only validate non-empty strings from split
-                      if (validTagPattern.hasMatch(tag)) {
-                        validTags.add(tag);
-                      } else {
-                        allTagsValid = false;
-                        if (invalidTagsExamples.length < 3) { // Show a few examples
-                           invalidTagsExamples.add(tag);
-                        }
-                      }
-                    }
-                  }
-                }
-
-                if (!allTagsValid) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                          'Tags invalides : ${invalidTagsExamples.join(", ")}. Uniquement lettres minuscules, sans chiffres, espaces ou caractères spéciaux.'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return; // Keep the dialog open
-                }
-                
-                // If all tags are valid (or no tags were entered, which is also valid)
-                // We use validTags here which only contains successfully validated tags or is empty
-                Navigator.of(context).pop(validTags);
-              },
-            ),
-          ],
-        );
-      },
-    );
-
-    if (newTagsList != null) {
-      // Construct the CLI command based on:
-      // headscale nodes tag -i <identifier> -t tag:<tag1> -t tag:<tag2> ...
-      // Each tag MUST be prefixed with "tag:" for the CLI.
-      String cliCommand = 'headscale nodes tag -i ${widget.node.id}';
-      if (newTagsList.isNotEmpty) {
-        for (final tag in newTagsList) {
-          // Add "tag:" prefix here
-          cliCommand += ' -t "tag:$tag"';
-        }
-      }
-      // If newTagsList is empty, no -t flags are added.
-      // 'headscale nodes tag -i <ID>' is assumed to clear existing tags if no -t is provided.
-
-      // ignore: use_build_context_synchronously
-      _showCliCommandDialog(cliCommand);
-
-      // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Commande CLI générée. Exécutez-la et actualisez la page pour voir les changements.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-  }
-
-  Future<void> _showCliCommandDialog(String command) async {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Commande CLI pour les Tags'),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: <Widget>[
-                Text('La commande pour modifier les tags a été générée.'),
-                const SizedBox(height: 16),
-                Text('Veuillez copier cette commande et l\'exécuter dans votre terminal où la CLI `headscale` est configurée.'),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Fermer'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            ElevatedButton.icon( // Use ElevatedButton for more prominence
-              icon: const Icon(Icons.copy),
-              label: const Text('Copier la commande CLI'),
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: command));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Commande copiée dans le presse-papiers !'),
-                    backgroundColor: Colors.blue,
-                  ),
-                );
-                Navigator.of(context).pop(); // Close dialog after copying
-              },
-            ),
-          ],
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -173,10 +63,11 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       appBar: AppBar(
         title: Text(widget.node.name),
         actions: [
+          // Bouton pour modifier les tags du nœud.
           IconButton(
             icon: const Icon(Icons.edit),
             tooltip: 'Modifier les tags',
-            onPressed: _showEditTagsDialog,
+            onPressed: _showEditTagsFlow,
           ),
         ],
       ),
@@ -184,6 +75,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
+            // Affichage des différentes propriétés du nœud.
             _buildDetailRow('Nom : ', widget.node.name),
             _buildDetailRow('Hostname : ', widget.node.hostname),
             _buildDetailRow('Nom de domaine complet (FQDN) : ', widget.node.fqdn),
@@ -191,8 +83,8 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
             _buildDetailRow('Clé machine : ', widget.node.machineKey),
             _buildDetailRow('Utilisateur : ', widget.node.user),
             _buildDetailRow('En ligne : ', widget.node.online ? 'Oui' : 'Non'),
-            _buildDetailRow('Dernière connexion : ',
-                widget.node.lastSeen.toLocal().toString()),
+            _buildDetailRow(
+                'Dernière connexion : ', widget.node.lastSeen.toLocal().toString()),
             _buildDetailRow(
                 'Adresses IP : ', widget.node.ipAddresses.join(', ')),
             _buildDetailRow(
@@ -208,6 +100,10 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     );
   }
 
+  /// Construit une ligne pour afficher un détail du nœud (libellé et valeur).
+  ///
+  /// [label] : Le libellé du détail (ex: "Nom :").
+  /// [value] : La valeur du détail.
   Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -215,11 +111,11 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 150, // Adjusted width for better label display
+            width: 150, // Largeur ajustée pour un meilleur affichage du libellé.
             child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
           Expanded(
-            child: SelectableText(value),
+            child: SelectableText(value), // Texte sélectionnable pour faciliter la copie.
           ),
         ],
       ),
