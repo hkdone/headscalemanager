@@ -24,11 +24,137 @@ class HelpScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Cette application vous permet de gérer facilement votre serveur Headscale depuis votre appareil mobile ou de bureau. Pour commencer, suivez les étapes ci-dessous.',
+              'Cette application vous permet de gérer facilement votre serveur Headscale. Ce guide vous aidera à configurer votre serveur et à utiliser l\'application.',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 24),
 
+            // New Section: API vs CLI
+            Text(
+              'Fonctionnement : API vs Lignes de Commande (CLI)',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Pour des raisons de sécurité et de flexibilité, l\'application utilise une combinaison d\'appels directs à l\'API de Headscale et de commandes à exécuter manuellement sur votre serveur (CLI).',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '**Actions directes (via API) :**',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              color: Colors.grey[200],
+              child: const Text(
+                'Ces actions sont effectuées directement par l\'application :\n'
+                '- Lister les utilisateurs et les nœuds.\n'
+                '- Créer et supprimer des utilisateurs.\n'
+                '- Créer et invalider des clés de pré-authentification.\n'
+                '- Déplacer un nœud vers un autre utilisateur.\n'
+                '- Supprimer un nœud.\n'
+                '- Activer/Désactiver les routes (subnets et exit node).',
+                style: TextStyle(fontFamily: 'monospace', fontSize: 12),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '**Actions manuelles (via CLI) :**',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              color: Colors.grey[200],
+              child: const Text(
+                'Pour ces actions, l\'application génère la commande exacte que vous devez copier et coller dans le terminal de votre serveur Headscale. C\'est une mesure de sécurité pour les opérations sensibles :\n'
+                '- Enregistrer un nouveau nœud (la validation finale).\n'
+                '- Renommer un nœud.\n'
+                '- Modifier les tags d\'un nœud (pour les ACLs).\n'
+                '- Appliquer la politique ACL.',
+                style: TextStyle(fontFamily: 'monospace', fontSize: 12),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // New Section: Tutorial
+            Text(
+              'Tutoriel : Ajouter un appareil et le configurer (avec un client Tailscale)',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Voici les étapes complètes pour ajouter un nouvel appareil (nœud) à votre réseau Headscale.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '**Étape 1 : Créer un utilisateur**',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Si ce n\'est pas déjà fait, allez dans l\'onglet "Utilisateurs" et créez un nouvel utilisateur (par exemple, "mon-user").',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '**Étape 2 : Enregistrer l\'appareil**',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Il existe deux méthodes principales :',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '**A) Avec une clé de pré-authentification (Recommandé pour le client Tailscale sur Windows, Linux, macOS)**',
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '1. Dans l\'onglet "Utilisateurs", cliquez sur l\'icône de clé et créez une clé pour votre utilisateur. Même si aucune case n\'est cochée, il est nécessaire de mettre 1 jour d\'expiration de la clé pour générer une clé valide.\n'
+              '2. Copiez la commande `tailscale up ...` fournie.\n'
+              '3. Exécutez cette commande sur l\'appareil que vous souhaitez ajouter. Il sera automatiquement enregistré et apparaîtra dans votre tableau de bord.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '**B) Enregistrement manuel (Nécessaire pour l\'application Tailscale sur Android/iPhone)**',
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Les clients mobiles ne peuvent pas utiliser la commande `tailscale up` avec une clé. Il faut donc un enregistrement manuel :\n'
+              '1. Sur le client Tailscale (Android/iPhone), connectez-vous avec votre URL de serveur. Le client affichera une URL qu\'il faut copier et envoyer à l\'administrateur Headscale Manager.\n'
+              '2. Dans l\'application Headscale Manager, allez dans les détails de l\'utilisateur, puis cliquez sur "Enregistrer un nouvel appareil".\n'
+              '3. Coller le lien fournis par le client dans le champs prévu à cet effet sur la deuxiéme étape d\'enregistrement.L\'application vous montrera une commande `headscale nodes register --user mon-user --key ...`.\n'
+              '4. **Sur votre serveur**, exécutez cette commande en vérifiant la clé (`nodekey:xxx`) fournie par votre client mobile.\n'
+              '5. L\'appareil est maintenant associé à l\'utilisateur.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '**Étape 3 (Optionnel) : Renommer le nœud et ajouter des tags**',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Une fois le nœud apparu dans le tableau de bord, vous pouvez le configurer. C\'est une étape cruciale si vous utilisez les ACLs basées sur les tags.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '1. Allez dans les détails du nœud en cliquant dessus.\n'
+              '2. Utilisez le menu pour le **renommer** (par exemple, "mon-telephone").\n'
+              '3. Cliquez sur l\'icône de crayon pour **modifier les tags**. Ajoutez les tags pertinents (par exemple, `tag:user-phone`, `tag:user-laptop`).\n'
+              '4. L\'application execute automatiquement la commande `headscale nodes rename ...` mais vous donnera la commande CLI pour appliquer les changements `headscale nodes tag ...`. Exécutez-la sur votre serveur.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 24),
             Text(
               '1. Prérequis et Installation du Serveur Headscale',
               style: Theme.of(context).textTheme.titleLarge,
@@ -58,18 +184,17 @@ class HelpScreen extends StatelessWidget {
               padding: const EdgeInsets.all(8.0),
               color: Colors.grey[200],
               child: const Text(
-                '''docker run -d --name headscale \
+                ''''docker run -d --name headscale \
   -v <chemin_local_config>:/etc/headscale \
   -v <chemin_local_data>:/var/lib/headscale \
   -p 8080:8080 \
-  headscale/headscale:latest''',
+  headscale/headscale:latest''''',
                 style: TextStyle(fontFamily: 'monospace', fontSize: 12),
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              '- `<chemin_local_config>` : Chemin sur votre machine hôte où se trouvera le fichier `config.yaml` et `acl.yaml`.'
-
+              '- `<chemin_local_config>` : Chemin sur votre machine hôte où se trouvera le fichier `config.yaml` et `acl.yaml`.\n'
               '- `<chemin_local_data>` : Chemin sur votre machine hôte pour la persistance des données de Headscale (base de données, etc.).',
               style: Theme.of(context).textTheme.bodySmall,
             ),
@@ -93,7 +218,7 @@ class HelpScreen extends StatelessWidget {
               padding: const EdgeInsets.all(8.0),
               color: Colors.grey[200],
               child: const Text(
-                '''server_url: https://<VOTRE_FQDN_PUBLIC>:8081
+                ''''server_url: https://<VOTRE_FQDN_PUBLIC>:8081
 listen_addr: 0.0.0.0:8080
 metrics_listen_addr: 127.0.0.1:9090
 grpc_listen_addr: 127.0.0.1:50443
@@ -171,7 +296,7 @@ randomize_client_port: false
 preauthkey_expiry: 5m
 routes:
    enabled: true
-''',
+''''',
                 style: TextStyle(fontFamily: 'monospace', fontSize: 12),
               ),
             ),
@@ -202,9 +327,8 @@ routes:
             ),
             const SizedBox(height: 4),
             Text(
-              '- Vous avez un **FQDN (Fully Qualified Domain Name) public** (ex: `headscale.mondomaine.com`).'
-
-              '- Vous avez un **certificat SSL/TLS valide** pour ce FQDN (ex: via Let\'s Encrypt).'
+              '- Vous avez un **FQDN (Fully Qualified Domain Name) public** (ex: `headscale.mondomaine.com`).\n'
+              '- Vous avez un **certificat SSL/TLS valide** pour ce FQDN (ex: via Let\'s Encrypt).\n'
               '- Le proxy inverse redirige le **port externe HTTPS (443)** vers le **port interne HTTP (8080)** de votre conteneur Headscale.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
@@ -274,6 +398,7 @@ routes:
               '3. Utilisation de l\'Application',
               style: Theme.of(context).textTheme.titleLarge,
             ),
+
             const SizedBox(height: 16),
             Text(
               'L\'application est divisée en plusieurs sections accessibles via la barre de navigation inférieure :',
@@ -323,7 +448,7 @@ routes:
             ),
             const SizedBox(height: 4),
             Text(
-              '- **Ajouter Utilisateur (icône '+' en bas à droite) :** Ouvre un dialogue pour créer un nouvel utilisateur. Entrez simplement le nom d\'utilisateur souhaité. L\'application ajoutera automatiquement `le suffixe de domaine de votre serveur Headscale (par exemple, `@votre_domaine.com`)` au nom d\'utilisateur si non présent.',
+              '- **Ajouter Utilisateur (icône \'+\' en bas à droite) :** Ouvre un dialogue pour créer un nouvel utilisateur. Entrez simplement le nom d\'utilisateur souhaité. L\'application ajoutera automatiquement `le suffixe de domaine de votre serveur Headscale (par exemple, `@votre_domaine.com`)` au nom d\'utilisateur si non présent.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 4),
@@ -472,7 +597,7 @@ routes:
             ),
             const SizedBox(height: 4),
             Text(
-              '- **Créer Clé (icône '+' en bas à droite) :** Ouvre un dialogue pour créer une nouvelle clé de pré-authentification. Vous pouvez spécifier l\'utilisateur, si elle est réutilisable, éphémère et sa durée d\'expiration en jours. Après création, une commande `tailscale up` est affichée pour enregistrer un client.',
+              '- **Créer Clé (icône \'+\' en bas à droite) :** Ouvre un dialogue pour créer une nouvelle clé de pré-authentification. Vous pouvez spécifier l\'utilisateur, si elle est réutilisable, éphémère et sa durée d\'expiration en jours. Après création, une commande `tailscale up` est affichée pour enregistrer un client.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 4),
