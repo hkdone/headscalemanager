@@ -11,14 +11,12 @@ class EditTagsDialog extends StatefulWidget {
   /// Le nœud dont les tags doivent être modifiés.
   final Node node;
 
-  /// Fonction de rappel appelée lorsque la commande CLI pour les tags est générée.
-  /// La commande générée est passée en paramètre.
-  final Function(String command) onCliCommandGenerated;
+  // Removed onCliCommandGenerated as it's no longer needed.
+  // The dialog now returns the command directly via Navigator.pop.
 
   const EditTagsDialog({
     super.key,
     required this.node,
-    required this.onCliCommandGenerated,
   });
 
   @override
@@ -85,7 +83,7 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
       actions: [
         TextButton(
           child: const Text('Annuler'),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(), // Pop with null
         ),
         TextButton(
           child: const Text('Générer Commande CLI'),
@@ -105,9 +103,10 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
                 }
               }
               // Si newTagsList est vide, aucun drapeau -t n'est ajouté, ce qui efface les tags existants.
+              debugPrint('Generated CLI Command: $cliCommand'); // Impression de diagnostic
 
-              widget.onCliCommandGenerated(cliCommand);
-              Navigator.of(context).pop(); // Fermer ce dialogue
+              // Pop avec la commande générée
+              Navigator.of(context).pop(cliCommand);
             }
           },
         ),

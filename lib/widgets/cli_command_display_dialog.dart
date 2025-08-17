@@ -23,9 +23,14 @@ class CliCommandDisplayDialog extends StatelessWidget {
             const Text(
                 'Veuillez copier cette commande et l\'exécuter dans votre terminal où la CLI `headscale` est configurée.'),
             const SizedBox(height: 16),
-            SelectableText(
-              command,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+            // Diagnostic: Wrap SelectableText in a SizedBox with fixed dimensions
+            SizedBox(
+              width: 250, // Fixed width for testing
+              height: 100, // Fixed height for testing
+              child: SelectableText(
+                command,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+              ),
             ),
           ],
         ),

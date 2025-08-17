@@ -33,28 +33,32 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   /// Le dialogue permet à l'utilisateur de saisir de nouveaux tags et génère
   /// une commande CLI correspondante. Cette commande doit être exécutée
   /// manuellement par l'utilisateur.
-  void _showEditTagsFlow() {
-    showDialog(
+  void _showEditTagsFlow() async {
+    final String? generatedCommand = await showDialog<String>( // Await the dialog dismissal and get returned value
       context: context,
       builder: (context) => EditTagsDialog(
         node: widget.node,
-        onCliCommandGenerated: (command) {
-          // Affiche le dialogue de commande CLI après la génération.
-          showDialog(
-            context: context,
-            builder: (ctx) => CliCommandDisplayDialog(command: command),
-          );
-          // Affiche un SnackBar pour informer l'utilisateur.
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'Commande CLI générée. Exécutez-la et actualisez la page pour voir les changements.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        },
+        // onCliCommandGenerated: (command) { // This callback is no longer used
+        //   // The command is now returned by the dialog itself
+        // },
       ),
     );
+
+    if (generatedCommand != null && generatedCommand.isNotEmpty) {
+      // Affiche le dialogue de commande CLI après la génération.
+      showDialog(
+        context: context,
+        builder: (ctx) => CliCommandDisplayDialog(command: generatedCommand),
+      );
+      // Affiche un SnackBar pour informer l'utilisateur.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Commande CLI générée. Exécutez-la et actualisez la page pour voir les changements.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   @override
