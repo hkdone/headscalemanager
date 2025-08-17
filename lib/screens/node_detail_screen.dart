@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Added for Clipboard
+import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/node.dart';
-import 'package:headscalemanager/widgets/cli_command_display_dialog.dart'; // New import
-import 'package:headscalemanager/widgets/edit_tags_dialog.dart'; // New import
-import 'package:flutter/foundation.dart'; // For debugPrint
+import 'package:headscalemanager/widgets/cli_command_display_dialog.dart';
+import 'package:headscalemanager/widgets/edit_tags_dialog.dart';
+import 'package:dart_ping/dart_ping.dart';
+import 'dart:async';
 
 /// Écran affichant les détails d'un nœud Headscale spécifique.
 ///
@@ -21,12 +22,58 @@ class NodeDetailScreen extends StatefulWidget {
 class _NodeDetailScreenState extends State<NodeDetailScreen> {
   /// Liste des tags actuels du nœud.
   late List<String> _currentTags;
+  bool _isPinging = false;
+  bool? _pingResult;
 
   @override
   void initState() {
     super.initState();
     _currentTags = List<String>.from(widget.node.tags);
   }
+
+  /// Lance un ping sur l'adresse IPv4 du nœud.
+  void _pingNode() async {
+    setState(() {
+      _isPinging = true;
+      _pingResult = null;
+    });
+
+    final ipv4 = widget.node.ipAddresses.firstWhere((ip) => !ip.contains(':'), orElse: () => '');
+    if (ipv4.isEmpty) {
+      setState(() {
+        _isPinging = false;
+        _pingResult = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aucune adresse IPv4 trouvée pour ce nœud.')),
+      );
+      return;
+    }
+
+    final ping = Ping(ipv4, count: 3);
+    final completer = Completer<bool>();
+
+    final subscription = ping.stream.listen((event) {
+      if (event.summary != null) {
+        final received = event.summary!.received;
+        if (!completer.isCompleted) {
+          completer.complete(received > 0);
+        }
+      }
+    });
+
+    final result = await completer.future.timeout(const Duration(seconds: 5), onTimeout: () {
+      return false;
+    });
+
+    subscription.cancel();
+
+    setState(() {
+      _isPinging = false;
+      _pingResult = result;
+    });
+  }
+
 
   /// Affiche un dialogue pour modifier les tags du nœud.
   ///
@@ -38,9 +85,6 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       context: context,
       builder: (context) => EditTagsDialog(
         node: widget.node,
-        // onCliCommandGenerated: (command) { // This callback is no longer used
-        //   // The command is now returned by the dialog itself
-        // },
       ),
     );
 
@@ -98,6 +142,24 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                     : widget.node.advertisedRoutes.join(', ')),
             _buildDetailRow('Tags : ',
                 _currentTags.isEmpty ? 'Aucun' : _currentTags.join(', ')),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _isPinging ? null : _pingNode,
+                  icon: const Icon(Icons.network_ping),
+                  label: const Text('Ping'),
+                ),
+                const SizedBox(width: 16),
+                if (_isPinging)
+                  const CircularProgressIndicator()
+                else if (_pingResult != null)
+                  Icon(
+                    _pingResult! ? Icons.check_circle : Icons.cancel,
+                    color: _pingResult! ? Colors.green : Colors.red,
+                  ),
+              ],
+            )
           ],
         ),
       ),
@@ -121,6 +183,19 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           Expanded(
             child: SelectableText(value), // Texte sélectionnable pour faciliter la copie.
           ),
+          if (label == 'Nom de domaine complet (FQDN) : ')
+            IconButton(
+              icon: const Icon(Icons.copy),
+              tooltip: 'Copier le FQDN',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: value));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('FQDN copié dans le presse-papiers.'),
+                  ),
+                );
+              },
+            ),
         ],
       ),
     );
