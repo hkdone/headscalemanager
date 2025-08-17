@@ -23,7 +23,10 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   /// Liste des tags actuels du nœud.
   late List<String> _currentTags;
   bool _isPinging = false;
-  bool? _pingResult;
+  PingSummary? _pingSummary;
+  bool _isPingingContinuously = false;
+  StreamSubscription<PingData>? _pingSubscription;
+  final List<PingData> _pingResponses = [];
 
   @override
   void initState() {
@@ -31,18 +34,23 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     _currentTags = List<String>.from(widget.node.tags);
   }
 
+  @override
+  void dispose() {
+    _pingSubscription?.cancel();
+    super.dispose();
+  }
+
   /// Lance un ping sur l'adresse IPv4 du nœud.
   void _pingNode() async {
     setState(() {
       _isPinging = true;
-      _pingResult = null;
+      _pingSummary = null;
     });
 
     final ipv4 = widget.node.ipAddresses.firstWhere((ip) => !ip.contains(':'), orElse: () => '');
     if (ipv4.isEmpty) {
       setState(() {
         _isPinging = false;
-        _pingResult = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Aucune adresse IPv4 trouvée pour ce nœud.')),
@@ -50,28 +58,61 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       return;
     }
 
-    final ping = Ping(ipv4, count: 3);
-    final completer = Completer<bool>();
+    final ping = Ping(ipv4, count: 5);
+    final completer = Completer<PingSummary?>();
 
     final subscription = ping.stream.listen((event) {
       if (event.summary != null) {
-        final received = event.summary!.received;
         if (!completer.isCompleted) {
-          completer.complete(received > 0);
+          completer.complete(event.summary);
         }
       }
     });
 
-    final result = await completer.future.timeout(const Duration(seconds: 5), onTimeout: () {
-      return false;
+    final summary = await completer.future.timeout(const Duration(seconds: 10), onTimeout: () {
+      return null;
     });
 
     subscription.cancel();
 
     setState(() {
       _isPinging = false;
-      _pingResult = result;
+      _pingSummary = summary;
     });
+  }
+
+  void _toggleContinuousPing(bool value) {
+    setState(() {
+      _isPingingContinuously = value;
+      _pingSummary = null; // Clear previous results
+      _pingResponses.clear();
+    });
+
+    if (_isPingingContinuously) {
+      final ipv4 = widget.node.ipAddresses.firstWhere((ip) => !ip.contains(':'), orElse: () => '');
+      if (ipv4.isEmpty) {
+        setState(() {
+          _isPingingContinuously = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Aucune adresse IPv4 trouvée pour ce nœud.')),
+        );
+        return;
+      }
+
+      final ping = Ping(ipv4, count: 10000); // Effectively continuous
+      _pingSubscription = ping.stream.listen((event) {
+        setState(() {
+          _pingResponses.add(event);
+        });
+      }, onDone: () {
+        setState(() {
+          _isPingingContinuously = false;
+        });
+      });
+    } else {
+      _pingSubscription?.cancel();
+    }
   }
 
 
@@ -146,23 +187,113 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
             Row(
               children: [
                 ElevatedButton.icon(
-                  onPressed: _isPinging ? null : _pingNode,
+                  onPressed: _isPingingContinuously ? null : _pingNode,
                   icon: const Icon(Icons.network_ping),
                   label: const Text('Ping'),
                 ),
                 const SizedBox(width: 16),
-                if (_isPinging)
+                if (_isPinging && !_isPingingContinuously)
                   const CircularProgressIndicator()
-                else if (_pingResult != null)
-                  Icon(
-                    _pingResult! ? Icons.check_circle : Icons.cancel,
-                    color: _pingResult! ? Colors.green : Colors.red,
-                  ),
+                else if (_pingSummary != null && !_isPingingContinuously)
+                  _buildPingResults(_pingSummary!)
               ],
-            )
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Text("Ping en continu"),
+                Switch(
+                  value: _isPingingContinuously,
+                  onChanged: _toggleContinuousPing,
+                ),
+              ],
+            ),
+            if (_isPingingContinuously)
+              _buildContinuousPingResults(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPingResults(PingSummary summary) {
+    final received = summary.received;
+    final transmitted = summary.transmitted;
+    final time = summary.time;
+
+    if (received == 0) {
+      return const Row(
+        children: [
+          Icon(Icons.cancel, color: Colors.red),
+          SizedBox(width: 8),
+          Text("Échec du Ping", style: TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      );
+    }
+
+    final loss = transmitted > 0 ? (1 - received / transmitted) * 100 : 0;
+    final avgLatency = time != null && received > 0 ? (time.inMicroseconds / 1000 / received) : 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text("Succès", style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        SizedBox(height: 8),
+        Text("Latence moyenne: ${avgLatency.toStringAsFixed(2)} ms"),
+        Text("Paquets perdus: ${loss.toStringAsFixed(0)}% ($received/$transmitted reçus)"),
+      ],
+    );
+  }
+
+  Widget _buildContinuousPingResults() {
+    if (_pingResponses.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final responses = _pingResponses.where((e) => e.response != null).map((e) => e.response!).toList();
+    final errors = _pingResponses.where((e) => e.error != null).toList();
+    final transmitted = _pingResponses.length;
+    final received = responses.length;
+    final loss = transmitted > 0 ? (1 - received / transmitted) * 100 : 0;
+
+    final latencies = responses.where((e) => e.time != null).map((e) => e.time!.inMilliseconds).toList();
+    final avgLatency = latencies.isNotEmpty ? latencies.reduce((a, b) => a + b) / latencies.length : 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Statistiques en direct :", style: Theme.of(context).textTheme.titleMedium),
+        Text("Latence moyenne: ${avgLatency.toStringAsFixed(2)} ms"),
+        Text("Paquets perdus: ${loss.toStringAsFixed(0)}% ($received/$transmitted reçus)"),
+        const SizedBox(height: 10),
+        Text("Journal du ping :", style: Theme.of(context).textTheme.titleMedium),
+        Container(
+          height: 150,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: ListView.builder(
+            reverse: true,
+            itemCount: _pingResponses.length,
+            itemBuilder: (context, index) {
+              final data = _pingResponses.reversed.toList()[index];
+              if (data.response != null) {
+                return Text("  Réponse de ${data.response!.ip}: temps=${data.response!.time?.inMilliseconds}ms");
+              } else if (data.error != null) {
+                return Text("  Erreur: ${data.error!.error.toString()}", style: TextStyle(color: Colors.red));
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ],
     );
   }
 
