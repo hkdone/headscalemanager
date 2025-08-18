@@ -44,10 +44,9 @@ class AclGeneratorService {
         }
       }
 
-      final isExitNode = node.advertisedRoutes.contains('0.0.0.0/0') || node.advertisedRoutes.contains('::/0');
-      if (isExitNode) userOwnsExitNode[userName] = true;
+      if (node.isExitNode) userOwnsExitNode[userName] = true;
 
-      final subnetRoutes = node.advertisedRoutes.where((r) => r != '0.0.0.0/0' && r != '::/0').toList();
+      final subnetRoutes = node.sharedRoutes; // Use sharedRoutes directly
       if (subnetRoutes.isNotEmpty) {
         if (!routesByUser.containsKey(userName)) routesByUser[userName] = <String>{};
         routesByUser[userName]!.addAll(subnetRoutes);
@@ -63,7 +62,7 @@ class AclGeneratorService {
         }
       }
 
-      if (isExitNode && node.tags.isNotEmpty) {
+      if (node.isExitNode && node.tags.isNotEmpty) {
         final exitNodesList = autoApprovers['exitNodes'] as List<String>;
         for (var tag in node.tags) {
           if (!exitNodesList.contains(tag)) exitNodesList.add(tag);

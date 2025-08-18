@@ -45,7 +45,7 @@ class NodeManagementTile extends StatelessWidget {
   }
 
   /// Getter pour vérifier si le nœud est un nœud de sortie.
-  bool get _isExitNode => node.advertisedRoutes.contains('0.0.0.0/0') || node.advertisedRoutes.contains('::/0');
+  bool get _isExitNode => node.isExitNode;
 
   @override
   Widget build(BuildContext context) {

@@ -23,8 +23,10 @@ class Node {
   /// Date et heure de la dernière fois que le nœud a été vu en ligne.
   final DateTime lastSeen;
 
-  /// Liste des routes réseau annoncées par ce nœud.
-  final List<String> advertisedRoutes;
+  /// Liste des routes réseau partagées par ce nœud (correspond à approvedRoutes de l'API).
+  final List<String> sharedRoutes;
+  /// Indique si ce nœud est un nœud de sortie (basé sur la présence de 0.0.0.0/0 ou ::/0 dans availableRoutes).
+  final bool isExitNode;
 
   /// Liste des tags associés à ce nœud.
   final List<String> tags;
@@ -44,9 +46,10 @@ class Node {
     required this.ipAddresses,
     required this.online,
     required this.lastSeen,
-    required this.advertisedRoutes,
+    required this.sharedRoutes,
+    required this.isExitNode,
     required this.tags,
-    required this.baseDomain, // Nouveau champ
+    required this.baseDomain,
   });
 
   /// Constructeur d'usine (factory constructor) pour créer une instance de Node à partir d'un Map JSON.
@@ -65,34 +68,25 @@ class Node {
     // avec un fallback à 'Unknown Hostname' si non présent.
     final hostname = json['name'] as String? ?? 'Unknown Hostname';
 
+    final List<String> availableRoutes = List<String>.from(json['availableRoutes'] ?? []);
+    final bool isExitNode = availableRoutes.contains('0.0.0.0/0') || availableRoutes.contains('::/0');
+
     return Node(
-      // L'ID du nœud, avec un fallback à une chaîne vide.
       id: json['id'] ?? '',
-      // La clé machine du nœud, avec un fallback à une chaîne vide.
       machineKey: json['machineKey'] ?? '',
-      // Le nom d'hôte stable.
       hostname: hostname,
-      // Le nom affichable du nœud : utilise 'givenName' s'il est présent, sinon utilise 'hostname'.
       name: givenName.isNotEmpty ? givenName : hostname,
-      // Le nom de l'utilisateur associé au nœud, avec un fallback à 'N/A'.
       user: userMap != null ? (userMap['name'] ?? 'N/A') : 'N/A',
-      // Liste des adresses IP, convertie à partir d'une liste dynamique, avec un fallback à une liste vide.
       ipAddresses: List<String>.from(json['ipAddresses'] ?? []),
-      // Statut en ligne du nœud, avec un fallback à false.
       online: json['online'] ?? false,
-      // Date de la dernière connexion. Si 'lastSeen' est nul, utilise la date et l'heure actuelles.
-      // ATTENTION : Utiliser DateTime.now() comme fallback peut être trompeur car cela suggère
-      // que le nœud vient d'être vu, alors que l'information était absente.
       lastSeen: json['lastSeen'] != null
           ? DateTime.parse(json['lastSeen'])
           : DateTime.now(),
-      // Routes annoncées, mappées depuis 'subnetRoutes', avec un fallback à une liste vide.
-      advertisedRoutes: List<String>.from(json['subnetRoutes'] ?? []),
-      // Tags du nœud, avec une priorité sur 'forcedTags', puis 'validTags', puis 'tags',
-      // avec un fallback à une liste vide.
+      sharedRoutes: List<String>.from(json['approvedRoutes'] ?? []),
+      isExitNode: isExitNode,
       tags: List<String>.from(
           json['forcedTags'] ?? json['validTags'] ?? json['tags'] ?? []),
-      baseDomain: baseDomain, // Passage du nouveau champ
+      baseDomain: baseDomain,
     );
   }
 

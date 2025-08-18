@@ -151,7 +151,7 @@ class ExitNodeCommandDialog extends StatelessWidget {
               child: const Text('Procéder à la confirmation'),
               onPressed: () async {
                 Navigator.of(context).pop(); // Fermer la boîte de dialogue actuelle
-                final List<String> combinedRoutes = List.from(node.advertisedRoutes);
+                final List<String> combinedRoutes = List.from(node.sharedRoutes);
                 if (!combinedRoutes.contains('0.0.0.0/0')) {
                   combinedRoutes.add('0.0.0.0/0');
                 }

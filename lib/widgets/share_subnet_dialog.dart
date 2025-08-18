@@ -73,7 +73,7 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
           onPressed: () async {
             if (_formKey.currentState!.validate()) {
               final String newSubnet = _subnetController.text;
-              final List<String> combinedRoutes = List.from(widget.node.advertisedRoutes);
+              final List<String> combinedRoutes = List.from(widget.node.sharedRoutes);
 
               if (!combinedRoutes.contains(newSubnet)) {
                 combinedRoutes.add(newSubnet);

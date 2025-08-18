@@ -177,10 +177,10 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
             _buildDetailRow(
                 'Adresses IP : ', widget.node.ipAddresses.join(', ')),
             _buildDetailRow(
-                'Routes annoncées : ',
-                widget.node.advertisedRoutes.isEmpty
+                'Routes partagées : ',
+                widget.node.sharedRoutes.isEmpty
                     ? 'Aucune'
-                    : widget.node.advertisedRoutes.join(', ')),
+                    : widget.node.sharedRoutes.join(', ')),
             _buildDetailRow('Tags : ',
                 _currentTags.isEmpty ? 'Aucun' : _currentTags.join(', ')),
             const SizedBox(height: 20),

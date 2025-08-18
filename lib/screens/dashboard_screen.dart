@@ -134,18 +134,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             title: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(node.name),
+                                Row(
+                                  children: [
+                                    Text(node.name),
+                                    if (node.isExitNode)
+                                      const Padding(
+                                        padding: EdgeInsets.only(left: 4.0),
+                                        child: Icon(Icons.exit_to_app, size: 16, color: Colors.orange),
+                                      ),
+                                  ],
+                                ),
                                 Text(node.hostname, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                               ],
                             ),
-                            // Adresses IP, routes annoncées et dernière connexion.
+                            // Adresses IP, routes partagées et dernière connexion.
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(node.ipAddresses.join(', ')),
-                                if (node.advertisedRoutes.isNotEmpty)
+                                if (node.sharedRoutes.isNotEmpty)
                                   Text(
-                                    'Routes : ${node.advertisedRoutes.join(', ')}',
+                                    'Routes partagées : ${node.sharedRoutes.join(', ')}',
                                     style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
                                   ),
                                 Text('Dernière connexion : ${node.lastSeen.toLocal()}', style: const TextStyle(fontSize: 12, color: Colors.grey)),

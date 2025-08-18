@@ -1,14 +1,66 @@
-error: The named parameter 'appNodes' is required, but there's no corresponding argument. (missing_required_argument at [headscalemanager] lib\screens\network_map_screen.dart:34)
-error: The named parameter 'appUsers' is required, but there's no corresponding argument. (missing_required_argument at [headscalemanager] lib\screens\network_map_screen.dart:34)
-error: The named parameter 'allNodes' isn't defined. (undefined_named_parameter at [headscalemanager] lib\screens\network_map_screen.dart:35)
-error: The named parameter 'allUsers' isn't defined. (undefined_named_parameter at [headscalemanager] lib\screens\network_map_screen.dart:36)
-error: Missing concrete implementations of 'abstract class Algorithm.init', 'abstract class Algorithm.setDimensions', 'abstract class Algorithm.setFocusedNode', and 'abstract class Algorithm.step'. (non_abstract_class_inherits_abstract_member at [headscalemanager] lib\utils\user_grouped_layout.dart:5)
-error: Missing concrete implementations of 'abstract class Algorithm.init', 'abstract class Algorithm.setDimensions', 'abstract class Algorithm.setFocusedNode', and 'abstract class Algorithm.step'. (non_abstract_class_inherits_abstract_member at [headscalemanager] lib\utils\user_grouped_layout.dart:5)
-error: 'UserGroupedLayout.run' ('void Function(Graph, double?, double?)') isn't a valid override of 'Algorithm.run' ('Size Function(Graph?, double, double)'). (invalid_override at [headscalemanager] lib\utils\user_grouped_layout.dart:27)
-error: 'UserGroupedLayout.run' ('void Function(Graph, double?, double?)') isn't a valid override of 'Algorithm.run' ('Size Function(Graph?, double, double)'). (invalid_override at [headscalemanager] lib\utils\user_grouped_layout.dart:27)
-error: The property 'key' can't be unconditionally accessed because the receiver can be 'null'. (unchecked_use_of_nullable_value at [headscalemanager] lib\utils\user_grouped_layout.dart:71)
-error: The property 'key' can't be unconditionally accessed because the receiver can be 'null'. (unchecked_use_of_nullable_value at [headscalemanager] lib\utils\user_grouped_layout.dart:71)
-error: The property 'x' can't be unconditionally accessed because the receiver can be 'null'. (unchecked_use_of_nullable_value at [headscalemanager] lib\utils\user_grouped_layout.dart:72)
-error: The property 'x' can't be unconditionally accessed because the receiver can be 'null'. (unchecked_use_of_nullable_value at [headscalemanager] lib\utils\user_grouped_layout.dart:72)
-error: The property 'y' can't be unconditionally accessed because the receiver can be 'null'. (unchecked_use_of_nullable_value at [headscalemanager] lib\utils\user_grouped_layout.dart:73)
-error: The property 'y' can't be unconditionally accessed because the receiver can be 'null'. (unchecked_use_of_nullable_value at [headscalemanager] lib\utils\user_grouped_layout.dart:73)
+{
+  "groups": {
+    "group:jean@nasfilecloud.me": [
+      "jean@nasfilecloud.me"
+    ]
+  },
+  "tagOwners": {
+    "tag:jeanmobile": [
+      "group:jean@nasfilecloud.me"
+    ],
+    "tag:pcjean": [
+      "group:jean@nasfilecloud.me"
+    ],
+    "tag:srvplex": [
+      "group:jean@nasfilecloud.me"
+    ],
+    "tag:mobilemarine": [
+      "group:jean@nasfilecloud.me"
+    ]
+  },
+  "autoApprovers": {
+    "routes": {
+      "192.168.1.0/24": [
+        "tag:srvplex"
+      ]
+    },
+    "exitNodes": [
+      "tag:srvplex"
+    ]
+  },
+  "acls": [
+    {
+      "action": "accept",
+      "src": [
+        "tag:jeanmobile",
+        "tag:pcjean",
+        "tag:srvplex",
+        "tag:mobilemarine"
+      ],
+      "dst": [
+        "tag:jeanmobile:*",
+        "tag:pcjean:*",
+        "tag:srvplex:*",
+        "tag:mobilemarine:*",
+        "192.168.1.0/24:*",
+        "autogroup:internet:*"
+      ]
+    },
+    {
+      "action": "accept",
+      "src": [
+        "tag:srvplex"
+      ],
+      "dst": [
+        "tag:jeanmobile:*",
+        "tag:pcjean:*",
+        "tag:srvplex:*",
+        "tag:mobilemarine:*",
+        "192.168.1.0/24:*",
+        "autogroup:internet:*"
+      ]
+    }
+  ],
+  "hosts": {},
+  "tests": []
+}
