@@ -23,7 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Liste des widgets (écrans) correspondant aux éléments de la barre de navigation.
   /// L'ordre doit correspondre à l'ordre des `BottomNavigationBarItem`.
-  static const List<Widget> _widgetOptions = <Widget>[
+    static const List<Widget> _widgetOptions = <Widget>[
     DashboardScreen(),
     UsersScreen(),
     AclScreen(),

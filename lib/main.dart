@@ -38,11 +38,30 @@ class MyApp extends StatelessWidget {
         /// il est recommandé d'utiliser `ColorScheme.fromSeed` ou de définir
         /// un `ColorScheme` personnalisé.
         theme: ThemeData(
+          brightness: Brightness.light,
           primarySwatch: Colors.blue,
+          scaffoldBackgroundColor: Colors.grey[100], // Fond d'écran légèrement gris
           visualDensity: VisualDensity.adaptivePlatformDensity,
+          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+            backgroundColor: Colors.white, // Barre de nav blanche
+            selectedItemColor: Colors.blue,
+            unselectedItemColor: Colors.black54,
+            type: BottomNavigationBarType.fixed,
+          ),
         ),
         /// Thème visuel de l'application pour le mode sombre.
-        darkTheme: ThemeData.dark(),
+                darkTheme: ThemeData(
+          brightness: Brightness.dark,
+          primarySwatch: Colors.blue,
+          scaffoldBackgroundColor: const Color(0xFF121212), // Fond d'écran sombre
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+          bottomNavigationBarTheme: BottomNavigationBarThemeData(
+            backgroundColor: const Color(0xFF212121), // Barre de nav plus claire
+            selectedItemColor: Colors.blue[300],
+            unselectedItemColor: Colors.grey,
+            type: BottomNavigationBarType.fixed,
+          ),
+        ),
         /// Définit le mode de thème à utiliser (système, clair ou sombre).
         /// `ThemeMode.system` respecte les préférences de thème du système d'exploitation.
         themeMode: ThemeMode.system,
