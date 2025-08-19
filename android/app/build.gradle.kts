@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -9,6 +12,15 @@ android {
     namespace = "com.dkstudio.headscalemanager"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
+
+    // Load the key.properties file
+    val keystoreProperties = Properties()
+    val keystorePropertiesFile = file("C:/Users/dkdone/StudioProjects/headscaleManager/android/key.properties")
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+    }
+
+    
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -29,28 +41,24 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(rootProject.projectDir.absolutePath + "/key.jks")
+            storePassword = keystoreProperties.getProperty("storePassword")
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
-        buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             // signingConfig = debugSigningConfig // Comment out or remove this line
 
             // Add the following lines for release signing
-            if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
-                signingConfig = signingConfigs.release
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
-    }
-
-    signingConfigs {
-        create("release") {
-            storeFile = file(System.getenv('MYAPP_UPLOAD_STORE_FILE') ?: project.property('MYAPP_UPLOAD_STORE_FILE') as String)
-            storePassword = System.getenv('MYAPP_UPLOAD_STORE_PASSWORD') ?: project.property('MYAPP_UPLOAD_STORE_PASSWORD') as String
-            keyAlias = System.getenv('MYAPP_UPLOAD_KEY_ALIAS') ?: project.property('MYAPP_UPLOAD_KEY_ALIAS') as String
-            keyPassword = System.getenv('MYAPP_UPLOAD_KEY_PASSWORD') ?: project.property('MYAPP_UPLOAD_KEY_PASSWORD') as String
-        }
-    }
     }
 }
 
