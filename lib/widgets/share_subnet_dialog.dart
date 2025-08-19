@@ -39,29 +39,31 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
 
     return AlertDialog(
       title: const Text('Partager le sous-réseau local'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-              'Entrez le sous-réseau à annoncer (par exemple, 192.168.1.0/24).\n\nNote : L\'appareil doit être configuré pour annoncer cette route.'),
-          const SizedBox(height: 16),
-          Form(
-            key: _formKey,
-            child: TextFormField(
-              controller: _subnetController,
-              decoration: const InputDecoration(
-                  labelText: 'Sous-réseau (format CIDR)'),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Veuillez entrer un sous-réseau';
-                }
-                final regex = RegExp(r'^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}');
-                if (!regex.hasMatch(value)) return 'Format CIDR invalide';
-                return null;
-              },
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+                'Entrez le sous-réseau à annoncer (par exemple, 192.168.1.0/24).\n\nNote : L\'appareil doit être configuré pour annoncer cette route.'),
+            const SizedBox(height: 16),
+            Form(
+              key: _formKey,
+              child: TextFormField(
+                controller: _subnetController,
+                decoration: const InputDecoration(
+                    labelText: 'Sous-réseau (format CIDR)'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Veuillez entrer un sous-réseau';
+                  }
+                  final regex = RegExp(r'^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}');
+                  if (!regex.hasMatch(value)) return 'Format CIDR invalide';
+                  return null;
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       actions: <Widget>[
         TextButton(
@@ -96,7 +98,7 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
                 showDialog(
                   context: context,
                   builder: (ctx) => SubnetCommandDialog(
-                    title: 'Étape 1 : Configurer le routage de sous-réseau',
+                    title: 'Sur le client : Configurer le routage de sous-réseau',
                     tailscaleCommand: 'tailscale up --advertise-routes=$newSubnet --login-server=$loginServer',
                     linuxInstructions: 'Sur votre appareil Linux, activez le transfert IP et le NAT, puis exécutez la commande Tailscale :',
                     windowsInstructions: 'Sur votre appareil Windows, activez le transfert IP et le NAT (partage de connexion Internet), puis exécutez la commande Tailscale :',

@@ -4,14 +4,12 @@ import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart'; // For debugPrint
-import 'package:headscalemanager/widgets/subnet_command_dialog.dart'; // Reusing the generic command dialog
 
 /// Dialogue pour configurer un nœud comme nœud de sortie.
 ///
 /// Affiche les commandes Tailscale nécessaires et les instructions spécifiques
 /// à la plateforme pour activer la fonctionnalité de nœud de sortie.
-class ExitNodeCommandDialog extends StatelessWidget {
+class ExitNodeCommandDialog extends StatefulWidget {
   /// Le nœud à configurer comme nœud de sortie.
   final Node node;
 
@@ -23,6 +21,25 @@ class ExitNodeCommandDialog extends StatelessWidget {
     required this.node,
     required this.onExitNodeEnabled,
   });
+
+  @override
+  State<ExitNodeCommandDialog> createState() => _ExitNodeCommandDialogState();
+}
+
+class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,8 +82,9 @@ class ExitNodeCommandDialog extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const TabBar(
-                  tabs: [
+                TabBar(
+                  controller: _tabController,
+                  tabs: const [
                     Tab(text: 'Linux'),
                     Tab(text: 'Windows'),
                     Tab(text: 'Mobile'),
@@ -75,6 +93,7 @@ class ExitNodeCommandDialog extends StatelessWidget {
                 const SizedBox(height: 16),
                 Expanded(
                   child: TabBarView(
+                    controller: _tabController,
                     children: [
                       // Instructions Linux
                       SingleChildScrollView(
@@ -151,7 +170,7 @@ class ExitNodeCommandDialog extends StatelessWidget {
               child: const Text('Procéder à la confirmation'),
               onPressed: () async {
                 Navigator.of(context).pop(); // Fermer la boîte de dialogue actuelle
-                final List<String> combinedRoutes = List.from(node.sharedRoutes);
+                final List<String> combinedRoutes = List.from(widget.node.sharedRoutes);
                 if (!combinedRoutes.contains('0.0.0.0/0')) {
                   combinedRoutes.add('0.0.0.0/0');
                 }
@@ -159,9 +178,9 @@ class ExitNodeCommandDialog extends StatelessWidget {
                   combinedRoutes.add('::/0');
                 }
                 try {
-                  await appProvider.apiService.setNodeRoutes(node.id, combinedRoutes);
+                  await appProvider.apiService.setNodeRoutes(widget.node.id, combinedRoutes);
                   showSafeSnackBar(context, 'Nœud de sortie activé.');
-                  onExitNodeEnabled(); // Appelle le callback pour rafraîchir
+                  widget.onExitNodeEnabled(); // Appelle le callback pour rafraîchir
                 } catch (e) {
                   debugPrint('Erreur lors de l\'activation du nœud de sortie : $e');
                   showSafeSnackBar(context, 'Échec de l\'activation du nœud de sortie : $e');
