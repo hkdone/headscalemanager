@@ -123,17 +123,12 @@ class HelpScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '**B) Enregistrement manuel (Nécessaire pour l\'application Tailscale sur Android/iPhone)**',
+              '**B) Enregistrement manuel**',
               style: Theme.of(context).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
-              'Les clients mobiles ne peuvent pas utiliser la commande `tailscale up` avec une clé. Il faut donc un enregistrement manuel :\n'
-              '1. Sur le client Tailscale (Android/iPhone), connectez-vous avec votre URL de serveur. Le client affichera une URL qu\'il faut copier et envoyer à l\'administrateur Headscale Manager.\n'
-              '2. Dans l\'application Headscale Manager, allez dans les détails de l\'utilisateur, puis cliquez sur "Enregistrer un nouvel appareil".\n'
-              '3. Coller le lien fournis par le client dans le champs prévu à cet effet sur la deuxiéme étape d\'enregistrement.L\'application vous montrera une commande `headscale nodes register --user mon-user --key ...`.\n'
-              '4. **Sur votre serveur**, exécutez cette commande en vérifiant la clé (`nodekey:xxx`) fournie par votre client mobile.\n'
-              '5. L\'appareil est maintenant associé à l\'utilisateur.',
+              'L\'enregistrement manuel se fait en deux étapes :\n\n1. **Sur l\'appareil client :**\n    * **Pour Windows, Linux, et macOS :** Dans l\'application, allez dans les détails de l\'utilisateur, cliquez sur "Enregistrer un nouvel appareil", et dans l\'onglet "Windows/Linux/macOS", copiez la commande `tailscale up ...` et exécutez-la sur l\'appareil.\n    * **Pour iOS et Android :** Dans l\'application, allez dans les détails de l\'utilisateur, cliquez sur "Enregistrer un nouvel appareil", et dans l\'onglet "iOS/Android", copiez l\'URL du serveur. Sur le client Tailscale, allez dans les paramètres, sélectionnez "Use alternate server", et collez l\'URL.\n\n2. **Dans l\'application Headscale Manager :**\n    * Après avoir effectué l\'étape 1, le client Tailscale vous fournira une URL d\'enregistrement.\n    * Dans l\'application Headscale Manager, passez à l\'étape 2 de l\'enregistrement, collez l\'URL fournie par le client, ce qui générera une commande `headscale nodes register ...`.\n    * Exécutez cette commande sur votre serveur Headscale pour finaliser l\'enregistrement.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),

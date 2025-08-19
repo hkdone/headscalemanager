@@ -1,4 +1,6 @@
-storePassword=masqué
-keyPassword=masqué
-keyAlias=headscalemanager
-storeFile=key.jks
+======== Exception caught by rendering library =====================================================
+The following assertion was thrown during layout:
+A RenderFlex overflowed by 10 pixels on the bottom.
+
+The relevant error-causing widget was:
+  Column Column:file:///C:/Users/dkdone/StudioProjects/headscaleManager/lib/widgets/registration_dialogs.dart:136:18

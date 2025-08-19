@@ -6,14 +6,10 @@ import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
 
 /// Affiche un dialogue pour guider l'utilisateur dans l'enregistrement d'un appareil
-/// en fournissant la commande `tailscale up`.
+/// en fournissant la commande `tailscale up` ou l'URL du serveur.
 ///
 /// Cette fonction est la première étape du processus d'enregistrement d'un appareil.
-/// Elle génère une commande `tailscale up` que l'utilisateur doit exécuter sur
-/// l'appareil client.
-///
-/// [context] : Le contexte de construction du widget.
-/// [user] : L'utilisateur sous lequel l'appareil sera enregistré.
+/// Elle présente des onglets pour différents systèmes d'exploitation.
 Future<void> showTailscaleUpCommandDialog(BuildContext context, User user) async {
   final appProvider = context.read<AppProvider>();
   final serverUrl = await appProvider.storageService.getServerUrl();
@@ -22,125 +18,176 @@ Future<void> showTailscaleUpCommandDialog(BuildContext context, User user) async
     return;
   }
 
-  // Construit l'URL du serveur de connexion, en supprimant le slash final si présent.
   final String loginServer = serverUrl.endsWith('/') ? serverUrl.substring(0, serverUrl.length - 1) : serverUrl;
-  // Construit la commande Tailscale à exécuter sur l'appareil client.
   final String command = 'tailscale up --login-server=$loginServer';
 
   return showDialog(
     context: context,
     builder: (dialogContext) {
-      return AlertDialog(
-        title: const Text('Étape 1 : Exécuter sur l\'appareil'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-                'Copiez la commande ci-dessous et exécutez-la sur l\'appareil que vous souhaitez enregistrer. Ensuite, fournissez le lien web généré à cette application pour l\'étape suivante.'),
-            const SizedBox(height: 16),
-            // Affiche la commande Tailscale, rendue sélectionnable pour la copie.
-            SelectableText(
-              command,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+      return DefaultTabController(
+        length: 2,
+        child: AlertDialog(
+          title: const Text('Étape 1 : Connecter l\'appareil'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const TabBar(
+                  tabs: [
+                    Tab(text: 'Windows/Linux/macOS'),
+                    Tab(text: 'iOS/Android'),
+                  ],
+                ),
+                SizedBox(
+                  height: 200, // Adjust height as needed
+                  child: TabBarView(
+                    children: [
+                      // Tab for Windows/Linux/macOS
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                                'Exécutez la commande suivante dans le terminal de votre appareil:'),
+                            const SizedBox(height: 16),
+                            SelectableText(
+                              command,
+                              style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.copy),
+                              label: const Text('Copier la commande'),
+                              onPressed: () async {
+                                await Clipboard.setData(ClipboardData(text: command));
+                                showSafeSnackBar(context, 'Commande copiée !');
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Tab for iOS/Android
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                  'Sur votre appareil, allez dans les paramètres du client Tailscale, sélectionnez "Use alternate server" et entrez l\'URL suivante:'),
+                              const SizedBox(height: 16),
+                              SelectableText(
+                                loginServer,
+                                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.copy),
+                                label: const Text('Copier l\'URL'),
+                                onPressed: () async {
+                                  await Clipboard.setData(ClipboardData(text: loginServer));
+                                  showSafeSnackBar(context, 'URL copiée !');
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Fermer'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+            ElevatedButton(
+              child: const Text('Étape suivante'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                showHeadscaleRegisterCommandDialog(context, user);
+              },
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            child: const Text('Fermer'),
-            onPressed: () => Navigator.of(dialogContext).pop(),
-          ),
-          TextButton(
-            child: const Text('Copier la commande'),
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: command));
-              showSafeSnackBar(context, 'Commande copiée dans le presse-papiers !');
-            },
-          ),
-          // Bouton pour passer à la deuxième étape du processus d'enregistrement.
-          ElevatedButton(
-            child: const Text('Étape suivante : Enregistrer la clé'),
-            onPressed: () {
-              Navigator.of(dialogContext).pop(); // Ferme la boîte de dialogue actuelle.
-              showHeadscaleRegisterCommandDialog(context, user); // Ouvre la nouvelle boîte de dialogue.
-            },
-          ),
-        ],
       );
     },
   );
 }
 
-/// Affiche un dialogue pour guider l'utilisateur dans l'enregistrement de la clé
-/// générée par l'appareil sur le serveur Headscale.
+/// Affiche un dialogue pour la deuxième étape de l'enregistrement de l'appareil.
 ///
-/// Cette fonction est la deuxième étape du processus d'enregistrement d'un appareil.
-/// Elle demande à l'utilisateur de coller le lien web obtenu de l'appareil client
-/// et génère la commande `headscale nodes register` correspondante.
-///
-/// [context] : Le contexte de construction du widget.
-/// [user] : L'utilisateur sous lequel l'appareil sera enregistré.
+/// Guide l'utilisateur pour coller le lien web obtenu du client Tailscale
+/// et génère la commande `headscale nodes register` à exécuter sur le serveur.
 Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user) async {
   final TextEditingController urlController = TextEditingController();
-  // Notifier de valeur pour la commande générée, mis à jour dynamiquement.
   final ValueNotifier<String> generatedCommand = ValueNotifier<String>('');
 
   return showDialog(
     context: context,
     builder: (dialogContext) {
       return AlertDialog(
-        title: const Text('Étape 2 : Enregistrer la clé sur Headscale'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Collez le lien web généré par l\'appareil ici :'),
-            const SizedBox(height: 8),
-            // Champ de texte pour coller l\'URL d\'enregistrement.
-            TextField(
-              controller: urlController,
-              decoration: const InputDecoration(
-                labelText: 'URL d\'enregistrement Web',
-                border: OutlineInputBorder(),
+        title: const Text('Étape 2 : Enregistrer sur le serveur'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                  'Après avoir suivi l\'étape 1 sur votre appareil, le client Tailscale vous fournira une URL d\'enregistrement unique. Collez cette URL ci-dessous pour générer la commande finale à exécuter sur votre serveur Headscale.'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: urlController,
+                decoration: const InputDecoration(
+                  labelText: 'Coller l\'URL du client ici',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (url) {
+                  final Uri? uri = Uri.tryParse(url);
+                  if (uri != null && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'register') {
+                    final String key = uri.pathSegments[1];
+                    generatedCommand.value = 'headscale nodes register --user ${user.name} --key $key';
+                  } else {
+                    generatedCommand.value = 'URL invalide. Le format attendu est : http://.../register/nodekey:...';
+                  }
+                },
               ),
-              onChanged: (url) {
-                // Analyse l\'URL pour extraire la clé et générer la commande Headscale.
-                final Uri? uri = Uri.tryParse(url);
-                if (uri != null && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'register') {
-                  final String key = uri.pathSegments[1];
-                  generatedCommand.value = 'headscale nodes register --user ${user.name} --key $key';
-                } else {
-                  generatedCommand.value = 'Format d\'URL invalide';
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-            // Affiche la commande Headscale générée, mise à jour en temps réel.
-            ValueListenableBuilder<String>(
-              valueListenable: generatedCommand,
-              builder: (ctx, cmd, child) {
-                return SelectableText(
-                  cmd,
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-                );
-              },
-            ),
-          ],
+              const SizedBox(height: 16),
+              const Text('Commande à exécuter sur votre serveur :'),
+              const SizedBox(height: 8),
+              ValueListenableBuilder<String>(
+                valueListenable: generatedCommand,
+                builder: (ctx, cmd, child) {
+                  return SelectableText(
+                    cmd,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 14,
+                      color: cmd.startsWith('headscale') ? Colors.black : Colors.red,
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
             child: const Text('Fermer'),
             onPressed: () => Navigator.of(dialogContext).pop(),
           ),
-          TextButton(
-            child: const Text('Copier la commande'),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.copy),
+            label: const Text('Copier la commande'),
             onPressed: () async {
-              // Copie la commande uniquement si elle est valide.
               if (generatedCommand.value.startsWith('headscale')) {
                 await Clipboard.setData(ClipboardData(text: generatedCommand.value));
-                showSafeSnackBar(context, 'Commande copiée dans le presse-papiers !');
+                showSafeSnackBar(context, 'Commande copiée !');
               } else {
                 showSafeSnackBar(context, 'Impossible de copier une commande invalide.');
               }
@@ -151,3 +198,4 @@ Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user)
     },
   );
 }
+
