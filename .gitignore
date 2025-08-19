@@ -33,6 +33,10 @@ migrate_working_dir/
 .pub/
 /build/
 
+# Sensitive files
+android/key.properties
+*.jks
+
 # Symbolication related
 app.*.symbols
 
