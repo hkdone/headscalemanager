@@ -40,6 +40,7 @@ class HeadscaleApiService {
   /// Gère les erreurs de réponse HTTP en construisant un message d'erreur descriptif.
   /// Inclut le nom de la fonction qui a échoué, le code de statut et le corps de la réponse.
   String _handleError(String functionName, http.Response response) {
+    print('Erreur API: ${response.body}'); // Add this line to print the response body
     return 'Échec de $functionName. Statut : ${response.statusCode}, Corps : ${response.body}';
   }
 
@@ -208,8 +209,10 @@ class HeadscaleApiService {
 
     // Vérifie si la requête a réussi.
     if (response.statusCode == 200) {
-      // Décode la réponse JSON et construit un objet PreAuthKey.
-      return PreAuthKey.fromJson(json.decode(response.body));
+      // Décode la réponse JSON et extrait l'objet preAuthKey.
+      final data = json.decode(response.body);
+      final preAuthKeyJson = data['preAuthKey'];
+      return PreAuthKey.fromJson(preAuthKeyJson);
     } else {
       // Lève une exception si la requête a échoué.
       throw Exception(_handleError('créer une clé de pré-authentification', response));
@@ -356,47 +359,47 @@ class HeadscaleApiService {
 
   /// Récupère toutes les clés de pré-authentification.
   Future<List<PreAuthKey>> getPreAuthKeys() async {
-    // Récupère l'URL de base du serveur.
     final baseUrl = await _getBaseUrl();
-    // Effectue la requête GET pour obtenir la liste des clés de pré-authentification.
-    final response = await http.get(
-      Uri.parse('${baseUrl}api/v1/preauthkey'),
-      headers: await _getHeaders(),
-    );
+    final List<PreAuthKey> allPreAuthKeys = [];
 
-    // Vérifie si la requête a réussi.
-    if (response.statusCode == 200) {
-      // Décode la réponse JSON.
-      final data = json.decode(response.body);
-      // Extrait la liste des clés de pré-authentification JSON.
-      final List<dynamic> keysJson = data['preAuthKeys']; // Supposant que 'preAuthKeys' est la clé
+    // First, get all users
+    final users = await getUsers();
 
-      // Mappe la liste JSON en objets PreAuthKey.
-      // ATTENTION : La construction 'PreAuthKey.fromJson({'preAuthKey': json})'
-      // suggère que le constructeur fromJson du modèle PreAuthKey attend un Map
-      // avec une clé 'preAuthKey' contenant les données réelles de la clé.
-      // Vérifiez la définition de PreAuthKey.fromJson pour confirmer si cela est correct
-      // ou si 'PreAuthKey.fromJson(json)' devrait être utilisé à la place.
-      return keysJson.map((json) => PreAuthKey.fromJson({'preAuthKey': json})).toList();
-    } else {
-      // Lève une exception si la requête a échoué.
-      throw Exception(_handleError('charger les clés de pré-authentification', response));
+    // Then, for each user, get their pre-auth keys
+    for (final user in users) {
+      final response = await http.get(
+        Uri.parse('${baseUrl}api/v1/preauthkey?user=${user.id}'),
+        headers: await _getHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<dynamic> keysJson = data['preAuthKeys'];
+        allPreAuthKeys.addAll(keysJson.map((json) => PreAuthKey.fromJson(json)).toList());
+      } else {
+        // Log the error but continue with other users
+        print(_handleError('charger les clés de pré-authentification pour l\'utilisateur ${user.name}', response));
+      }
     }
+
+    return allPreAuthKeys;
   }
 
-  /// Supprime une clé de pré-authentification en utilisant son ID.
-  Future<void> deletePreAuthKey(String keyId) async {
-    // Récupère l'URL de base du serveur.
+  /// Fait expirer une clé de pré-authentification.
+  Future<void> expirePreAuthKey(String userId, String key) async {
     final baseUrl = await _getBaseUrl();
-    // Effectue la requête DELETE pour supprimer la clé de pré-authentification.
-    final response = await http.delete(
-      Uri.parse('${baseUrl}api/v1/preauthkey/$keyId'),
+    final response = await http.post(
+      Uri.parse('${baseUrl}api/v1/preauthkey/expire'),
       headers: await _getHeaders(),
+      body: jsonEncode(<String, String>{
+        'user': userId,
+        'key': key,
+      }),
     );
-
-    // Lève une exception si la requête n'a pas réussi.
+    print('Expire PreAuthKey Status Code: ${response.statusCode}');
     if (response.statusCode != 200) {
-      throw Exception(_handleError('supprimer la clé de pré-authentification', response));
+      print('Erreur lors de l\'expiration de la clé: ${response.body}');
+      throw Exception(_handleError('expirer la clé de pré-authentification', response));
     }
   }
 

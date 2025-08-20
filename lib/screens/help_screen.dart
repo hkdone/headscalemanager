@@ -31,12 +31,12 @@ class HelpScreen extends StatelessWidget {
 
             // New Section: API vs CLI
             Text(
-              'Fonctionnement : API vs Lignes de Commande (CLI)',
+              'Fonctionnement : API',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
             Text(
-              'Pour des raisons de sécurité et de flexibilité, l\'application utilise une combinaison d\'appels directs à l\'API de Headscale et de commandes à exécuter manuellement sur votre serveur (CLI).',
+              'L\'application utilise des appels directs à l\'API de Headscale pour toutes les opérations de gestion.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
@@ -49,7 +49,7 @@ class HelpScreen extends StatelessWidget {
               padding: const EdgeInsets.all(8.0),
               color: Colors.grey[200],
               child: const Text(
-                'Ces actions sont effectuées directement par l\'application :\n'
+                'Ces actions sont effectuées directement par l\'application :\n' 
                 '- Lister les utilisateurs et les nœuds.\n'
                 '- Créer et supprimer des utilisateurs.\n'
                 '- Créer et invalider des clés de pré-authentification.\n'
@@ -57,24 +57,6 @@ class HelpScreen extends StatelessWidget {
                 '- Déplacer un nœud vers un autre utilisateur.\n'
                 '- Supprimer un nœud.\n'
                 '- Activer/Désactiver les routes (subnets et exit node).',
-                style: TextStyle(fontFamily: 'monospace', fontSize: 12),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '**Actions manuelles (via CLI) :**',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8.0),
-              color: Colors.grey[200],
-              child: const Text(
-                'Pour ces actions, l\'application génère la commande exacte que vous devez copier et coller dans le terminal de votre serveur Headscale. C\'est une mesure de sécurité pour les opérations sensibles :\n'
-                '- Enregistrer un nouveau nœud (la validation finale).\n'
-                '- Renommer un nœud.\n'
-                '- Modifier les tags d\'un nœud (pour les ACLs).\n'
-                '- Appliquer la politique ACL.',
                 style: TextStyle(fontFamily: 'monospace', fontSize: 12),
               ),
             ),
@@ -112,7 +94,7 @@ class HelpScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '**A) Avec une clé de pré-authentification (Recommandé pour le client Tailscale sur Windows, Linux, macOS)**',
+              '**A) Avec une clé de pré-authentification (Recommandé)**',
               style: Theme.of(context).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
@@ -124,12 +106,13 @@ class HelpScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '**B) Enregistrement manuel**',
+              '**B) Enregistrement via l\'application (pour les clients mobiles)**',
               style: Theme.of(context).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
-              'L\'enregistrement manuel se fait en deux étapes :\n\n1. **Sur l\'appareil client :**\n    * **Pour Windows, Linux, et macOS :** Dans l\'application, allez dans les détails de l\'utilisateur, cliquez sur "Enregistrer un nouvel appareil", et dans l\'onglet "Windows/Linux/macOS", copiez la commande `tailscale up ...` et exécutez-la sur l\'appareil.\n    * **Pour iOS et Android :** Dans l\'application, allez dans les détails de l\'utilisateur, cliquez sur "Enregistrer un nouvel appareil", et dans l\'onglet "iOS/Android", copiez l\'URL du serveur. Sur le client Tailscale, allez dans les paramètres, sélectionnez "Use alternate server", et collez l\'URL.\n\n2. **Dans l\'application Headscale Manager :**\n    * Après avoir effectué l\'étape 1, le client Tailscale vous fournira une URL d\'enregistrement.\n    * Dans l\'application Headscale Manager, passez à l\'étape 2 de l\'enregistrement, collez l\'URL fournie par le client, ce qui générera une commande `headscale nodes register ...`.\n    * Exécutez cette commande sur votre serveur Headscale pour finaliser l\'enregistrement.',
+              '1.  **Sur l\'appareil client (iOS/Android) :** Dans l\'application Tailscale, allez dans les paramètres, sélectionnez "Use alternate server", et collez l\'URL de votre serveur Headscale.\n'
+              '2.  **Dans l\'application Headscale Manager :** Après avoir effectué l\'étape 1, le client Tailscale vous fournira une URL d\'enregistrement unique. Dans l\'application Headscale Manager, allez dans les détails de l\'utilisateur, cliquez sur "Enregistrer un nouvel appareil", et collez l\'URL fournie par le client. L\'appareil sera enregistré directement via l\'API.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
@@ -146,8 +129,7 @@ class HelpScreen extends StatelessWidget {
             Text(
               '1. Allez dans les détails du nœud en cliquant dessus.\n'
               '2. Utilisez le menu pour le **renommer** (par exemple, "mon-telephone").\n'
-              '3. Cliquez sur l\'icône de crayon pour **modifier les tags**. Ajoutez les tags pertinents (par exemple, `tag:user-phone`, `tag:user-laptop`).\n'
-              '4. L\'application execute automatiquement la commande `headscale nodes rename ...` mais vous donnera la commande CLI pour appliquer les changements `headscale nodes tag ...`. Exécutez-la sur votre serveur.',
+              '3. Cliquez sur l\'icône de crayon pour **modifier les tags**. Ajoutez les tags pertinents (par exemple, `tag:user-phone`, `tag:user-laptop`). L\'application mettra à jour les tags directement via l\'API.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 24),
@@ -454,7 +436,7 @@ routes:
             ),
             const SizedBox(height: 4),
             Text(
-              '- **Créer Clé de Pré-authentification (icône \'vpn_key\' en bas à droite) :** Ouvre un dialogue pour créer une clé de pré-authentification. Vous pouvez sélectionner un utilisateur, et spécifier si la clé est réutilisable, éphémère et sa durée d\'expiration en jours. Après création, une commande `tailscale up` est affichée pour enregistrer un client.',
+              '- **Gérer les clés de pré-authentification (icône \'vpn_key\' en bas à droite) :** Ouvre un écran pour gérer les clés de pré-authentification de votre serveur Headscale.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 4),
@@ -537,7 +519,7 @@ routes:
             ),
             const SizedBox(height: 4),
             Text(
-              '- **Modifier les Tags (icône de crayon dans l\'AppBar) :** Ouvre un dialogue pour modifier les tags associés au nœud. Vous entrez les tags sous forme de liste séparée par des virgules. L\'application génère une commande CLI `headscale nodes tag` que vous devez copier et exécuter manuellement sur votre serveur Headscale pour appliquer les changements.',
+              '- **Modifier les Tags (icône de crayon dans l\'AppBar) :** Ouvre un dialogue pour modifier les tags associés au nœud. Vous entrez les tags sous forme de liste séparée par des virgules. L\'application mettra à jour les tags directement via l\'API.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 4),
@@ -588,7 +570,7 @@ routes:
             ),
             const SizedBox(height: 8),
             Text(
-              'Cet écran (accessible via le bouton `vpn_key` sur l\'écran Utilisateurs) vous permet de visualiser, créer et supprimer des clés de pré-authentification. Ces clés sont utilisées pour enregistrer de nouveaux appareils sans intervention manuelle sur le serveur.',
+              'Cet écran (accessible via le bouton `vpn_key` sur l écran Utilisateurs) vous permet de visualiser, créer et expirer des clés de pré-authentification. Ces clés sont utilisées pour enregistrer de nouveaux appareils sans intervention manuelle sur le serveur.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 8),
@@ -598,15 +580,22 @@ routes:
             ),
             const SizedBox(height: 4),
             Text(
-              '- **Créer Clé (icône \'+\' en bas à droite) :** Ouvre un dialogue pour créer une nouvelle clé de pré-authentification. Vous pouvez spécifier l\'utilisateur, si elle est réutilisable, éphémère et sa durée d\'expiration en jours. Après création, une commande `tailscale up` est affichée pour enregistrer un client.',
+              '- **Créer Clé (icône \\'+' en bas à droite) :** Ouvre un dialogue pour créer une nouvelle clé de pré-authentification. Vous pouvez spécifier l utilisateur, si elle est réutilisable, éphémère et sa durée d expiration en jours. Après création, une commande `tailscale up` est affichée pour enregistrer un client.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 4),
             Text(
-              '- **Supprimer Clé (icône de poubelle à côté de chaque clé) :** Supprime une clé de pré-authentification existante après confirmation.',
+              '- **Expirer Clé (icône de poubelle à côté de chaque clé) :** Fait expirer une clé de pré-authentification existante après confirmation.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '- **Expirer toutes les clés (icône `delete_sweep` en bas à droite) :** Fait expirer toutes les clés de pré-authentification existantes après confirmation.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
+
+            
 
             Text(
               '**3.7. Paramètres**',

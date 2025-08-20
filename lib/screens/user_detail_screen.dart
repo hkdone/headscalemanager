@@ -53,7 +53,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             Text('ID : ${widget.user.id}', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             // Affiche la date de création de l'utilisateur.
-            Text('Créé le : ${widget.user.createdAt.toLocal()}', style: Theme.of(context).textTheme.titleMedium),
+            Text('Créé le : ${widget.user.createdAt?.toLocal() ?? 'N/A'}', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 24),
             // Bouton pour enregistrer un nouvel appareil sous cet utilisateur.
             Center(

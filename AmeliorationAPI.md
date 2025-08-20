@@ -19,16 +19,18 @@ Après avoir analysé les fichiers `ListeApiAvaible.md` (contenant la spécifica
 ### Gestion des Utilisateurs (`/api/v1/user`)
 - **`HeadscaleService_RenameUser`**: Renommer un utilisateur existant.
 
-### Gestion des Clés de Pré-authentification (`/api/v1/preauthkey`)
-- **`HeadscaleService_ExpirePreAuthKey`**: Faire expirer une clé de pré-authentification. (Votre application a une fonction `deletePreAuthKey` qui utilise une méthode et un chemin non documentés).
+### ✅ --- Implémenté --- Gestion des Clés de Pré-authentification (`/api/v1/preauthkey`)
+- **`HeadscaleService_ListPreAuthKeys`**: Lister toutes les clés de pré-authentification.
+- **`HeadscaleService_CreatePreAuthKey`**: Créer une nouvelle clé de pré-authentification.
+- **`HeadscaleService_ExpirePreAuthKey`**: Faire expirer une clé de pré-authentification.
 
 ## Incohérences et Points à Corriger
 
 Il est recommandé de corriger les points suivants dans `lib/api/headscale_api_service.dart` pour aligner l'application avec la spécification de l'API.
 
-1.  **Enregistrement de machine**:
+1.  ✅ --- Corrigé --- **Enregistrement de machine**:
     - **Actuel**: `POST /api/v1/machine/{key}/register`
-    - **Attendu**: `POST /api/v1/node/register` (Opération: `HeadscaleService_RegisterNode`)
+    - **Corrigé**: `POST /api/v1/node/register` (Opération: `HeadscaleService_RegisterNode`)
 
 2.  **Gestion de la politique ACL**:
     - **Obtention (GET)**:
@@ -42,9 +44,9 @@ Il est recommandé de corriger les points suivants dans `lib/api/headscale_api_s
     - **Actuel**: `POST /api/v1/machine/{id}/tags`
     - **Attendu**: `POST /api/v1/node/{nodeId}/tags` (Opération: `HeadscaleService_SetTags`)
 
-4.  **Suppression/Expiration de clé de pré-authentification**:
+4.  ✅ --- Corrigé --- **Suppression/Expiration de clé de pré-authentification**:
     - **Actuel**: `DELETE /api/v1/preauthkey/{keyId}`
-    - **Attendu**: `POST /api/v1/preauthkey/expire` (Opération: `HeadscaleService_ExpirePreAuthKey`)
+    - **Corrigé**: `POST /api/v1/preauthkey/expire` (Opération: `HeadscaleService_ExpirePreAuthKey`)
 
 5.  **Routes de sous-réseau**:
     - Les points de terminaison `POST /api/v1/subnet/{route}/enable` et `POST /api/v1/subnet/{route}/disable` utilisés dans les fonctions `enableSubnetRoute` et `disableSubnetRoute` ne sont **pas présents** dans la spécification Swagger fournie. Il faudrait vérifier si la spécification est à jour ou si ces appels sont obsolètes.

@@ -10,13 +10,12 @@ import 'package:flutter/foundation.dart'; // For debugPrint
 /// Dialogue pour créer une nouvelle clé de pré-authentification.
 ///
 /// Permet de sélectionner un utilisateur, de définir les propriétés de la clé
-/// (réutilisable, éphémère, expiration) et de générer la commande `tailscale up`
-/// pour l'enregistrement d'un nouvel appareil.
+/// (réutilisable, éphémère, expiration).
 class CreatePreAuthKeyDialog extends StatefulWidget {
-  /// Fonction de rappel appelée après la création réussie d'une clé.
-  final VoidCallback onKeyCreated;
+  /// Future qui contiendra la liste des utilisateurs.
+  final Future<List<User>> usersFuture;
 
-  const CreatePreAuthKeyDialog({super.key, required this.onKeyCreated});
+  const CreatePreAuthKeyDialog({super.key, required this.usersFuture});
 
   @override
   State<CreatePreAuthKeyDialog> createState() => _CreatePreAuthKeyDialogState();
@@ -46,7 +45,7 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
           children: [
             // Sélecteur d'utilisateur pour la clé de pré-authentification.
             FutureBuilder<List<User>>(
-              future: provider.apiService.getUsers(),
+              future: widget.usersFuture,
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const CircularProgressIndicator();
@@ -125,47 +124,11 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
                   _isEphemeral,
                   expiration: expiration,
                 );
-                final serverUrl = await provider.storageService.getServerUrl();
-                final fullCommand = 'tailscale up --login-server=${serverUrl ?? ''} --authkey=${key.key}';
-
-                Navigator.of(context).pop(); // Ferme le dialogue de création
-                // Affiche un nouveau dialogue avec la commande générée.
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Clé de pré-authentification créée'),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('La commande d\'enregistrement de l\'appareil a été générée.'),
-                        const SizedBox(height: 16),
-                        const Text('Veuillez copier cette commande et l\'envoyer au client pour qu\'il l\'exécute sur son appareil.'),
-                        const SizedBox(height: 16),
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        child: const Text('Fermer'),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.copy),
-                        label: const Text('Copier la commande pour le client'),
-                        onPressed: () async {
-                          await Clipboard.setData(ClipboardData(text: fullCommand));
-                          showSafeSnackBar(context, 'Commande copiée dans le presse-papiers !');
-                          Navigator.of(context).pop(); // Ferme le dialogue après copie
-                        },
-                      ),
-                    ],
-                  ),
-                );
-                widget.onKeyCreated(); // Appelle le callback pour rafraîchir la liste
+                Navigator.of(context).pop(key); // Return the created key
               } catch (e) {
                 debugPrint('Erreur lors de la création de la clé : $e');
-                Navigator.of(context).pop();
                 showSafeSnackBar(context, 'Échec de la création de la clé : $e');
+                Navigator.of(context).pop(); // Pop the dialog on error
               }
             }
           },

@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/pre_auth_key.dart';
+import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart'; // For debugPrint
-import 'package:headscalemanager/widgets/create_pre_auth_key_dialog.dart'; // New import
-import 'package:headscalemanager/widgets/delete_pre_auth_key_dialog.dart'; // New import
+import 'package:headscalemanager/widgets/create_pre_auth_key_dialog.dart';
+import 'package:headscalemanager/widgets/delete_pre_auth_key_dialog.dart';
+import 'package:headscalemanager/services/storage_service.dart';
 
-/// Écran de gestion des clés de pré-authentification Headscale.
-///
-/// Permet de visualiser, créer et supprimer des clés de pré-authentification.
 class PreAuthKeysScreen extends StatefulWidget {
   const PreAuthKeysScreen({super.key});
 
@@ -19,19 +17,25 @@ class PreAuthKeysScreen extends StatefulWidget {
 }
 
 class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
-  /// Future qui contiendra la liste des clés de pré-authentification récupérées depuis l'API.
   late Future<List<PreAuthKey>> _preAuthKeysFuture;
+  late Future<List<User>> _usersFuture;
 
   @override
   void initState() {
     super.initState();
-    _refreshPreAuthKeys();
+    _refreshData();
   }
 
-  /// Rafraîchit la liste des clés de pré-authentification en effectuant un nouvel appel API.
-  void _refreshPreAuthKeys() {
+  void _refreshData() {
     setState(() {
-      _preAuthKeysFuture = context.read<AppProvider>().apiService.getPreAuthKeys();
+      _preAuthKeysFuture = context
+          .read<AppProvider>()
+          .apiService
+          .getPreAuthKeys();
+      _usersFuture = context
+          .read<AppProvider>()
+          .apiService
+          .getUsers();
     });
   }
 
@@ -39,58 +43,64 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Clés de pré-authentification'),
+        title: const Text('Clés de Pré-authentification'),
       ),
       body: FutureBuilder<List<PreAuthKey>>(
         future: _preAuthKeysFuture,
         builder: (context, snapshot) {
-          // Affiche un indicateur de chargement pendant la récupération des clés.
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          // Affiche un message d'erreur si la récupération des clés échoue.
           if (snapshot.hasError) {
-            debugPrint('Erreur lors du chargement des clés de pré-authentification : ${snapshot.error}');
             return Center(child: Text('Erreur : ${snapshot.error}'));
           }
-          // Affiche un message si aucune clé n'est trouvée.
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Aucune clé de pré-authentification trouvée.'));
+            return const Center(
+                child: Text('Aucune clé de pré-authentification trouvée.'));
           }
 
-          final keys = snapshot.data!;
+          final preAuthKeys = snapshot.data!;
 
-          // Construit une liste déroulante de cartes, une par clé de pré-authentification.
           return ListView.builder(
-            itemCount: keys.length,
+            itemCount: preAuthKeys.length,
             itemBuilder: (context, index) {
-              final key = keys[index];
+              final key = preAuthKeys[index];
               return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: ListTile(
-                  title: Text(key.key),
-                  subtitle: Column(
+                margin: const EdgeInsets.all(8.0),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Utilisateur : ${key.user}'),
+                      Text('Clé : ${key.key}', style: const TextStyle(
+                          fontWeight: FontWeight.bold)),
+                      Text('Utilisateur : ${key.user?.name ?? 'N/A'}'),
                       Text('Réutilisable : ${key.reusable ? 'Oui' : 'Non'}'),
                       Text('Éphémère : ${key.ephemeral ? 'Oui' : 'Non'}'),
-                      if (key.expiration != null)
-                        Text('Expire le : ${key.expiration.toLocal().toShortDateString()}'),
+                      Text('Utilisée : ${key.used ? 'Oui' : 'Non'}'),
+                      Text('Expiration : ${key.expiration?.toLocal() ??
+                          'Jamais'}'),
+                      Text('Créée le : ${key.createdAt?.toLocal() ?? 'N/A'}'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) =>
+                                    DeletePreAuthKeyDialog(preAuthKey: key,
+                                        onKeyDeleted: _refreshData),
+                              );
+                              if (confirm == true) {
+                                _refreshData();
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                     ],
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () {
-                      // Affiche le dialogue de suppression de clé.
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => DeletePreAuthKeyDialog(
-                          preAuthKey: key,
-                          onKeyDeleted: _refreshPreAuthKeys, // Rafraîchit la liste après suppression
-                        ),
-                      );
-                    },
                   ),
                 ),
               );
@@ -98,27 +108,111 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
           );
         },
       ),
-      // Bouton flottant pour créer une nouvelle clé de pré-authentification.
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Affiche le dialogue de création de clé.
-          showDialog(
-            context: context,
-            builder: (ctx) => CreatePreAuthKeyDialog(
-              onKeyCreated: _refreshPreAuthKeys, // Rafraîchit la liste après création
-            ),
-          );
-        },
-        heroTag: 'createPreAuthKey',
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Expirer toutes les clés ?'),
+                  content: const Text('Êtes-vous sûr de vouloir expirer toutes les clés de pré-authentification ?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: const Text('Annuler'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: const Text('Expirer tout', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                final preAuthKeys = await _preAuthKeysFuture;
+                final apiService = context.read<AppProvider>().apiService;
+                for (final key in preAuthKeys) {
+                  if (key.user != null && key.key.isNotEmpty) {
+                    try {
+                      await apiService.expirePreAuthKey(key.user!.id, key.key);
+                    } catch (e) {
+                      // Log error but continue with other keys
+                      debugPrint('Erreur lors de l\'expiration de la clé ${key.key}: $e');
+                    }
+                  }
+                }
+                _refreshData();
+                showSafeSnackBar(context, 'Toutes les clés ont été expirées.');
+              }
+            },
+            heroTag: 'expireAllKeys',
+            tooltip: 'Expirer toutes les clés',
+            child: const Icon(Icons.delete_sweep),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton(
+            onPressed: () async {
+              final result = await showDialog<PreAuthKey?>( 
+                context: context,
+                builder: (ctx) => CreatePreAuthKeyDialog(usersFuture: _usersFuture),
+              );
+              if (result != null) {
+                _refreshData();
+                showSafeSnackBar(context, 'Clé de pré-authentification créée.');
+                final appProvider = context.read<AppProvider>();
+                final serverUrl = await appProvider.storageService.getServerUrl();
+                final String loginServer = serverUrl?.endsWith('/') == true
+                    ? serverUrl!.substring(0, serverUrl.length - 1)
+                    : serverUrl ?? '';
+                _showTailscaleUpCommandDialog(context, result, loginServer);
+              }
+            },
+            tooltip: 'Créer une clé de pré-authentification',
+            child: const Icon(Icons.add),
+          ),
+        ],
       ),
     );
   }
-}
 
-// Extension pour formater la date
-extension on DateTime {
-  String toShortDateString() {
-    return '${day.toString().padLeft(2, '0')}/${month.toString().padLeft(2, '0')}/${year.toString()}';
+  void _showTailscaleUpCommandDialog(BuildContext context, PreAuthKey key, String loginServer) {
+    final fullCommand = 'tailscale up --login-server=$loginServer --authkey=${key.key}';
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clé de pré-authentification créée'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('La commande d\'enregistrement de l\'appareil a été générée.'),
+            const SizedBox(height: 16),
+            const Text('Veuillez copier cette commande et l\'envoyer au client pour qu\'il l\'exécute sur son appareil.'),
+            const SizedBox(height: 16),
+            SelectableText(
+              fullCommand,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            child: const Text('Fermer'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.copy),
+            label: const Text('Copier la commande pour le client'),
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: fullCommand));
+              showSafeSnackBar(context, 'Commande copiée dans le presse-papiers !');
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
+    );
   }
 }

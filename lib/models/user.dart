@@ -6,7 +6,7 @@ class User {
   final String name;
 
   /// Date et heure de création de l'utilisateur.
-  final DateTime createdAt;
+  final DateTime? createdAt;
 
   /// Constructeur de la classe User.
   ///
@@ -14,7 +14,7 @@ class User {
   User({
     required this.id,
     required this.name,
-    required this.createdAt,
+    this.createdAt,
   });
 
   /// Constructeur d'usine (factory constructor) pour créer une instance de User à partir d'un Map JSON.
@@ -30,9 +30,9 @@ class User {
       // Date de création de l'utilisateur. Si 'createdAt' est nul, utilise la date et l'heure actuelles.
       // ATTENTION : Utiliser DateTime.now() comme fallback peut être trompeur car cela suggère
       // que l'utilisateur vient d'être créé, alors que l'information était absente.
-      createdAt: json['createdAt'] != null
+      createdAt: json['createdAt'] != null && json['createdAt'] is String
           ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
+          : null,
     );
   }
 

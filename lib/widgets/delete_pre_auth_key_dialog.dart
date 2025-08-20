@@ -38,14 +38,14 @@ class DeletePreAuthKeyDialog extends StatelessWidget {
           child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
           onPressed: () async {
             try {
-              await provider.apiService.deletePreAuthKey(preAuthKey.key);
+              await provider.apiService.expirePreAuthKey(preAuthKey.user!.id,preAuthKey.key);
               Navigator.of(context).pop(); // Ferme le dialogue de confirmation
               onKeyDeleted(); // Appelle le callback pour rafraîchir la liste
-              showSafeSnackBar(context, 'Clé supprimée avec succès.');
+              showSafeSnackBar(context, 'Clé expirée avec succès.');
             } catch (e) {
-              debugPrint('Erreur lors de la suppression de la clé : $e');
+              debugPrint('Erreur lors de l\'expiration de la clé : $e');
               Navigator.of(context).pop();
-              showSafeSnackBar(context, 'Échec de la suppression de la clé : $e');
+              showSafeSnackBar(context, 'Échec de l\'expiration de la clé : $e');
             }
           },
         ),

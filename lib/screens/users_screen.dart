@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/user_detail_screen.dart';
+import 'package:headscalemanager/screens/pre_auth_keys_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/pre_auth_key.dart';
@@ -69,7 +70,7 @@ class _UsersScreenState extends State<UsersScreen> {
               final user = users[index];
               return ListTile(
                 title: Text(user.name),
-                subtitle: Text('Créé le : ${user.createdAt.toLocal()}'),
+                subtitle: Text('Créé le : ${user.createdAt?.toLocal() ?? 'N/A'}'),
                 trailing: PopupMenuButton<String>(
                   onSelected: (value) {
                     if (value == 'delete') {
@@ -107,6 +108,15 @@ class _UsersScreenState extends State<UsersScreen> {
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          // Bouton flottant pour gérer les clés de pré-authentification.
+          FloatingActionButton(
+            onPressed: () {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PreAuthKeysScreen()));
+            },
+            heroTag: 'managePreAuthKeys',
+            child: const Icon(Icons.vpn_key),
+          ),
+          const SizedBox(height: 16),
           // Bouton flottant pour créer un nouvel utilisateur.
           FloatingActionButton(
             onPressed: () {
@@ -119,20 +129,6 @@ class _UsersScreenState extends State<UsersScreen> {
             },
             heroTag: 'createUser',
             child: const Icon(Icons.add),
-          ),
-          const SizedBox(height: 16),
-          // Bouton flottant pour créer une clé de pré-authentification.
-          FloatingActionButton(
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => CreatePreAuthKeyDialog(
-                  onKeyCreated: _refreshUsers, // Rafraîchit la liste après création de clé
-                ),
-              );
-            },
-            heroTag: 'createKey',
-            child: const Icon(Icons.vpn_key),
           ),
         ],
       ),

@@ -4,28 +4,9 @@ Bienvenue dans le guide d'utilisation de l'application Headscale Manager !
 
 Cette application vous permet de gérer facilement votre serveur Headscale. Ce guide vous aidera à configurer votre serveur et à utiliser l'application.
 
-## Fonctionnement : API vs Lignes de Commande (CLI)
+## Fonctionnement : API
 
-Pour des raisons de sécurité et de flexibilité, l'application utilise une combinaison d'appels directs à l'API de Headscale et de commandes à exécuter manuellement sur votre serveur (CLI).
-
-### Actions directes (via API) :
-
-Ces actions sont effectuées directement par l'application :
-- Lister les utilisateurs et les nœuds.
-- Créer et supprimer des utilisateurs.
-- Créer et invalider des clés de pré-authentification.
-- Gérer les clés d'API.
-- Déplacer un nœud vers un autre utilisateur.
-- Supprimer un nœud.
-- Activer/Désactiver les routes (subnets et exit node).
-
-### Actions manuelles (via CLI) :
-
-Pour ces actions, l'application génère la commande exacte que vous devez copier et coller dans le terminal de votre serveur Headscale. C'est une mesure de sécurité pour les opérations sensibles :
-- Enregistrer un nouveau nœud (la validation finale).
-- Renommer un nœud.
-- Modifier les tags d'un nœud (pour les ACLs).
-- Appliquer la politique ACL.
+L'application utilise des appels directs à l'API de Headscale pour toutes les opérations de gestion.
 
 ## Tutoriel : Ajouter un appareil et le configurer (avec un client Tailscale)
 
@@ -45,18 +26,10 @@ Il existe deux méthodes principales :
 2. Copiez la commande `tailscale up ...` fournie.
 3. Exécutez cette commande sur l'appareil que vous souhaitez ajouter. Il sera automatiquement enregistré et apparaîtra dans votre tableau de bord.
 
-**B) Enregistrement manuel**
+**B) Enregistrement via l'application (pour les clients mobiles)**
 
-L'enregistrement manuel se fait en deux étapes :
-
-1.  **Sur l'appareil client :**
-    *   **Pour Windows, Linux, et macOS :** Dans l'application, allez dans les détails de l'utilisateur, cliquez sur "Enregistrer un nouvel appareil", et dans l'onglet "Windows/Linux/macOS", copiez la commande `tailscale up ...` et exécutez-la sur l'appareil.
-    *   **Pour iOS et Android :** Dans l'application, allez dans les détails de l'utilisateur, cliquez sur "Enregistrer un nouvel appareil", et dans l'onglet "iOS/Android", copiez l'URL du serveur. Sur le client Tailscale, allez dans les paramètres, sélectionnez "Use alternate server", et collez l'URL.
-
-2.  **Dans l'application Headscale Manager :**
-    *   Après avoir effectué l'étape 1, le client Tailscale vous fournira une URL d'enregistrement.
-    *   Dans l'application Headscale Manager, passez à l'étape 2 de l'enregistrement, collez l'URL fournie par le client, ce qui générera une commande `headscale nodes register ...`.
-    *   Exécutez cette commande sur votre serveur Headscale pour finaliser l'enregistrement.
+1.  **Sur l'appareil client (iOS/Android) :** Dans l'application Tailscale, allez dans les paramètres, sélectionnez "Use alternate server", et collez l'URL de votre serveur Headscale.
+2.  **Dans l'application Headscale Manager :** Après avoir effectué l'étape 1, le client Tailscale vous fournira une URL d'enregistrement unique. Dans l'application Headscale Manager, allez dans les détails de l'utilisateur, cliquez sur "Enregistrer un nouvel appareil", et collez l'URL fournie par le client. L'appareil sera enregistré directement via l'API.
 
 ### Étape 3 (Optionnel) : Renommer le nœud et ajouter des tags
 
@@ -64,8 +37,7 @@ Une fois le nœud apparu dans le tableau de bord, vous pouvez le configurer. C'e
 
 1. Allez dans les détails du nœud en cliquant dessus.
 2. Utilisez le menu pour le **renommer** (par exemple, "mon-telephone").
-3. Cliquez sur l'icône de crayon pour **modifier les tags**. Ajoutez les tags pertinents (par exemple, `tag:user-phone`, `tag:user-laptop`).
-4. L'application execute automatiquement la commande `headscale nodes rename ...` mais vous donnera la commande CLI pour appliquer les changements `headscale nodes tag ...`. Exécutez-la sur votre serveur.
+3. Cliquez sur l'icône de crayon pour **modifier les tags**. Ajoutez les tags pertinents (par exemple, `tag:user-phone`, `tag:user-laptop`). L'application mettra à jour les tags directement via l'API.
 
 ## 1. Prérequis et Installation du Serveur Headscale
 
@@ -225,7 +197,7 @@ Gérez les utilisateurs de votre serveur Headscale. Vous pouvez voir la liste de
 
 **Boutons et Fonctionnalités :**
 - **Ajouter Utilisateur (icône '+' en bas à droite) :** Ouvre un dialogue pour créer un nouvel utilisateur. Entrez simplement le nom d'utilisateur souhaité. L'application ajoutera automatiquement `le suffixe de domaine de votre serveur Headscale (par exemple, `@votre_domaine.com`)` au nom d'utilisateur si non présent.
-- **Créer Clé de Pré-authentification (icône 'vpn_key' en bas à droite) :** Ouvre un dialogue pour créer une clé de pré-authentification. Vous pouvez sélectionner un utilisateur, et spécifier si la clé est réutilisable, éphémère et sa durée d'expiration en jours. Après création, une commande `tailscale up` est affichée pour enregistrer un client.
+- **Gérer les clés de pré-authentification (icône 'vpn_key' en bas à droite) :** Ouvre un écran pour gérer les clés de pré-authentification de votre serveur Headscale.
 - **Supprimer Utilisateur (icône de poubelle à côté de chaque utilisateur) :** Supprime l'utilisateur sélectionné. Une confirmation vous sera demandée. Notez que la suppression échouera si l'utilisateur possède encore des appareils.
 - **Détails Utilisateur (clic sur un utilisateur) :** Affiche les détails de l'utilisateur, y compris les nœuds qui lui sont associés et les clés de pré-authentification.
 
@@ -250,7 +222,7 @@ Cet écran affiche les informations détaillées d'un utilisateur et liste tous 
 Cet écran affiche toutes les informations détaillées d'un nœud spécifique, y compris son FQDN (construit dynamiquement à partir du nom du nœud et du domaine de base de votre serveur Headscale), ses adresses IP, ses routes annoncées et ses tags.
 
 **Boutons et Fonctionnalités :**
-- **Modifier les Tags (icône de crayon dans l'AppBar) :** Ouvre un dialogue pour modifier les tags associés au nœud. Vous entrez les tags sous forme de liste séparée par des virgules. L'application génère une commande CLI `headscale nodes tag` que vous devez copier et exécuter manuellement sur votre serveur Headscale pour appliquer les changements.
+- **Modifier les Tags (icône de crayon dans l'AppBar) :** Ouvre un dialogue pour modifier les tags associés au nœud. Vous entrez les tags sous forme de liste séparée par des virgules. L'application mettra à jour les tags directement via l'API.
 - **Menu d'Actions (icône "trois points" ou "plus" à côté de chaque nœud dans les listes) :** Ce menu contextuel offre plusieurs actions pour le nœud :
   - **Renommer l'appareil :** Permet de changer le nom affichable du nœud.
   - **Déplacer l'appareil :** Permet de transférer le nœud vers un autre utilisateur.
@@ -260,15 +232,19 @@ Cet écran affiche toutes les informations détaillées d'un nœud spécifique, 
   - **Désactiver les routes de sous-réseau :** Désactive les routes de sous-réseau annoncées via l'API.
   - **Supprimer l'appareil :** Supprime le nœud du serveur Headscale après confirmation.
 
-### 3.6. Clés de Pré-authentification
 
-Cet écran (accessible via le bouton `vpn_key` sur l'écran Utilisateurs) vous permet de visualiser, créer et supprimer des clés de pré-authentification. Ces clés sont utilisées pour enregistrer de nouveaux appareils sans intervention manuelle sur le serveur.
 
-**Boutons et Fonctionnalités :**
-- **Créer Clé (icône '+' en bas à droite) :** Ouvre un dialogue pour créer une nouvelle clé de pré-authentification. Vous pouvez spécifier l'utilisateur, si elle est réutilisable, éphémère et sa durée d'expiration en jours. Après création, une commande `tailscale up` est affichée pour enregistrer un client.
-- **Supprimer Clé (icône de poubelle à côté de chaque clé) :** Supprime une clé de pré-authentification existante après confirmation.
+ ### 3.6. Clés de Pré-authentification
 
-### 3.7. Paramètres
+ Cet écran (accessible via le bouton `vpn_key` sur l'écran Utilisateurs) vous permet de visualiser, créer et expirer des clés de pré-authentification. Ces clés sont utilisées pour enregistrer
+de nouveaux appareils sans intervention manuelle sur le serveur.
+
+ **Boutons et Fonctionnalités :**
+- **Créer Clé (icône '+' en bas à droite) :** Ouvre un dialogue pour créer une nouvelle clé de pré-authentification. Vous pouvez spécifier l'utilisateur, si elle est réutilisable, éphémère
+et sa durée d'expiration en jours. Après création, une commande `tailscale up` est affichée pour enregistrer un client.
+- **Expirer Clé (icône de poubelle à côté de chaque clé) :** Fait expirer une clé de pré-authentification existante après confirmation.
+- **Expirer toutes les clés (icône 'delete_sweep' en bas à droite) :** Fait expirer toutes les clés de pré-authentification existantes après confirmation.
+
 
 Cet écran vous permet de configurer l'application pour qu'elle se connecte à votre serveur Headscale.
 
