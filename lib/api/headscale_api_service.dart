@@ -121,18 +121,20 @@ class HeadscaleApiService {
   }
 
   /// Enregistre une machine pour un utilisateur donné en utilisant la clé de la machine.
-  Future<void> registerMachine(String machineKey, String userName) async {
-    // Récupère l'URL de base du serveur.
+  Future<Node> registerMachine(String machineKey, String userName) async {
     final baseUrl = await _getBaseUrl();
-    // Effectue la requête POST pour enregistrer la machine.
+    final serverUrl = await _storageService.getServerUrl();
+    final String baseDomain = serverUrl?.extractBaseDomain() ?? 'headscale.local';
+
     final response = await http.post(
-      Uri.parse('${baseUrl}api/v1/machine/$machineKey/register'),
+      Uri.parse('${baseUrl}api/v1/node/register?user=$userName&key=$machineKey'),
       headers: await _getHeaders(),
-      body: jsonEncode(<String, String>{'user': userName}),
     );
 
-    // Lève une exception si la requête n'a pas réussi.
-    if (response.statusCode != 200) {
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return Node.fromJson(data['node'], baseDomain);
+    } else {
       throw Exception(_handleError('enregistrer la machine', response));
     }
   }

@@ -126,20 +126,20 @@ Future<void> showTailscaleUpCommandDialog(BuildContext context, User user) async
 /// et génère la commande `headscale nodes register` à exécuter sur le serveur.
 Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user) async {
   final TextEditingController urlController = TextEditingController();
-  final ValueNotifier<String> generatedCommand = ValueNotifier<String>('');
+  final ValueNotifier<String> machineKey = ValueNotifier<String>('');
 
   return showDialog(
     context: context,
     builder: (dialogContext) {
       return AlertDialog(
-        title: const Text('Étape 2 : Enregistrer sur le serveur'),
+        title: const Text('Étape 2 : Enregistrer l\'appareil'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                  'Après avoir suivi l\'étape 1 sur votre appareil, le client Tailscale vous fournira une URL d\'enregistrement unique. Collez cette URL ci-dessous pour générer la commande finale à exécuter sur votre serveur Headscale.'),
+                  'Après avoir suivi l\'étape 1 sur votre appareil, le client Tailscale vous fournira une URL d\'enregistrement unique. Collez cette URL ci-dessous pour enregistrer l\'appareil.'),
               const SizedBox(height: 16),
               TextField(
                 controller: urlController,
@@ -150,47 +150,39 @@ Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user)
                 onChanged: (url) {
                   final Uri? uri = Uri.tryParse(url);
                   if (uri != null && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'register') {
-                    final String key = uri.pathSegments[1];
-                    generatedCommand.value = 'headscale nodes register --user ${user.name} --key $key';
+                    machineKey.value = uri.pathSegments[1];
                   } else {
-                    generatedCommand.value = 'URL invalide. Le format attendu est : http://.../register/nodekey:...';
+                    machineKey.value = '';
                   }
-                },
-              ),
-              const SizedBox(height: 16),
-              const Text('Commande à exécuter sur votre serveur :'),
-              const SizedBox(height: 8),
-              ValueListenableBuilder<String>(
-                valueListenable: generatedCommand,
-                builder: (ctx, cmd, child) {
-                  return SelectableText(
-                    cmd,
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 14,
-                      color: cmd.startsWith('headscale') ? Colors.black : Colors.red,
-                    ),
-                  );
                 },
               ),
             ],
           ),
         ),
-        actions: [
+
+              actions: [
           TextButton(
             child: const Text('Fermer'),
             onPressed: () => Navigator.of(dialogContext).pop(),
           ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.copy),
-            label: const Text('Copier la commande'),
-            onPressed: () async {
-              if (generatedCommand.value.startsWith('headscale')) {
-                await Clipboard.setData(ClipboardData(text: generatedCommand.value));
-                showSafeSnackBar(context, 'Commande copiée !');
-              } else {
-                showSafeSnackBar(context, 'Impossible de copier une commande invalide.');
-              }
+          ValueListenableBuilder<String>(
+            valueListenable: machineKey,
+            builder: (ctx, key, child) {
+              return ElevatedButton.icon(
+                icon: const Icon(Icons.save),
+                label: const Text('Enregistrer sur le serveur'),
+                onPressed: key.isEmpty
+                    ? null
+                    : () async {
+                        try {
+                          await context.read<AppProvider>().apiService.registerMachine(key, user.name);
+                          Navigator.of(dialogContext).pop();
+                          showSafeSnackBar(context, 'Appareil enregistré avec succès.');
+                        } catch (e) {
+                          showSafeSnackBar(context, 'Erreur lors de l\'enregistrement: $e');
+                        }
+                      },
+              );
             },
           ),
         ],

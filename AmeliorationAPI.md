@@ -11,10 +11,10 @@ Après avoir analysé les fichiers `ListeApiAvaible.md` (contenant la spécifica
 - **`HeadscaleService_DeleteApiKey`**: Supprimer une clé d'API.
 
 ### Gestion des Nœuds (`/api/v1/node`)
-- **`HeadscaleService_DebugCreateNode`**: Créer un nœud à des fins de débogage.
-- **`HeadscaleService_BackfillNodeIPs`**: Remplir les adresses IP pour les nœuds existants.
-- **`HeadscaleService_ExpireNode`**: Faire expirer un nœud (différent de le supprimer).
-- **`HeadscaleService_SetTags`**: Attribuer des tags à un nœud. (Votre application a une fonction `setMachineTags` qui semble viser cet objectif, mais elle utilise un chemin d'API incorrect).
+- **`HeadscaleService_DebugCreateNode`**: ❌ --- Non voulu --- Créer un nœud à des fins de débogage.
+- **`HeadscaleService_BackfillNodeIPs`**: ⌛ --- En attente --- Remplir les adresses IP pour les nœuds existants.
+- **`HeadscaleService_ExpireNode`**: ⌛ --- En attente --- Faire expirer un nœud (différent de le supprimer).
+- **`HeadscaleService_SetTags`**: ✅ --- Implémenté --- Attribuer des tags à un nœud.
 
 ### Gestion des Utilisateurs (`/api/v1/user`)
 - **`HeadscaleService_RenameUser`**: Renommer un utilisateur existant.
