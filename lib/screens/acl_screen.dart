@@ -128,9 +128,107 @@ Note: Ce texte est codé en dur. Pour une meilleure gestion, il pourrait être d
             tooltip: 'Générer la configuration de base',
             child: const Icon(Icons.settings_backup_restore),
           ),
+          const SizedBox(height: 16),
+          // Bouton pour récupérer la politique ACL du serveur.
+          FloatingActionButton(
+            onPressed: _fetchAclPolicyFromServer,
+            heroTag: 'fetchAclFromServer',
+            tooltip: 'Récupérer la politique ACL du serveur',
+            child: const Icon(Icons.cloud_download),
+          ),
+          const SizedBox(height: 16),
+          // Bouton pour exporter la politique ACL vers le serveur.
+          FloatingActionButton(
+            onPressed: _exportAclPolicyToServer,
+            heroTag: 'exportAclToServer',
+            tooltip: 'Exporter la politique ACL vers le serveur',
+            child: const Icon(Icons.cloud_upload),
+          ),
         ],
       ),
     );
+  }
+
+  /// Exporte la politique ACL actuelle vers le serveur Headscale.
+  Future<void> _exportAclPolicyToServer() async {
+    final bool confirm = await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirmer l\'exportation ACL'),
+          content: const Text(
+              'L\'exportation de la politique ACL peut potentiellement affecter le fonctionnement de votre réseau Headscale. Êtes-vous sûr de vouloir continuer ?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Confirmer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!confirm) {
+      return; // L\'utilisateur a annulé
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final appProvider = context.read<AppProvider>();
+      final apiService = appProvider.apiService;
+
+      final String aclJsonString = _aclController.text;
+      final Map<String, dynamic> aclMap = json.decode(aclJsonString);
+
+      await apiService.setAclPolicy(aclMap);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Politique ACL exportée avec succès vers le serveur.')),
+      );
+    } catch (e) {
+      debugPrint('Erreur lors de l\'exportation de la politique ACL vers le serveur : $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Échec de l\'exportation de la politique ACL : $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// Récupère la politique ACL actuelle depuis le serveur Headscale.
+  Future<void> _fetchAclPolicyFromServer() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final appProvider = context.read<AppProvider>();
+      final apiService = appProvider.apiService;
+
+      final String aclJsonString = await apiService.getAclPolicy();
+      _currentAclPolicy = json.decode(aclJsonString);
+      _updateAclControllerText();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Politique ACL récupérée du serveur.')),
+      );
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération de la politique ACL du serveur : $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Échec de la récupération de la politique ACL : $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   /// Ajoute une règle ACL générée à la politique ACL actuelle.

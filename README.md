@@ -56,7 +56,7 @@ docker run -d --name headscale \
   headscale/headscale:latest
 ```
 
-- `<chemin_local_config>` : Chemin sur votre machine hôte où se trouvera le fichier `config.yaml` et `acl.yaml`.
+- `<chemin_local_config>` : Chemin sur votre machine hôte où se trouvera le fichier `config.yaml`.
 - `<chemin_local_data>` : Chemin sur votre machine hôte pour la persistance des données de Headscale (base de données, etc.).
 
 ### 1.2. Fichiers de Configuration
@@ -119,8 +119,8 @@ log:
   level: info
   format: text
 policy:
-   mode: file
-   path: /etc/headscale/acl.yaml
+   mode: database
+   path: ""
 dns:
   magic_dns: true
   base_domain: <VOTRE_DOMAINE_DE_BASE>.com
@@ -147,7 +147,7 @@ routes:
 
 **N'oubliez pas de remplacer `<VOTRE_FQDN_PUBLIC>` par le nom de domaine public que vous utiliserez.**
 
-- **`acl.yaml`** : Pour le moment, vous pouvez le laisser vide pour une utilisation sans ACLs. Il sera utilisé par Headscale pour appliquer les politiques d'accès.
+
 
 ### 1.3. Configuration d'un Proxy Inverse (Recommandé)
 

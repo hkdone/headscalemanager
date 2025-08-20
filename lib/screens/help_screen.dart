@@ -172,7 +172,7 @@ class HelpScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '- `<chemin_local_config>` : Chemin sur votre machine hôte où se trouvera le fichier `config.yaml` et `acl.yaml`.\n'
+              '- `<chemin_local_config>` : Chemin sur votre machine hôte où se trouvera le fichier `config.yaml`.
               '- `<chemin_local_data>` : Chemin sur votre machine hôte pour la persistance des données de Headscale (base de données, etc.).',
               style: Theme.of(context).textTheme.bodySmall,
             ),
@@ -250,8 +250,8 @@ log:
   level: info
   format: text
 policy:
-   mode: file
-   path: /etc/headscale/acl.yaml
+   mode: database
+   path: ""
 dns:
   magic_dns: true
   base_domain: <VOTRE_DOMAINE_DE_BASE>.com
@@ -284,10 +284,7 @@ routes:
               style: Theme.of(context).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Text(
-              '- **`acl.yaml`** : Pour le moment, vous pouvez le laisser vide pour une utilisation sans ACLs. Il sera utilisé par Headscale pour appliquer les politiques d\'accès.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            
             const SizedBox(height: 16),
             Text(
               '**1.3. Configuration d\'un Proxy Inverse (Recommandé)**',

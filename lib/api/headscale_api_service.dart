@@ -225,7 +225,7 @@ class HeadscaleApiService {
     final baseUrl = await _getBaseUrl();
     // Effectue la requête GET pour obtenir la politique ACL.
     final response = await http.get(
-      Uri.parse('${baseUrl}api/v1/acl'),
+      Uri.parse('${baseUrl}api/v1/policy'),
       headers: await _getHeaders(),
     );
 
@@ -233,7 +233,14 @@ class HeadscaleApiService {
     if (response.statusCode == 200) {
       // Décode la réponse JSON et retourne la politique ACL.
       final data = json.decode(response.body);
-      return data['acl']; // Supposant que la politique est retournée sous forme de chaîne simple
+      // Vérifie si la clé 'policy' existe et n'est pas nulle.
+      if (data['policy'] != null) {
+        return data['policy'];
+      } else {
+        // Si 'policy' est nulle ou absente, retourne une chaîne vide ou lève une erreur spécifique.
+        // Pour l'instant, nous allons retourner une chaîne vide pour éviter l'erreur de type.
+        return '';
+      }
     } else {
       // Lève une exception si la requête a échoué.
       throw Exception(_handleError('charger la politique ACL', response));
@@ -244,11 +251,11 @@ class HeadscaleApiService {
   Future<void> setAclPolicy(Map<dynamic, dynamic> aclMap) async {
     // Récupère l'URL de base du serveur.
     final baseUrl = await _getBaseUrl();
-    // Effectue la requête POST pour définir la politique ACL.
-    final response = await http.post(
-      Uri.parse('${baseUrl}api/v1/acl'),
+    // Effectue la requête PUT pour définir la politique ACL.
+    final response = await http.put(
+      Uri.parse('${baseUrl}api/v1/policy'),
       headers: await _getHeaders(),
-      body: jsonEncode(aclMap),
+      body: jsonEncode({'policy': jsonEncode(aclMap)}),
     );
 
     // Lève une exception si la requête n'a pas réussi.
