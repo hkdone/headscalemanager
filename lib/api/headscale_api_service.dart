@@ -457,4 +457,8 @@ class HeadscaleApiService {
       throw Exception(_handleError('supprimer la clé API', response));
     }
   }
+
+
+
+  
 }
