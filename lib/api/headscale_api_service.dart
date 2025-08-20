@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/models/pre_auth_key.dart';
+import 'package:headscalemanager/models/api_key.dart';
 import 'package:headscalemanager/services/storage_service.dart';
 
 /// Service API pour interagir avec le backend Headscale.
@@ -394,6 +395,66 @@ class HeadscaleApiService {
     // Lève une exception si la requête n'a pas réussi.
     if (response.statusCode != 200) {
       throw Exception(_handleError('supprimer la clé de pré-authentification', response));
+    }
+  }
+
+  /// Récupère toutes les clés d'API.
+  Future<List<ApiKey>> listApiKeys() async {
+    final baseUrl = await _getBaseUrl();
+    final response = await http.get(
+      Uri.parse('${baseUrl}api/v1/apikey'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final List<dynamic> apiKeysJson = data['apiKeys'];
+      return apiKeysJson.map((json) => ApiKey.fromJson(json)).toList();
+    } else {
+      throw Exception(_handleError('lister les clés API', response));
+    }
+  }
+
+  /// Crée une nouvelle clé d'API.
+  Future<String> createApiKey() async {
+    final baseUrl = await _getBaseUrl();
+    final response = await http.post(
+      Uri.parse('${baseUrl}api/v1/apikey'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['apiKey'];
+    } else {
+      throw Exception(_handleError('créer la clé API', response));
+    }
+  }
+
+  /// Fait expirer une clé d'API.
+  Future<void> expireApiKey(String prefix) async {
+    final baseUrl = await _getBaseUrl();
+    final response = await http.post(
+      Uri.parse('${baseUrl}api/v1/apikey/expire'),
+      headers: await _getHeaders(),
+      body: jsonEncode(<String, String>{'prefix': prefix}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(_handleError('expirer la clé API', response));
+    }
+  }
+
+  /// Supprime une clé d'API.
+  Future<void> deleteApiKey(String prefix) async {
+    final baseUrl = await _getBaseUrl();
+    final response = await http.delete(
+      Uri.parse('${baseUrl}api/v1/apikey/$prefix'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(_handleError('supprimer la clé API', response));
     }
   }
 }

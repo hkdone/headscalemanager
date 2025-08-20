@@ -53,6 +53,7 @@ class HelpScreen extends StatelessWidget {
                 '- Lister les utilisateurs et les nœuds.\n'
                 '- Créer et supprimer des utilisateurs.\n'
                 '- Créer et invalider des clés de pré-authentification.\n'
+                '- Gérer les clés d\'API.\n'
                 '- Déplacer un nœud vers un autre utilisateur.\n'
                 '- Supprimer un nœud.\n'
                 '- Activer/Désactiver les routes (subnets et exit node).',
@@ -425,6 +426,11 @@ routes:
               '- **Afficher les détails du nœud :** Tapez sur n\'importe quel nœud dans la liste pour naviguer vers son écran de détails (`Détails du Nœud`).',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            const SizedBox(height: 4),
+            Text(
+              '- **Gérer les clés d\'API (icône \'api\') :** Ouvre un écran pour gérer les clés d\'API de votre serveur Headscale.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             const SizedBox(height: 16),
 
             Text(
@@ -629,6 +635,37 @@ routes:
             const SizedBox(height: 4),
             Text(
               '- **Bouton Enregistrer :** Sauvegarde les identifiants saisis. L\'application redémarrera pour appliquer les nouveaux paramètres.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+
+            Text(
+              '**3.8. Gestion des clés API**',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Cet écran (accessible via le bouton `api` sur l\'écran du tableau de bord) vous permet de visualiser, créer, et supprimer des clés d\'API. Ces clés sont utilisées pour authentifier les requêtes à l\'API de Headscale.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '**Boutons et Fonctionnalités :**',
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '- **Créer Clé (icône \'+\' en bas à droite) :** Ouvre un dialogue pour créer une nouvelle clé d\'API. La nouvelle clé sera affichée à l\'écran et devra être copiée immédiatement, car elle ne sera plus visible par la suite.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '- **Expirer Clé (icône d\'horloge à côté de chaque clé) :** Fait expirer une clé d\'API existante après confirmation.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '- **Supprimer Clé (icône de poubelle à côté de chaque clé) :** Supprime une clé d\'API existante après confirmation.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 24),

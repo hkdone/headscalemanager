@@ -4,7 +4,7 @@ Après avoir analysé les fichiers `ListeApiAvaible.md` (contenant la spécifica
 
 ## Fonctionnalités de l'API non utilisées
 
-### Gestion des clés d'API (`/api/v1/apikey`)
+### ✅ --- Implémenté --- Gestion des clés d'API (`/api/v1/apikey`)
 - **`HeadscaleService_ListApiKeys`**: Lister toutes les clés d'API.
 - **`HeadscaleService_CreateApiKey`**: Créer une nouvelle clé d'API.
 - **`HeadscaleService_ExpireApiKey`**: Faire expirer une clé d'API.

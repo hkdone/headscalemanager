@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:headscalemanager/screens/api_keys_screen.dart';
 import 'package:headscalemanager/screens/node_detail_screen.dart';
 
 /// Écran du tableau de bord affichant un aperçu des nœuds Headscale.
@@ -172,11 +173,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
         },
       ),
       // Bouton flottant pour rafraîchir la liste des nœuds.
-      floatingActionButton: FloatingActionButton(
-        onPressed: _refreshNodes,
-        heroTag: 'refreshNodes',
-        tooltip: 'Rafraîchir les nœuds',
-        child: const Icon(Icons.refresh),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            onPressed: _refreshNodes,
+            heroTag: 'refreshNodes',
+            tooltip: 'Rafraîchir les nœuds',
+            child: const Icon(Icons.refresh),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton(
+            onPressed: () {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ApiKeysScreen()));
+            },
+            heroTag: 'apiKeys',
+            tooltip: 'Gérer les clés API',
+            child: const Icon(Icons.api),
+          ),
+        ],
       ),
     );
   }

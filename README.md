@@ -14,6 +14,7 @@ Ces actions sont effectuées directement par l'application :
 - Lister les utilisateurs et les nœuds.
 - Créer et supprimer des utilisateurs.
 - Créer et invalider des clés de pré-authentification.
+- Gérer les clés d'API.
 - Déplacer un nœud vers un autre utilisateur.
 - Supprimer un nœud.
 - Activer/Désactiver les routes (subnets et exit node).
@@ -216,6 +217,7 @@ Cet écran affiche un aperçu de l'état de votre réseau Headscale. Vous y trou
 **Boutons et Fonctionnalités :**
 - **Développer/Réduire les groupes d'utilisateurs :** Tapez sur le nom d'un utilisateur pour afficher ou masquer les nœuds qui lui sont associés.
 - **Afficher les détails du nœud :** Tapez sur n'importe quel nœud dans la liste pour naviguer vers son écran de détails (`Détails du Nœud`).
+- **Gérer les clés d'API (icône 'api') :** Ouvre un écran pour gérer les clés d'API de votre serveur Headscale.
 
 ### 3.2. Utilisateurs (Users)
 
@@ -276,3 +278,12 @@ Cet écran vous permet de configurer l'application pour qu'elle se connecte à v
 - **Bouton Enregistrer :** Sauvegarde les identifiants saisis. L'application redémarrera pour appliquer les nouveaux paramètres.
 
 Pour toute question ou problème, veuillez consulter la documentation officielle de Headscale ou les ressources de la communauté.
+
+### 3.8. Gestion des clés API
+
+Cet écran (accessible via le bouton `api` sur l'écran du tableau de bord) vous permet de visualiser, créer, et supprimer des clés d'API. Ces clés sont utilisées pour authentifier les requêtes à l'API de Headscale.
+
+**Boutons et Fonctionnalités :**
+- **Créer Clé (icône '+' en bas à droite) :** Ouvre un dialogue pour créer une nouvelle clé d'API. La nouvelle clé sera affichée à l'écran et devra être copiée immédiatement, car elle ne sera plus visible par la suite.
+- **Expirer Clé (icône d'horloge à côté de chaque clé) :** Fait expirer une clé d'API existante après confirmation.
+- **Supprimer Clé (icône de poubelle à côté de chaque clé) :** Supprime une clé d'API existante après confirmation.
