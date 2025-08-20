@@ -203,11 +203,31 @@ Gérez les utilisateurs de votre serveur Headscale. Vous pouvez voir la liste de
 
 ### 3.3. ACLs (Access Control Lists)
 
-Cette section vous permet de visualiser et de générer des politiques ACL pour votre réseau Headscale. Les ACLs définissent qui peut communiquer avec qui.
+Cette section vous permet de visualiser, générer et gérer les politiques ACL pour votre réseau Headscale. Les ACLs définissent qui peut communiquer avec qui.
 
-**Boutons et Fonctionnalités :**
-- **Générer la configuration de base (icône de restauration) :** Génère une politique ACL "Tout-Tag" basée sur les utilisateurs et les nœuds existants. Cette politique est affichée dans le champ de texte et peut être copiée. Cette fonctionnalité est utile pour obtenir une base de politique ACL.
-- **Partager le fichier ACL (icône de partage) :** Exporte la politique ACL affichée dans le champ de texte vers un fichier JSON que vous pouvez partager ou sauvegarder.
+**Workflow recommandé pour la gestion des ACLs :**
+
+1.  **Générer la configuration de base (icône de restauration) :**
+    *   Utilisez ce bouton pour générer une politique ACL "Tout-Tag" basée sur les utilisateurs et les nœuds existants. Cette politique est affichée dans le champ de texte.
+    *   Ceci est le point de départ pour créer ou modifier votre politique.
+
+2.  **Importer la politique actuelle du serveur (icône de cloud download) :**
+    *   Si vous avez déjà une politique ACL configurée sur votre serveur Headscale (manuellement ou via une version précédente de l'application), utilisez ce bouton pour la récupérer et l'afficher dans le champ de texte.
+    *   Ceci est utile pour vérifier la politique active ou pour la modifier manuellement avant de la réexporter.
+
+3.  **Modifier la politique (manuellement) :**
+    *   Le champ de texte est éditable. Vous pouvez modifier la politique ACL directement dans ce champ. Assurez-vous que le format JSON reste valide.
+
+4.  **Exporter la politique vers le serveur (icône de cloud upload) :**
+    *   Une fois que vous êtes satisfait de la politique affichée dans le champ de texte, utilisez ce bouton pour l'envoyer et l'appliquer sur votre serveur Headscale.
+    *   **Attention :** Cette opération peut potentiellement affecter le fonctionnement de votre réseau. Une confirmation vous sera demandée avant l'envoi.
+
+5.  **Partager le fichier ACL (icône de partage) :**
+    *   Exporte la politique ACL affichée dans le champ de texte vers un fichier JSON que vous pouvez partager ou sauvegarder localement.
+
+**Points importants :**
+*   **Toujours vérifier :** Avant d'exporter une politique, assurez-vous qu'elle correspond à vos attentes. Une ACL mal configurée peut bloquer l'accès à vos nœuds.
+*   **Sauvegarder :** Il est recommandé de sauvegarder régulièrement vos politiques ACL en utilisant la fonction de partage.
 
 ### 3.4. Détails Utilisateur
 
