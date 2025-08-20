@@ -172,7 +172,7 @@ class HelpScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '- `<chemin_local_config>` : Chemin sur votre machine hôte où se trouvera le fichier `config.yaml`.
+              '- `<chemin_local_config>` : Chemin sur votre machine hôte où se trouvera le fichier `config.yaml`.'
               '- `<chemin_local_data>` : Chemin sur votre machine hôte pour la persistance des données de Headscale (base de données, etc.).',
               style: Theme.of(context).textTheme.bodySmall,
             ),

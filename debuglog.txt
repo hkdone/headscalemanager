@@ -1,2 +1,0 @@
-I/flutter (16729): Erreur API: {"code":2, "message":"update is disabled for modes other than 'database'", "details":[]}
-I/flutter (16729): Erreur lors de l'exportation de la politique ACL vers le serveur : Exception: Échec de sauvegarder la politique ACL. Statut : 500, Corps : {"code":2, "message":"update is disabled for modes other than 'database'", "details":[]}
