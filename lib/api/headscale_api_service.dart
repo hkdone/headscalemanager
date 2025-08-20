@@ -458,6 +458,26 @@ class HeadscaleApiService {
     }
   }
 
+  /// Définit les tags pour un nœud.
+  Future<Node> setTags(String nodeId, List<String> tags) async {
+    final baseUrl = await _getBaseUrl();
+    final serverUrl = await _storageService.getServerUrl();
+    final String baseDomain = serverUrl?.extractBaseDomain() ?? 'headscale.local';
+
+    final response = await http.post(
+      Uri.parse('${baseUrl}api/v1/node/$nodeId/tags'),
+      headers: await _getHeaders(),
+      body: jsonEncode(<String, dynamic>{'tags': tags}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return Node.fromJson(data['node'], baseDomain);
+    } else {
+      throw Exception(_handleError('définir les tags', response));
+    }
+  }
+
 
 
   

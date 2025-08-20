@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
+import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:flutter/foundation.dart'; // For debugPrint
+import 'package:provider/provider.dart';
 
 /// Dialogue pour modifier les tags d'un nœud.
 ///
 /// Permet à l'utilisateur de saisir des tags sous forme de liste séparée par des virgules.
-/// Valide le format des tags et génère une commande CLI pour appliquer les changements.
+/// Valide le format des tags et met à jour les tags via l'API.
 class EditTagsDialog extends StatefulWidget {
   /// Le nœud dont les tags doivent être modifiés.
   final Node node;
-
-  // Removed onCliCommandGenerated as it's no longer needed.
-  // The dialog now returns the command directly via Navigator.pop.
 
   const EditTagsDialog({
     super.key,
@@ -30,7 +29,8 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
   @override
   void initState() {
     super.initState();
-    _tagsController.text = widget.node.tags.join(', ');
+    // remove "tag:" prefix before displaying
+    _tagsController.text = widget.node.tags.map((t) => t.startsWith('tag:') ? t.substring(4) : t).join(', ');
   }
 
   @override
@@ -41,6 +41,7 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final apiProvider = Provider.of<AppProvider>(context, listen: false);
     return AlertDialog(
       title: const Text('Modifier les tags'),
       content: Form(
@@ -86,27 +87,21 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
           onPressed: () => Navigator.of(context).pop(), // Pop with null
         ),
         TextButton(
-          child: const Text('Générer Commande CLI'),
-          onPressed: () {
+          child: const Text('Sauvegarder'),
+          onPressed: () async {
             if (_formKey.currentState!.validate()) {
               final tagsString = _tagsController.text.trim();
               final newTagsList = tagsString.isNotEmpty
-                  ? tagsString.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList()
+                  ? tagsString.split(',').map((t) => 'tag:${t.trim()}').where((t) => t.length > 4).toList()
                   : <String>[];
 
-              // Construire la commande CLI
-              // headscale nodes tag -i <identifiant> -t tag:<tag1> -t tag:<tag2> ...
-              String cliCommand = 'headscale nodes tag -i ${widget.node.id}';
-              if (newTagsList.isNotEmpty) {
-                for (final tag in newTagsList) {
-                  cliCommand += ' -t "tag:$tag"';
-                }
+              try {
+                await apiProvider.apiService.setTags(widget.node.id, newTagsList);
+                Navigator.of(context).pop();
+                showSafeSnackBar(context, 'Tags mis à jour avec succès.');
+              } catch (e) {
+                showSafeSnackBar(context, 'Erreur lors de la mise à jour des tags: $e');
               }
-              // Si newTagsList est vide, aucun drapeau -t n'est ajouté, ce qui efface les tags existants.
-              debugPrint('Generated CLI Command: $cliCommand'); // Impression de diagnostic
-
-              // Pop avec la commande générée
-              Navigator.of(context).pop(cliCommand);
             }
           },
         ),
