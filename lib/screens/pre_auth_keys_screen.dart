@@ -6,9 +6,6 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/widgets/create_pre_auth_key_dialog.dart';
-import 'package:headscalemanager/widgets/delete_pre_auth_key_dialog.dart';
-import 'package:headscalemanager/services/storage_service.dart';
-
 class PreAuthKeysScreen extends StatefulWidget {
   const PreAuthKeysScreen({super.key});
 
@@ -61,15 +58,44 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
 
           final preAuthKeys = snapshot.data!;
 
+          // Sort keys: non-expired first, then expired
+          preAuthKeys.sort((a, b) {
+            final aExpired = a.expiration != null && a.expiration!.isBefore(DateTime.now());
+            final bExpired = b.expiration != null && b.expiration!.isBefore(DateTime.now());
+
+            if (aExpired && !bExpired) {
+              return 1; // a is expired, b is not, so b comes first
+            } else if (!aExpired && bExpired) {
+              return -1; // a is not expired, b is, so a comes first
+            } else {
+              return 0; // Both are expired or both are not expired, maintain original order
+            }
+          });
+
           return ListView.builder(
             itemCount: preAuthKeys.length,
             itemBuilder: (context, index) {
               final key = preAuthKeys[index];
-              return Card(
-                margin: const EdgeInsets.all(8.0),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
+              final isExpired = key.expiration != null && key.expiration!.isBefore(DateTime.now());
+              return InkWell(
+                onTap: () async {
+                  if (!isExpired) {
+                    final appProvider = context.read<AppProvider>();
+                    final serverUrl = await appProvider.storageService.getServerUrl();
+                    final String loginServer = serverUrl?.endsWith('/') == true
+                        ? serverUrl!.substring(0, serverUrl.length - 1)
+                        : serverUrl ?? '';
+                    _showTailscaleUpCommandDialog(context, key, loginServer);
+                  } else {
+                    showSafeSnackBar(context, 'Cette clé est expirée et ne peut pas être utilisée pour l\'enregistrement.');
+                  }
+                },
+                child: Card(
+                  margin: const EdgeInsets.all(8.0),
+                  color: isExpired ? Colors.grey[300] : Colors.green[100],
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Clé : ${key.key}', style: const TextStyle(
@@ -78,31 +104,12 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
                       Text('Réutilisable : ${key.reusable ? 'Oui' : 'Non'}'),
                       Text('Éphémère : ${key.ephemeral ? 'Oui' : 'Non'}'),
                       Text('Utilisée : ${key.used ? 'Oui' : 'Non'}'),
-                      Text('Expiration : ${key.expiration?.toLocal() ??
-                          'Jamais'}'),
+                      Text('Expiration : ${key.expiration?.toLocal() ?? 'Jamais'}'),
                       Text('Créée le : ${key.createdAt?.toLocal() ?? 'N/A'}'),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () async {
-                              final confirm = await showDialog<bool>(
-                                context: context,
-                                builder: (ctx) =>
-                                    DeletePreAuthKeyDialog(preAuthKey: key,
-                                        onKeyDeleted: _refreshData),
-                              );
-                              if (confirm == true) {
-                                _refreshData();
-                              }
-                            },
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
+              )
               );
             },
           );
@@ -110,6 +117,7 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
       ),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min, // Changed to min to prevent overflow
         children: [
           FloatingActionButton(
             onPressed: () async {
@@ -149,7 +157,7 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
             },
             heroTag: 'expireAllKeys',
             tooltip: 'Expirer toutes les clés',
-            child: const Icon(Icons.delete_sweep),
+            child: const Icon(Icons.timer_off),
           ),
           const SizedBox(height: 16),
           FloatingActionButton(
@@ -182,14 +190,12 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clé de pré-authentification créée'),
+        title: const Text('Commande d\'enregistrement'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('La commande d\'enregistrement de l\'appareil a été générée.'),
-            const SizedBox(height: 16),
-            const Text('Veuillez copier cette commande et l\'envoyer au client pour qu\'il l\'exécute sur son appareil.'),
+            const Text('Copiez et exécutez cette commande sur votre appareil pour vous connecter.'),
             const SizedBox(height: 16),
             SelectableText(
               fullCommand,
@@ -199,16 +205,29 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
         ),
         actions: [
           TextButton(
+            child: const Text('Expirer la clé'),
+            onPressed: () async {
+              try {
+                final apiService = context.read<AppProvider>().apiService;
+                await apiService.expirePreAuthKey(key.user!.id, key.key);
+                _refreshData();
+                Navigator.of(context).pop(); // Close the dialog
+                showSafeSnackBar(context, 'Clé expirée avec succès.');
+              } catch (e) {
+                showSafeSnackBar(context, 'Erreur lors de l\'expiration de la clé: $e');
+              }
+            },
+          ),
+          TextButton(
             child: const Text('Fermer'),
             onPressed: () => Navigator.of(context).pop(),
           ),
           ElevatedButton.icon(
             icon: const Icon(Icons.copy),
-            label: const Text('Copier la commande pour le client'),
+            label: const Text('Copier'),
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: fullCommand));
               showSafeSnackBar(context, 'Commande copiée dans le presse-papiers !');
-              Navigator.of(context).pop();
             },
           ),
         ],
