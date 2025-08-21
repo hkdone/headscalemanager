@@ -100,7 +100,7 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
           onPressed: () async {
             if (_selectedUser != null) {
               try {
-                await provider.apiService.moveNode(widget.node.id, _selectedUser!.name);
+                await provider.apiService.moveNode(widget.node.id, _selectedUser!.id);
                 Navigator.of(context).pop(); // Ferme le dialogue
                 widget.onNodeMoved(); // Appelle le callback pour rafraîchir la liste
                 showSafeSnackBar(context, 'Appareil déplacé avec succès.');

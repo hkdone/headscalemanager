@@ -178,6 +178,8 @@ Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user)
                           await context.read<AppProvider>().apiService.registerMachine(key, user.name);
                           Navigator.of(dialogContext).pop();
                           showSafeSnackBar(context, 'Appareil enregistré avec succès.');
+                          // Show the informational dialog about ACL tags
+                          _showAclTagInfoDialog(context);
                         } catch (e) {
                           showSafeSnackBar(context, 'Erreur lors de l\'enregistrement: $e');
                         }
@@ -191,3 +193,23 @@ Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user)
   );
 }
 
+/// Affiche un dialogue d'information sur l'importance des tags pour les ACLs.
+Future<void> _showAclTagInfoDialog(BuildContext context) async {
+  return showDialog(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Information sur les Tags ACL'),
+        content: const Text(
+          'N\'oubliez pas d\'ajouter un tag à ce nouveau nœud. Si vous utilisez les ACLs, les tags sont essentiels pour définir les permissions d\'accès.'
+        ),
+        actions: [
+          TextButton(
+            child: const Text('Compris'),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+          ),
+        ],
+      );
+    },
+  );
+}

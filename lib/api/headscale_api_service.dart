@@ -114,7 +114,7 @@ class HeadscaleApiService {
     if (response.statusCode == 200) {
       // Décode la réponse JSON et construit un objet Node à partir des données.
       // Passe le baseDomain au constructeur fromJson du Node.
-      return Node.fromJson(json.decode(response.body)['node'], baseDomain); // Supposant que 'node' est la clé pour l'objet nœud unique
+      return Node.fromJson(json.decode(response.body)['node'], baseDomain); // Supposant que 'node' est la clé pour l\'objet nœud unique
     } else {
       // Lève une exception si la requête a échoué.
       throw Exception(_handleError('charger les détails du nœud', response));
@@ -330,20 +330,20 @@ class HeadscaleApiService {
   }
 
   /// Déplace un nœud vers un utilisateur différent.
-  Future<void> moveNode(String nodeId, String userName) async {
-    // Récupère l'URL de base du serveur.
+  Future<void> moveNode(String nodeId, String userId) async {
+    print('Déplacement du nœud $nodeId vers l\'utilisateur $userId');
     final baseUrl = await _getBaseUrl();
-    // Effectue la requête POST pour déplacer le nœud vers un autre utilisateur.
     final response = await http.post(
       Uri.parse('${baseUrl}api/v1/node/$nodeId/user'),
       headers: await _getHeaders(),
-      body: jsonEncode(<String, String>{'user': userName}),
+      body: jsonEncode(<String, String>{'user': userId}),
     );
 
-    // Lève une exception si la requête n'a pas réussi.
     if (response.statusCode != 200) {
+      print('Échec du déplacement du nœud. Statut: ${response.statusCode}, Corps: ${response.body}');
       throw Exception(_handleError('déplacer le nœud', response));
     }
+    print('Nœud déplacé avec succès.');
   }
 
   /// Définit les tags pour une machine.
