@@ -33,7 +33,7 @@ class HeadscaleApiService {
     if (url == null) {
       throw Exception('L\'URL du serveur n\'est pas configurée.');
     }
-    // Assure que l'URL se termine par un slash pour faciliter la concaténation des chemins d'API.
+    // Assure que l\'URL se termine par un slash pour faciliter la concaténation des chemins d\'API.
     return url.endsWith('/') ? url : '$url/';
   }
 

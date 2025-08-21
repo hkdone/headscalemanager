@@ -156,7 +156,7 @@ Pour des raisons de sécurité et d'accessibilité, il est fortement recommandé
 Assurez-vous que :
 - Vous avez un **FQDN (Fully Qualified Domain Name) public** (ex: `headscale.mondomaine.com`).
 - Vous avez un **certificat SSL/TLS valide** pour ce FQDN (ex: via Let's Encrypt).
-- Le proxy inverse redirige le **port externe HTTPS (443)** vers le **port interne HTTP (8080)** de votre conteneur Headscale.
+- Le proxy inverse redirige le **port externe HTTPS (8081)** vers le **port interne HTTP (8080)** de votre conteneur Headscale.
 
 ### 1.4. Génération de la Clé API Headscale
 

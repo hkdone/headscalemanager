@@ -52,6 +52,8 @@ android {
 
     buildTypes {
         release {
+            isMinifyEnabled = false // Disable R8
+            isShrinkResources = false // Disable resource shrinking
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             // signingConfig = debugSigningConfig // Comment out or remove this line
