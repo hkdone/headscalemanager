@@ -4,6 +4,8 @@ Bienvenue dans le guide d'utilisation de l'application Headscale Manager !
 
 Cette application vous permet de gérer facilement votre serveur Headscale. Ce guide vous aidera à configurer votre serveur et à utiliser l'application.
 
+Telechargement de l'application mobile android : https://play.google.com/store/apps/details?id=com.dkstudio.headscalemanager
+
 ## Fonctionnement : API
 
 L'application utilise des appels directs à l'API de Headscale pour toutes les opérations de gestion.
