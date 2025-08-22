@@ -1,16 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:flutter/foundation.dart'; // Import for debugPrint
-import 'package:headscalemanager/services/acl_generator_service.dart'; // New import
+import 'package:flutter/foundation.dart';
+import 'package:headscalemanager/services/acl_generator_service.dart';
 
-/// Écran de gestion des politiques ACL (Access Control List) Headscale.
-///
-/// Permet de visualiser, éditer, générer et partager les politiques ACL.
 class AclScreen extends StatefulWidget {
   const AclScreen({super.key});
 
@@ -19,38 +17,49 @@ class AclScreen extends StatefulWidget {
 }
 
 class _AclScreenState extends State<AclScreen> {
-  /// Contrôleur pour le champ de texte affichant la politique ACL.
   final TextEditingController _aclController = TextEditingController();
-
-  /// Indicateur de chargement pour l'écran.
   bool _isLoading = true;
-
-  /// La politique ACL actuelle, stockée sous forme de Map.
   Map<String, dynamic> _currentAclPolicy = {};
-
-  /// Instance du service de génération d'ACL.
   final AclGeneratorService _aclGeneratorService = AclGeneratorService();
+
+  // State for temporary rules UI
+  List<Node> _allNodes = [];
+  Node? _selectedSourceNode;
+  Node? _selectedDestinationNode;
+  final List<Map<String, String>> _temporaryRules = [];
 
   @override
   void initState() {
     super.initState();
-    _loadAcl();
+    _loadInitialData();
   }
 
-  /// Met à jour le texte du contrôleur ACL avec le contenu de `_currentAclPolicy`.
-  ///
-  /// Le JSON est formaté avec une indentation pour une meilleure lisibilité.
+  Future<void> _loadInitialData() async {
+    _loadAcl();
+    await _fetchNodes();
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _fetchNodes() async {
+    try {
+      final apiService = context.read<AppProvider>().apiService;
+      _allNodes = await apiService.getNodes();
+    } catch (e) {
+      debugPrint('Error fetching nodes: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to fetch nodes: $e')),
+      );
+    }
+  }
+
   void _updateAclControllerText() {
     const JsonEncoder encoder = JsonEncoder.withIndent('  ');
     _aclController.text = encoder.convert(_currentAclPolicy);
-    // Rafraîchir l'UI si le texte du contrôleur est lié
     setState(() {});
   }
 
-  /// Initialise la politique ACL avec une structure JSON par défaut pour Headscale.
-  ///
-  /// Cette structure inclut les sections 'acls', 'groups', 'tagOwners', 'autoApprovers',
-  /// 'tests' et 'hosts'.
   void _loadAcl() {
     _currentAclPolicy = {
       'acls': [],
@@ -61,9 +70,6 @@ class _AclScreenState extends State<AclScreen> {
       'hosts': {},
     };
     _updateAclControllerText();
-    setState(() {
-      _isLoading = false;
-    });
   }
 
   @override
@@ -75,26 +81,8 @@ class _AclScreenState extends State<AclScreen> {
               padding: const EdgeInsets.all(8.0),
               child: Column(
                 children: [
-                  // Carte d'information pour les serveurs DNS globaux.
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Text(
-                        '''Pour définir des serveurs DNS globaux, ajoutez une section 'dns' à votre politique (format JSON).
-
-Exemple :
-"dns": {
-  "servers": ["8.8.8.8", "1.1.1.1"],
-  "magicDNS": true
-}
-
-Note: Ce texte est codé en dur. Pour une meilleure gestion, il pourrait être déplacé vers une constante ou un fichier de ressources.''',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                  ),
+                  _buildTemporaryRulesSection(),
                   const SizedBox(height: 10),
-                  // Champ de texte extensible pour afficher et éditer la politique ACL.
                   Expanded(
                     child: TextField(
                       controller: _aclController,
@@ -102,18 +90,17 @@ Note: Ce texte est codé en dur. Pour une meilleure gestion, il pourrait être d
                       expands: true,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
-                        labelText: 'Politique ACL (format JSON)',
+                        labelText: 'Politique ACL',
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-      // Boutons d'action flottants.
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          // Bouton pour partager le fichier ACL.
+        children:
+         [
           FloatingActionButton(
             onPressed: _shareAclFile,
             heroTag: 'shareAclFile',
@@ -121,15 +108,13 @@ Note: Ce texte est codé en dur. Pour une meilleure gestion, il pourrait être d
             child: const Icon(Icons.share),
           ),
           const SizedBox(height: 16),
-          // Bouton pour générer la configuration de base de l'ACL.
           FloatingActionButton(
-            onPressed: _initializeAclPolicy, // Renommé pour éviter la confusion avec _loadAcl
-            heroTag: 'initializeAcl',
-            tooltip: 'Générer la configuration de base',
+            onPressed: _generateAclPolicy,
+            heroTag: 'generateAcl',
+            tooltip: 'Générer la politique ACL',
             child: const Icon(Icons.settings_backup_restore),
           ),
           const SizedBox(height: 16),
-          // Bouton pour récupérer la politique ACL du serveur.
           FloatingActionButton(
             onPressed: _fetchAclPolicyFromServer,
             heroTag: 'fetchAclFromServer',
@@ -137,7 +122,6 @@ Note: Ce texte est codé en dur. Pour une meilleure gestion, il pourrait être d
             child: const Icon(Icons.cloud_download),
           ),
           const SizedBox(height: 16),
-          // Bouton pour exporter la politique ACL vers le serveur.
           FloatingActionButton(
             onPressed: _exportAclPolicyToServer,
             heroTag: 'exportAclToServer',
@@ -149,15 +133,127 @@ Note: Ce texte est codé en dur. Pour une meilleure gestion, il pourrait être d
     );
   }
 
-  /// Exporte la politique ACL actuelle vers le serveur Headscale.
+  Widget _buildTemporaryRulesSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Autorisations Temporaires', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: _buildNodeDropdown('Source', _selectedSourceNode, (node) => setState(() => _selectedSourceNode = node))),
+                const SizedBox(width: 10),
+                Expanded(child: _buildNodeDropdown('Destination', _selectedDestinationNode, (node) => setState(() => _selectedDestinationNode = node))),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Center(
+              child: ElevatedButton.icon(
+                onPressed: _addTemporaryRule,
+                icon: const Icon(Icons.add_link),
+                label: const Text('Ajouter la règle'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Règles actives:', style: Theme.of(context).textTheme.titleMedium),
+                IconButton(
+                  icon: const Icon(Icons.delete_sweep),
+                  tooltip: 'Effacer toutes les règles temporaires',
+                  onPressed: _clearTemporaryRules,
+                )
+              ],
+            ),
+            Wrap(
+              spacing: 8.0,
+              children: _temporaryRules.asMap().entries.map((entry) {
+                int idx = entry.key;
+                Map<String, String> rule = entry.value;
+                return Chip(
+                  label: Text('${rule['src']} <-> ${rule['dst']}'),
+                  onDeleted: () => _removeTemporaryRule(idx),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  DropdownButtonFormField<Node> _buildNodeDropdown(String label, Node? selectedNode, ValueChanged<Node?> onChanged) {
+    return DropdownButtonFormField<Node>(
+      value: selectedNode,
+      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+      items: _allNodes.map((Node node) {
+        return DropdownMenuItem<Node>(
+          value: node,
+          child: Text(node.name, overflow: TextOverflow.ellipsis),
+        );
+      }).toList(),
+      onChanged: onChanged,
+      isExpanded: true,
+    );
+  }
+
+  void _addTemporaryRule() {
+    if (_selectedSourceNode == null || _selectedDestinationNode == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veuillez sélectionner un nœud source et un nœud destination.')));
+      return;
+    }
+    if (_selectedSourceNode!.id == _selectedDestinationNode!.id) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La source et la destination ne peuvent pas être identiques.')));
+      return;
+    }
+    if (_selectedSourceNode!.tags.isEmpty || _selectedDestinationNode!.tags.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Les deux nœuds doivent avoir au moins un tag.')));
+      return;
+    }
+
+    final newRule = {
+      'src': _selectedSourceNode!.tags.first,
+      'dst': _selectedDestinationNode!.tags.first,
+    };
+
+    bool ruleExists = _temporaryRules.any((rule) => 
+        (rule['src'] == newRule['src'] && rule['dst'] == newRule['dst']) ||
+        (rule['src'] == newRule['dst'] && rule['dst'] == newRule['src']));
+
+    if (ruleExists) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cette règle existe déjà.')));
+      return;
+    }
+
+    setState(() {
+      _temporaryRules.add(newRule);
+    });
+  }
+
+  void _removeTemporaryRule(int index) {
+    setState(() {
+      _temporaryRules.removeAt(index);
+    });
+  }
+
+  void _clearTemporaryRules() {
+    setState(() {
+      _temporaryRules.clear();
+    });
+  }
+
   Future<void> _exportAclPolicyToServer() async {
     final bool confirm = await showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Confirmer l\'exportation ACL'),
+          title: const Text('Confirmer l\'exportation manuelle'),
           content: const Text(
-              'L\'exportation de la politique ACL peut potentiellement affecter le fonctionnement de votre réseau Headscale. Êtes-vous sûr de vouloir continuer ?'),
+              'Vous allez exporter le contenu du champ de texte vers le serveur. Assurez-vous que le JSON est valide. Continuer ?'),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -172,22 +268,13 @@ Note: Ce texte est codé en dur. Pour une meilleure gestion, il pourrait être d
       },
     );
 
-    if (!confirm) {
-      return; // L\'utilisateur a annulé
-    }
+    if (!confirm) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
     try {
-      final appProvider = context.read<AppProvider>();
-      final apiService = appProvider.apiService;
-
-      final String aclJsonString = _aclController.text;
-      final Map<String, dynamic> aclMap = json.decode(aclJsonString);
-
+      final apiService = context.read<AppProvider>().apiService;
+      final aclMap = json.decode(_aclController.text);
       await apiService.setAclPolicy(aclMap);
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Politique ACL exportée avec succès vers le serveur.')),
       );
@@ -197,25 +284,18 @@ Note: Ce texte est codé en dur. Pour une meilleure gestion, il pourrait être d
         SnackBar(content: Text('Échec de l\'exportation de la politique ACL : $e')),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
-  /// Récupère la politique ACL actuelle depuis le serveur Headscale.
   Future<void> _fetchAclPolicyFromServer() async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
     try {
-      final appProvider = context.read<AppProvider>();
-      final apiService = appProvider.apiService;
-
-      final String aclJsonString = await apiService.getAclPolicy();
+      final apiService = context.read<AppProvider>().apiService;
+      final aclJsonString = await apiService.getAclPolicy();
       _currentAclPolicy = json.decode(aclJsonString);
+      _temporaryRules.clear(); // Clear local rules when fetching from server
       _updateAclControllerText();
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Politique ACL récupérée du serveur.')),
       );
@@ -225,82 +305,49 @@ Note: Ce texte est codé en dur. Pour une meilleure gestion, il pourrait être d
         SnackBar(content: Text('Échec de la récupération de la politique ACL : $e')),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
-  /// Ajoute une règle ACL générée à la politique ACL actuelle.
-  ///
-  /// [ruleJson] : La règle ACL sous forme de chaîne JSON.
-  void _addGeneratedRule(String ruleJson) {
-    try {
-      final newRule = jsonDecode(ruleJson);
-
-      // S'assure que 'acls' est une liste avant d'ajouter la nouvelle règle.
-      if (_currentAclPolicy['acls'] == null || !(_currentAclPolicy['acls'] is List)) {
-        _currentAclPolicy['acls'] = [];
-      }
-
-      (_currentAclPolicy['acls'] as List).add(newRule);
-      _updateAclControllerText();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Règle ACL ajoutée.')),
-      );
-    } catch (e) {
-      debugPrint('Erreur lors de l\'ajout de la règle ACL : $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur d\'ajout de la règle : $e. Assurez-vous que la règle est un JSON valide.')),
-      );
-    }
-  }
-
-  /// Génère une politique ACL complète en utilisant le service `AclGeneratorService`.
-  ///
-  /// Récupère les utilisateurs et les nœuds via l'API, puis utilise le service
-  /// pour construire la politique ACL basée sur les tags et les routes.
-  Future<void> _initializeAclPolicy() async { // Renommé
+  Future<void> _generateAclPolicy() async {
+    setState(() => _isLoading = true);
     try {
       final appProvider = context.read<AppProvider>();
       final apiService = appProvider.apiService;
 
-      // Récupération des utilisateurs et des nœuds via le service API.
       final users = await apiService.getUsers();
-      final nodes = await apiService.getNodes();
+      final nodes = _allNodes.isNotEmpty ? _allNodes : await apiService.getNodes();
+      if (_allNodes.isEmpty) _allNodes = nodes;
 
-      // Utilisation du service AclGeneratorService pour générer la politique ACL.
       _currentAclPolicy = _aclGeneratorService.generateAclPolicy(
         users: users,
         nodes: nodes,
+        temporaryRules: _temporaryRules, // Pass temporary rules to the service
       );
 
       _updateAclControllerText();
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Politique ACL "Tout-Tag" générée.')),
+        const SnackBar(content: Text('Politique ACL générée dans le champ de texte.')),
       );
     } catch (e) {
       debugPrint('Erreur lors de la génération de la politique ACL : $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Échec de la génération de la politique ACL : $e')),
       );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
-  /// Partage le contenu de la politique ACL actuelle sous forme de fichier JSON.
-  ///
-  /// Le fichier est sauvegardé temporairement et partagé via le plugin `share_plus`.
   Future<void> _shareAclFile() async {
     try {
       const JsonEncoder encoder = JsonEncoder.withIndent('  ');
       final String aclJsonString = encoder.convert(_currentAclPolicy);
 
-      // Vérifie si la politique est vide ou non initialisée.
       if (aclJsonString.isEmpty || aclJsonString == encoder.convert({})) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Le contenu ACL est vide ou non initialisé. Générez d\'abord une politique.')),
+          const SnackBar(content: Text('Le contenu ACL est vide. Générez d\'abord une politique.')),
         );
         return;
       }
@@ -310,7 +357,6 @@ Note: Ce texte est codé en dur. Pour une meilleure gestion, il pourrait être d
       await file.writeAsString(aclJsonString);
 
       await Share.shareXFiles([XFile(file.path)], text: 'Voici votre politique ACL Headscale.');
-
     } catch (e) {
       debugPrint('Erreur lors du partage du fichier ACL : $e');
       ScaffoldMessenger.of(context).showSnackBar(

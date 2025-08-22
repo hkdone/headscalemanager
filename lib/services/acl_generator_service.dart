@@ -18,6 +18,7 @@ class AclGeneratorService {
   Map<String, dynamic> generateAclPolicy({
     required List<User> users,
     required List<Node> nodes,
+    List<Map<String, String>> temporaryRules = const [],
   }) {
     // --- Étape 1: Extraire toutes les informations des nœuds et utilisateurs ---
     final groups = <String, List<String>>{};
@@ -28,7 +29,6 @@ class AclGeneratorService {
 
     final tagsByUser = <String, Set<String>>{};
     final routesByUser = <String, Set<String>>{};
-    final userOwnsExitNode = <String, bool>{};
 
     for (var node in nodes) {
       final groupName = 'group:${node.user}';
@@ -44,9 +44,7 @@ class AclGeneratorService {
         }
       }
 
-      if (node.isExitNode) userOwnsExitNode[userName] = true;
-
-      final subnetRoutes = node.sharedRoutes; // Use sharedRoutes directly
+      final subnetRoutes = node.sharedRoutes;
       if (subnetRoutes.isNotEmpty) {
         if (!routesByUser.containsKey(userName)) routesByUser[userName] = <String>{};
         routesByUser[userName]!.addAll(subnetRoutes);
@@ -70,66 +68,59 @@ class AclGeneratorService {
       }
     }
 
-    // --- Étape 2: Construire les règles ACL "Tout-Tag" ---
+    // --- Étape 2: Construire les règles ACL en priorisant les règles temporaires ---
     final acls = <Map<String, dynamic>>[];
 
-    // Règle pour chaque utilisateur, basée sur l'ensemble de ses tags
+    // 2.1: Ajouter les règles d'autorisation temporaires EN PREMIER
+    for (var rule in temporaryRules) {
+      final src = rule['src'];
+      final dst = rule['dst'];
+
+      if (src != null && dst != null) {
+        // Règle pour la communication aller
+        acls.add({
+          'action': 'accept',
+          'src': [src],
+          'dst': ['$dst:*'],
+        });
+        // Règle pour la communication retour (essentiel)
+        acls.add({
+          'action': 'accept',
+          'src': [dst],
+          'dst': ['$src:*'],
+        });
+      }
+    }
+
+    // 2.2: Ajouter les règles de base avec isolation 100% stricte APRÈS
+    final allExitNodeTags = (autoApprovers['exitNodes'] as List<String>).toSet();
+
     tagsByUser.forEach((userName, userTags) {
-      if (userTags.isEmpty) return; // Ne rien faire pour les utilisateurs sans tags
+      if (userTags.isEmpty) return;
 
       final userTagList = userTags.toList();
       final destinations = <String>{};
-      // Les tags d'un utilisateur peuvent communiquer entre eux
+
+      // Accès à ses propres tags
       destinations.addAll(userTagList.map((t) => '$t:*'));
 
-      // Ajouter l'accès aux routes possédées par l'utilisateur
+      // Accès aux routes que CET utilisateur annonce
       if (routesByUser.containsKey(userName)) {
         destinations.addAll(routesByUser[userName]!.map((r) => '$r:*'));
       }
-      // Ajouter l'accès à internet si l'utilisateur possède un exit node
-      if (userOwnsExitNode[userName] == true) {
-        destinations.add('autogroup:internet:*');
-      }
+
+      // Accès à SES PROPRES exit nodes uniquement
+      final ownedExitNodes = allExitNodeTags.where((exitTag) {
+        final owners = tagOwners[exitTag] ?? [];
+        return owners.contains('group:$userName');
+      });
+      destinations.addAll(ownedExitNodes.map((t) => '$t:*'));
 
       acls.add({
         'action': 'accept',
         'src': userTagList,
-        'dst': destinations.toList(),
+        'dst': destinations.toList()..sort(),
       });
-    });
-
-    // Règle pour les tags "routeurs" eux-mêmes
-    final allRouterTags = <String>{};
-    (autoApprovers['routes'] as Map<String, List<String>>).values.forEach(allRouterTags.addAll);
-    allRouterTags.addAll(autoApprovers['exitNodes'] as List<String>);
-
-    allRouterTags.forEach((tag) {
-      final destinations = <String>{};
-      // Le routeur peut parler aux autres tags de son propriétaire
-      tagOwners[tag]?.forEach((ownerGroup) {
-        final ownerName = ownerGroup.replaceFirst('group:', '');
-        if (tagsByUser.containsKey(ownerName)) {
-          destinations.addAll(tagsByUser[ownerName]!.map((t) => '$t:*'));
-        }
-      });
-
-      // Le routeur peut parler aux routes qu'il annonce
-      (autoApprovers['routes'] as Map<String, List<String>>).forEach((route, tags) {
-        if (tags.contains(tag)) destinations.add('$route:*');
-      });
-
-      // Le routeur peut parler à internet s'il est un exit node
-      if ((autoApprovers['exitNodes'] as List<String>).contains(tag)) {
-        destinations.add('autogroup:internet:*');
-      }
-
-      if (destinations.isNotEmpty) {
-        acls.add({
-          'action': 'accept',
-          'src': [tag],
-          'dst': destinations.toList(),
-        });
-      }
     });
 
     // --- Étape 3: Assemblage final ---
