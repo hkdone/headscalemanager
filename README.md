@@ -210,31 +210,34 @@ Gérez les utilisateurs de votre serveur Headscale. Vous pouvez voir la liste de
 
 ### 3.3. ACLs (Access Control Lists)
 
-Cette section vous permet de visualiser, générer et gérer les politiques ACL pour votre réseau Headscale. Les ACLs définissent qui peut communiquer avec qui.
+Cette section, la plus puissante de l'application, vous permet de gérer finement qui peut communiquer avec qui. Le système repose sur une politique de base stricte (chaque utilisateur est isolé) à laquelle vous pouvez ajouter des exceptions temporaires.
 
 **Workflow recommandé pour la gestion des ACLs :**
 
-1.  **Générer la configuration de base (icône de restauration) :**
-    *   Utilisez ce bouton pour générer une politique ACL "Tout-Tag" basée sur les utilisateurs et les nœuds existants. Cette politique est affichée dans le champ de texte.
-    *   Ceci est le point de départ pour créer ou modifier votre politique.
+1.  **Étape 1 : Charger une configuration de base**
+    *   Utilisez le bouton **Récupérer** (nuage avec flèche vers le bas) pour charger la politique actuelle de votre serveur. C'est le point de départ recommandé.
+    *   Alternativement, si vous souhaitez repartir de zéro, le bouton **Générer** (icône de restauration) créera une politique de base avec l'isolation stricte pour tous vos nœuds actuels.
 
-2.  **Importer la politique actuelle du serveur (icône de cloud download) :**
-    *   Si vous avez déjà une politique ACL configurée sur votre serveur Headscale (manuellement ou via une version précédente de l'application), utilisez ce bouton pour la récupérer et l'afficher dans le champ de texte.
-    *   Ceci est utile pour vérifier la politique active ou pour la modifier manuellement avant de la réexporter.
+2.  **Étape 2 : Créer des autorisations temporaires (Optionnel)**
+    *   Dans la section "Autorisations Temporaires", utilisez les menus déroulants pour sélectionner un nœud **Source** et un nœud **Destination**.
+    *   Cliquez sur **"Ajouter la règle"**. Une puce représentant l'autorisation (ex: `tag:node-A <-> tag:node-B`) apparaît dans la liste des "Règles actives". À ce stade, rien n'a encore été envoyé au serveur.
+    *   Vous pouvez ajouter autant de règles temporaires que nécessaire. Utilisez l'icône de poubelle sur une puce pour la supprimer, ou le balai pour tout effacer.
 
-3.  **Modifier la politique (manuellement) :**
-    *   Le champ de texte est éditable. Vous pouvez modifier la politique ACL directement dans ce champ. Assurez-vous que le format JSON reste valide.
+3.  **Étape 3 : Générer et Contrôler la politique finale**
+    *   Une fois vos règles temporaires définies (ou si vous n'en voulez aucune), cliquez sur le bouton **Générer** (icône de restauration).
+    *   L'application va calculer le fichier ACL final, en plaçant vos règles temporaires en priorité, et l'afficher dans le grand champ de texte en dessous.
+    *   **Ceci est votre étape de contrôle.** Vérifiez que le JSON généré correspond bien à ce que vous souhaitez appliquer.
 
-4.  **Exporter la politique vers le serveur (icône de cloud upload) :**
-    *   Une fois que vous êtes satisfait de la politique affichée dans le champ de texte, utilisez ce bouton pour l'envoyer et l'appliquer sur votre serveur Headscale.
-    *   **Attention :** Cette opération peut potentiellement affecter le fonctionnement de votre réseau. Une confirmation vous sera demandée avant l'envoi.
+4.  **Étape 4 : Exporter et Appliquer sur le serveur**
+    *   Si la configuration dans le champ de texte vous convient, cliquez sur le bouton **Exporter** (nuage avec flèche vers le haut).
+    *   La politique sera envoyée au serveur. **Notez qu'il peut y avoir un délai de quelques secondes à une minute** pour que tous les appareils de votre réseau reçoivent et appliquent les nouvelles règles.
 
-5.  **Partager le fichier ACL (icône de partage) :**
-    *   Exporte la politique ACL affichée dans le champ de texte vers un fichier JSON que vous pouvez partager ou sauvegarder localement.
-
-**Points importants :**
-*   **Toujours vérifier :** Avant d'exporter une politique, assurez-vous qu'elle correspond à vos attentes. Une ACL mal configurée peut bloquer l'accès à vos nœuds.
-*   **Sauvegarder :** Il est recommandé de sauvegarder régulièrement vos politiques ACL en utilisant la fonction de partage.
+**Résumé des boutons :**
+- **Ajouter la règle :** Ajoute une autorisation à la liste locale des règles temporaires.
+- **Générer (icône de restauration) :** Calcule la politique finale (base + règles temporaires) et l'affiche dans le champ de texte pour vérification.
+- **Exporter (icône de cloud upload) :** Envoie le contenu du champ de texte au serveur pour application.
+- **Récupérer (icône de cloud download) :** Récupère la politique actuellement active sur le serveur.
+- **Partager (icône de partage) :** Exporte la politique affichée dans un fichier JSON local.
 
 ### 3.4. Détails Utilisateur
 

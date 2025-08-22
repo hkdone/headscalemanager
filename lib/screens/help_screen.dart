@@ -454,7 +454,7 @@ routes:
             ),
             const SizedBox(height: 8),
             Text(
-              'Cette section vous permet de visualiser, générer et gérer les politiques ACL pour votre réseau Headscale. Les ACLs définissent qui peut communiquer avec qui.',
+              'Cette section, la plus puissante de l\'application, vous permet de gérer finement qui peut communiquer avec qui. Le système repose sur une politique de base stricte (chaque utilisateur est isolé) à laquelle vous pouvez ajouter des exceptions temporaires.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 8),
@@ -464,42 +464,32 @@ routes:
             ),
             const SizedBox(height: 4),
             Text(
-              '1.  **Générer la configuration de base (icône de restauration) :**\n    *   Utilisez ce bouton pour générer une politique ACL "Tout-Tag" basée sur les utilisateurs et les nœuds existants. Cette politique est affichée dans le champ de texte.\n    *   Ceci est le point de départ pour créer ou modifier votre politique.',
+              '1.  **Étape 1 : Charger une configuration de base**\n'              '    *   Utilisez le bouton **Récupérer** (nuage avec flèche vers le bas) pour charger la politique actuelle de votre serveur. C\'est le point de départ recommandé.\n'              '    *   Alternativement, si vous souhaitez repartir de zéro, le bouton **Générer** (icône de restauration) créera une politique de base avec l\'isolation stricte pour tous vos nœuds actuels.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 4),
             Text(
-              '2.  **Importer la politique actuelle du serveur (icône de cloud download) :**\n    *   Si vous avez déjà une politique ACL configurée sur votre serveur Headscale (manuellement ou via une version précédente de l\'application), utilisez ce bouton pour la récupérer et l\'afficher dans le champ de texte.\n    *   Ceci est utile pour vérifier la politique active ou pour la modifier manuellement avant de la réexporter.',
+              '2.  **Étape 2 : Créer des autorisations temporaires (Optionnel)**\n'              '    *   Dans la section "Autorisations Temporaires", utilisez les menus déroulants pour sélectionner un nœud **Source** et un nœud **Destination**.\n'              '    *   Cliquez sur **"Ajouter la règle"**. Une puce représentant l\'autorisation (ex: `tag:node-A <-> tag:node-B`) apparaît dans la liste des "Règles actives". À ce stade, rien n\'a encore été envoyé au serveur.\n'              '    *   Vous pouvez ajouter autant de règles temporaires que nécessaire. Utilisez l\'icône de poubelle sur une puce pour la supprimer, ou le balai pour tout effacer.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 4),
             Text(
-              '3.  **Modifier la politique (manuellement) :**\n    *   Le champ de texte est éditable. Vous pouvez modifier la politique ACL directement dans ce champ. Assurez-vous que le format JSON reste valide.',
+              '3.  **Étape 3 : Générer et Contrôler la politique finale**\n'              '    *   Une fois vos règles temporaires définies (ou si vous n\'en voulez aucune), cliquez sur le bouton **Générer** (icône de restauration).\n'              '    *   L\'application va calculer le fichier ACL final, en plaçant vos règles temporaires en priorité, et l\'afficher dans le grand champ de texte en dessous.\n'              '    *   **Ceci est votre étape de contrôle.** Vérifiez que le JSON généré correspond bien à ce que vous souhaitez appliquer.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 4),
             Text(
-              '4.  **Exporter la politique vers le serveur (icône de cloud upload) :**\n    *   Une fois que vous êtes satisfait de la politique affichée dans le champ de texte, utilisez ce bouton pour l\'envoi et l\'appliquer sur votre serveur Headscale.\n    *   **Attention :** Cette opération peut potentiellement affecter le fonctionnement de votre réseau. Une confirmation vous sera demandée avant l\'envoi.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '5.  **Partager le fichier ACL (icône de partage) :**\n    *   Exporte la politique ACL affichée dans le champ de texte vers un fichier JSON que vous pouvez partager ou sauvegarder localement.',
+              '4.  **Étape 4 : Exporter et Appliquer sur le serveur**\n'              '    *   Si la configuration dans le champ de texte vous convient, cliquez sur le bouton **Exporter** (nuage avec flèche vers le haut).\n'              '    *   La politique sera envoyée au serveur. **Notez qu\'il peut y avoir un délai de quelques secondes à une minute** pour que tous les appareils de votre réseau reçoivent et appliquent les nouvelles règles.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
             Text(
-              '**Points importants :**',
+              '**Résumé des boutons :**',
               style: Theme.of(context).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
-              '*   **Toujours vérifier :** Avant d\'exporter une politique, assurez-vous qu\'elle correspond à vos attentes. Une ACL mal configurée peut bloquer l\'accès à vos nœuds.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '*   **Sauvegarder :** Il est recommandé de sauvegarder régulièrement vos politiques ACL en utilisant la fonction de partage.',
+              '- **Ajouter la règle :** Ajoute une autorisation à la liste locale des règles temporaires.\n'              '- **Générer (icône de restauration) :** Calcule la politique finale (base + règles temporaires) et l\'affiche dans le champ de texte pour vérification.\n'              '- **Exporter (icône de cloud upload) :** Envoie le contenu du champ de texte au serveur pour application.\n'              '- **Récupérer (icône de cloud download) :** Récupère la politique actuellement active sur le serveur.\n'              '- **Partager (icône de partage) :** Exporte la politique affichée dans un fichier JSON local.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
