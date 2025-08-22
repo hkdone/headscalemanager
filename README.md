@@ -6,7 +6,8 @@ Cette application vous permet de gérer facilement votre serveur Headscale. Ce g
 
 Telechargement de l'application mobile android : https://play.google.com/store/apps/details?id=com.dkstudio.headscalemanager
 
-Le code source est publique et cette application est une application flutter. Libre a vous de compiler celle-ci pour IOS ou web.
+
+
 
 ## Fonctionnement : API
 
