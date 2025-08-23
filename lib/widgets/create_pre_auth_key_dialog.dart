@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For Clipboard
-import 'package:headscalemanager/models/pre_auth_key.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';

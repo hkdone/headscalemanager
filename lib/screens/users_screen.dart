@@ -4,14 +4,8 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/user_detail_screen.dart';
 import 'package:headscalemanager/screens/pre_auth_keys_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/services.dart';
-import 'package:headscalemanager/models/pre_auth_key.dart';
-import 'package:headscalemanager/services/storage_service.dart';
-import 'package:headscalemanager/utils/string_utils.dart';
-import 'package:flutter/foundation.dart'; // For debugPrint
 import 'package:headscalemanager/widgets/create_user_dialog.dart'; // New import
 import 'package:headscalemanager/widgets/delete_user_dialog.dart'; // New import
-import 'package:headscalemanager/widgets/create_pre_auth_key_dialog.dart'; // Extracted earlier
 
 /// Écran de gestion des utilisateurs Headscale.
 ///
