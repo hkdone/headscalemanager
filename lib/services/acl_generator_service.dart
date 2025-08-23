@@ -62,8 +62,21 @@ class AclGeneratorService {
 
       if (node.isExitNode && node.tags.isNotEmpty) {
         final exitNodesList = autoApprovers['exitNodes'] as List<String>;
+        final routesMap = autoApprovers['routes'] as Map<String, List<String>>;
+        const exitRoutes = ['0.0.0.0/0', '::/0'];
+
         for (var tag in node.tags) {
-          if (!exitNodesList.contains(tag)) exitNodesList.add(tag);
+          if (!exitNodesList.contains(tag)) {
+            exitNodesList.add(tag);
+          }
+
+          // Enregistrer également les routes de sortie pour ce tag
+          for (var route in exitRoutes) {
+            final routeOwners = routesMap.putIfAbsent(route, () => []);
+            if (!routeOwners.contains(tag)) {
+              routeOwners.add(tag);
+            }
+          }
         }
       }
     }
@@ -104,9 +117,10 @@ class AclGeneratorService {
       // Accès à ses propres tags
       destinations.addAll(userTagList.map((t) => '$t:*'));
 
-      // Accès aux routes que CET utilisateur annonce
+      // Accès aux routes que CET utilisateur annonce, en excluant les routes de sortie
       if (routesByUser.containsKey(userName)) {
-        destinations.addAll(routesByUser[userName]!.map((r) => '$r:*'));
+        final nonExitRoutes = routesByUser[userName]!.where((route) => route != '0.0.0.0/0' && route != '::/0');
+        destinations.addAll(nonExitRoutes.map((r) => '$r:*'));
       }
 
       // Accès à SES PROPRES exit nodes uniquement
@@ -115,6 +129,11 @@ class AclGeneratorService {
         return owners.contains('group:$userName');
       });
       destinations.addAll(ownedExitNodes.map((t) => '$t:*'));
+
+      // Si l'utilisateur possède un exit node, lui donner accès à internet via celui-ci
+      if (ownedExitNodes.isNotEmpty) {
+        destinations.add('autogroup:internet:*');
+      }
 
       acls.add({
         'action': 'accept',

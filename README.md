@@ -203,41 +203,37 @@ Cet écran affiche un aperçu de l'état de votre réseau Headscale. Vous y trou
 Gérez les utilisateurs de votre serveur Headscale. Vous pouvez voir la liste des utilisateurs existants, en créer de nouveaux et les supprimer.
 
 **Boutons et Fonctionnalités :**
-- **Ajouter Utilisateur (icône '+' en bas à droite) :** Ouvre un dialogue pour créer un nouvel utilisateur. Entrez simplement le nom d'utilisateur souhaité. L'application ajoutera automatiquement `le suffixe de domaine de votre serveur Headscale (par exemple, `@votre_domaine.com`)` au nom d'utilisateur si non présent.
+- **Ajouter Utilisateur (icône '+' en bas à droite) :** Ouvre un dialogue pour créer un nouvel utilisateur. Entrez simplement le nom d'utilisateur souhaité. L'application ajoutera automatiquement `le suffixe de domaine de votre serveur Headscale (par exemple, "@votre_domaine.com")` au nom d'utilisateur si non présent.
 - **Gérer les clés de pré-authentification (icône 'vpn_key' en bas à droite) :** Ouvre un écran pour gérer les clés de pré-authentification de votre serveur Headscale.
 - **Supprimer Utilisateur (icône de poubelle à côté de chaque utilisateur) :** Supprime l'utilisateur sélectionné. Une confirmation vous sera demandée. Notez que la suppression échouera si l'utilisateur possède encore des appareils.
 - **Détails Utilisateur (clic sur un utilisateur) :** Affiche les détails de l'utilisateur, y compris les nœuds qui lui sont associés et les clés de pré-authentification.
 
 ### 3.3. ACLs (Access Control Lists)
 
-Cette section, la plus puissante de l'application, vous permet de gérer finement qui peut communiquer avec qui. Le système repose sur une politique de base stricte (chaque utilisateur est isolé) à laquelle vous pouvez ajouter des exceptions temporaires.
+Cette section vous permet de générer et de gérer la politique de contrôle d'accès de votre réseau. Elle définit qui a le droit de communiquer avec qui.
 
-**Workflow recommandé pour la gestion des ACLs :**
+**Principe de base : l'Isolation**
 
-1.  **Étape 1 : Charger une configuration de base**
-    *   Utilisez le bouton **Récupérer** (nuage avec flèche vers le bas) pour charger la politique actuelle de votre serveur. C'est le point de départ recommandé.
-    *   Alternativement, si vous souhaitez repartir de zéro, le bouton **Générer** (icône de restauration) créera une politique de base avec l'isolation stricte pour tous vos nœuds actuels.
+Le générateur de politique de cette application est basé sur un principe de sécurité fondamental : **chaque utilisateur est isolé dans sa propre "bulle"**. Par défaut, un utilisateur ne peut communiquer qu'avec les appareils qui lui appartiennent. Jean ne peut pas voir ou contacter les appareils de Clarisse, et vice-versa.
 
-2.  **Étape 2 : Créer des autorisations temporaires (Optionnel)**
-    *   Dans la section "Autorisations Temporaires", utilisez les menus déroulants pour sélectionner un nœud **Source** et un nœud **Destination**.
-    *   Cliquez sur **"Ajouter la règle"**. Une puce représentant l'autorisation (ex: `tag:node-A <-> tag:node-B`) apparaît dans la liste des "Règles actives". À ce stade, rien n'a encore été envoyé au serveur.
-    *   Vous pouvez ajouter autant de règles temporaires que nécessaire. Utilisez l'icône de poubelle sur une puce pour la supprimer, ou le balai pour tout effacer.
+**Fonctionnalités Automatiques**
 
-3.  **Étape 3 : Générer et Contrôler la politique finale**
-    *   Une fois vos règles temporaires définies (ou si vous n'en voulez aucune), cliquez sur le bouton **Générer** (icône de restauration).
-    *   L'application va calculer le fichier ACL final, en plaçant vos règles temporaires en priorité, et l'afficher dans le grand champ de texte en dessous.
-    *   **Ceci est votre étape de contrôle.** Vérifiez que le JSON généré correspond bien à ce que vous souhaitez appliquer.
+Lorsque vous générez une politique, le système accorde automatiquement à chaque utilisateur l'accès à ses propres ressources avancées :
+- **Routes de sous-réseau :** Si un appareil de Jean partage un sous-réseau (ex: `192.168.1.0/24`), seuls les autres appareils de Jean pourront y accéder.
+- **Exit Nodes :** Si Jean possède un appareil configuré en "exit node", seuls les appareils de Jean pourront l'utiliser pour sortir sur internet.
 
-4.  **Étape 4 : Exporter et Appliquer sur le serveur**
-    *   Si la configuration dans le champ de texte vous convient, cliquez sur le bouton **Exporter** (nuage avec flèche vers le haut).
-    *   La politique sera envoyée au serveur. **Notez qu'il peut y avoir un délai de quelques secondes à une minute** pour que tous les appareils de votre réseau reçoivent et appliquent les nouvelles règles.
+**Attention sur les Exit Nodes :**
+> Si plusieurs utilisateurs différents possèdent un "exit node" (par exemple, Jean a un exit node à Paris et Clarisse en a un à Lyon), la configuration actuelle des ACLs a une limitation importante : **tout utilisateur ayant la permission d'utiliser un exit node pourra voir et sélectionner n'importe lequel des exit nodes disponibles sur le réseau**. Il n'est pas possible de restreindre un utilisateur à un exit node spécifique. La gestion de "quel client utilise quel exit node" doit donc se faire manuellement sur l'appareil client.
 
-**Résumé des boutons :**
-- **Ajouter la règle :** Ajoute une autorisation à la liste locale des règles temporaires.
-- **Générer (icône de restauration) :** Calcule la politique finale (base + règles temporaires) et l'affiche dans le champ de texte pour vérification.
-- **Exporter (icône de cloud upload) :** Envoie le contenu du champ de texte au serveur pour application.
-- **Récupérer (icône de cloud download) :** Récupère la politique actuellement active sur le serveur.
-- **Partager (icône de partage) :** Exporte la politique affichée dans un fichier JSON local.
+**Workflow d'utilisation de la page ACL :**
+
+1.  **Générer la politique de base :** Appuyez sur le bouton **Générer** (icône de restauration). L'application va analyser tous vos utilisateurs et appareils et créer une politique ACL sécurisée basée sur les principes décrits ci-dessus.
+2.  **Contrôler (Optionnel) :** La politique générée s'affiche dans le champ de texte. Vous pouvez l'inspecter pour comprendre les règles qui seront appliquées.
+3.  **Exporter vers le serveur :** Une fois satisfait, appuyez sur le bouton **Exporter** (nuage avec flèche vers le haut) pour envoyer la politique à votre serveur Headscale. Les nouvelles règles seront appliquées sur votre réseau après un court délai.
+
+**Autorisations Temporaires**
+
+Si vous avez besoin de créer une exception temporaire (par exemple, autoriser l'ordinateur de Jean à communiquer avec le serveur de Clarisse), vous pouvez utiliser la section "Autorisations Temporaires" **avant** de cliquer sur "Générer". Ces règles seront ajoutées en priorité au début du fichier ACL, passant outre les règles d'isolation de base.
 
 ### 3.4. Détails Utilisateur
 
@@ -261,7 +257,6 @@ Cet écran affiche toutes les informations détaillées d'un nœud spécifique, 
   - **Partager le sous-réseau local :** Ouvre un dialogue pour entrer un sous-réseau CIDR. Affiche une commande `tailscale up --advertise-routes` pour annoncer le sous-réseau. Cette commande doit être exécutée manuellement sur l'appareil.
   - **Désactiver les routes de sous-réseau :** Désactive les routes de sous-réseau annoncées via l'API.
   - **Supprimer l'appareil :** Supprime le nœud du serveur Headscale après confirmation.
-
 
 
  ### 3.6. Clés de Pré-authentification
