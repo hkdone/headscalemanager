@@ -5,10 +5,13 @@ import 'package:provider/provider.dart';
 import 'package:headscalemanager/screens/api_keys_screen.dart';
 import 'package:headscalemanager/screens/node_detail_screen.dart';
 
+// Couleurs pour le thème épuré style iOS
+const Color _backgroundColor = Color(0xFFF2F2F7);
+const Color _primaryTextColor = Colors.black87;
+const Color _secondaryTextColor = Colors.black54;
+const Color _accentColor = Colors.blue;
+
 /// Écran du tableau de bord affichant un aperçu des nœuds Headscale.
-///
-/// Les nœuds sont regroupés par utilisateur et peuvent être développés
-/// pour afficher des détails supplémentaires.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -17,7 +20,6 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  /// Future qui contiendra la liste des nœuds récupérés depuis l'API.
   late Future<List<Node>> _nodesFuture;
 
   @override
@@ -26,7 +28,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _refreshNodes();
   }
 
-  /// Rafraîchit la liste des nœuds en effectuant un nouvel appel API.
   void _refreshNodes() {
     setState(() {
       _nodesFuture = context.read<AppProvider>().apiService.getNodes();
@@ -36,169 +37,104 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: FutureBuilder<List<Node>>(
-        future: _nodesFuture,
-        builder: (context, snapshot) {
-          // Affiche un indicateur de chargement pendant la récupération des nœuds.
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          // Affiche un message d'erreur si la récupération des nœuds échoue.
-          if (snapshot.hasError) {
-            return Center(child: Text('Erreur : ${snapshot.error}'));
-          }
-          // Affiche un message si aucun nœud n'est trouvé.
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Aucun nœud trouvé.'));
-          }
-
-          final nodes = snapshot.data!;
-          // Regroupe les nœuds par utilisateur.
-          final nodesByUser = <String, List<Node>>{};
-          for (var node in nodes) {
-            if (nodesByUser.containsKey(node.user)) {
-              nodesByUser[node.user]!.add(node);
-            } else {
-              nodesByUser[node.user] = [node];
+      backgroundColor: _backgroundColor,
+      body: SafeArea(
+        child: FutureBuilder<List<Node>>(
+          future: _nodesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
             }
-          }
+            if (snapshot.hasError) {
+              return Center(child: Text('Erreur : ${snapshot.error}'));
+            }
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(child: Text('Aucun nœud trouvé.'));
+            }
 
-          final users = nodesByUser.keys.toList();
-          final connectedNodes = nodes.where((node) => node.online).length;
-          final disconnectedNodes = nodes.length - connectedNodes;
+            final nodes = snapshot.data!;
+            final nodesByUser = <String, List<Node>>{};
+            for (var node in nodes) {
+              (nodesByUser[node.user] ??= []).add(node);
+            }
 
-          // Construit une liste déroulante de cartes, une par utilisateur.
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: _InfoCard(
-                          title: 'Utilisateurs',
-                          value: users.length.toString(),
-                          color: Colors.grey,
-                          icon: Icons.people,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _InfoCard(
-                          title: 'Connectés',
-                          value: connectedNodes.toString(),
-                          color: Colors.green,
-                          icon: Icons.lan,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _InfoCard(
-                          title: 'Déconnectés',
-                          value: disconnectedNodes.toString(),
-                          color: Colors.red,
-                          icon: Icons.phonelink_off,
-                        ),
-                      ),
-                    ],
+            final users = nodesByUser.keys.toList();
+            final connectedNodes = nodes.where((node) => node.online).length;
+            final disconnectedNodes = nodes.length - connectedNodes;
+
+            return Column(
+              children: [
+                _buildSummarySection(users.length, connectedNodes, disconnectedNodes),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    itemCount: users.length,
+                    itemBuilder: (context, index) {
+                      final user = users[index];
+                      final userNodes = nodesByUser[user]!;
+                      return _UserNodeCard(user: user, nodes: userNodes);
+                    },
                   ),
                 ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: users.length,
-                  itemBuilder: (context, index) {
-                    final user = users[index];
-                    final userNodes = nodesByUser[user]!;
+              ],
+            );
+          },
+        ),
+      ),
+      floatingActionButton: _buildFloatingActionButtons(),
+    );
+  }
 
-                    return Card(
-                      margin: const EdgeInsets.all(8.0),
-                      child: ExpansionTile(
-                        initiallyExpanded: true,
-                        // Titre de la tuile d'expansion (nom de l'utilisateur).
-                        title: Text(user, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        // Contenu de la tuile d'expansion (liste des nœuds de l'utilisateur).
-                        children: userNodes.map((node) {
-                          return ListTile(
-                            // Navigue vers l'écran de détails du nœud au tap.
-                            onTap: () {
-                              Navigator.of(context).push(MaterialPageRoute(builder: (_) => NodeDetailScreen(node: node)));
-                            },
-                            // Icône indiquant le statut en ligne/hors ligne du nœud.
-                            leading: Icon(
-                              Icons.circle,
-                              color: node.online ? Colors.green : Colors.grey,
-                            ),
-                            // Nom du nœud et nom d'hôte.
-                            title: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(node.name),
-                                    if (node.isExitNode)
-                                      const Padding(
-                                        padding: EdgeInsets.only(left: 4.0),
-                                        child: Icon(Icons.exit_to_app, size: 16, color: Colors.orange),
-                                      ),
-                                  ],
-                                ),
-                                Text(node.hostname, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                              ],
-                            ),
-                            // Adresses IP, routes partagées et dernière connexion.
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(node.ipAddresses.join(', ')),
-                                if (node.sharedRoutes.isNotEmpty)
-                                  Text(
-                                    'Routes partagées : ${node.sharedRoutes.join(', ')}',
-                                    style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
-                                  ),
-                                Text('Dernière connexion : ${node.lastSeen.toLocal()}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    );
-                  },
-                ),
-              ),
+  Widget _buildSummarySection(int userCount, int connectedCount, int disconnectedCount) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Card(
+        elevation: 0,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _StatItem(title: 'Utilisateurs', value: userCount.toString(), color: Colors.grey, icon: Icons.people),
+              const SizedBox(height: 40, child: VerticalDivider(thickness: 1)),
+              _StatItem(title: 'Connectés', value: connectedCount.toString(), color: Colors.green, icon: Icons.lan),
+              const SizedBox(height: 40, child: VerticalDivider(thickness: 1)),
+              _StatItem(title: 'Déconnectés', value: disconnectedCount.toString(), color: Colors.red, icon: Icons.phonelink_off),
             ],
-          );
-        },
-      ),
-      // Bouton flottant pour rafraîchir la liste des nœuds.
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            onPressed: _refreshNodes,
-            heroTag: 'refreshNodes',
-            tooltip: 'Rafraîchir les nœuds',
-            child: const Icon(Icons.refresh),
           ),
-          const SizedBox(height: 16),
-          FloatingActionButton(
-            onPressed: () {
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ApiKeysScreen()));
-            },
-            heroTag: 'apiKeys',
-            tooltip: 'Gérer les clés API',
-            child: const Icon(Icons.api),
-          ),
-        ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildFloatingActionButtons() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        FloatingActionButton(
+          onPressed: _refreshNodes,
+          heroTag: 'refreshNodes',
+          tooltip: 'Rafraîchir les nœuds',
+          backgroundColor: _accentColor,
+          child: const Icon(Icons.refresh, color: Colors.white),
+        ),
+        const SizedBox(height: 16),
+        FloatingActionButton(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ApiKeysScreen())),
+          heroTag: 'apiKeys',
+          tooltip: 'Gérer les clés API',
+          backgroundColor: _accentColor,
+          child: const Icon(Icons.api, color: Colors.white),
+        ),
+      ],
     );
   }
 }
 
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({
+class _StatItem extends StatelessWidget {
+  const _StatItem({
     required this.title,
     required this.value,
     required this.color,
@@ -212,37 +148,74 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: color,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white, size: 32),
-            const SizedBox(height: 8),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: 8),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: _secondaryTextColor, fontWeight: FontWeight.w500, fontSize: 12),
         ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+}
+
+class _UserNodeCard extends StatelessWidget {
+  final String user;
+  final List<Node> nodes;
+
+  const _UserNodeCard({required this.user, required this.nodes});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+      child: ExpansionTile(
+        initiallyExpanded: true,
+        title: Text(user, style: const TextStyle(fontWeight: FontWeight.bold, color: _primaryTextColor, fontSize: 17)),
+        childrenPadding: const EdgeInsets.only(bottom: 8.0),
+        children: nodes.map((node) => _buildNodeTile(context, node)).toList(),
+      ),
+    );
+  }
+
+  Widget _buildNodeTile(BuildContext context, Node node) {
+    return ListTile(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => NodeDetailScreen(node: node))),
+      leading: Icon(Icons.circle, color: node.online ? Colors.green : Colors.grey.shade300, size: 12),
+      title: Row(
+        children: [
+          Text(node.name, style: const TextStyle(color: _primaryTextColor, fontWeight: FontWeight.w500)),
+          if (node.isExitNode)
+            const Padding(
+              padding: EdgeInsets.only(left: 8.0),
+              child: Icon(Icons.exit_to_app, size: 16, color: Colors.orange),
+            ),
+        ],
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(node.hostname, style: const TextStyle(fontSize: 13, color: _secondaryTextColor)),
+          Text(node.ipAddresses.join(', '), style: const TextStyle(fontSize: 13, color: _secondaryTextColor)),
+          if (node.sharedRoutes.isNotEmpty)
+            Text(
+              'Routes: ${node.sharedRoutes.join(', ')}',
+              style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
+            ),
+          Text('Dernière connexion : ${node.lastSeen.toLocal()}', style: const TextStyle(fontSize: 12, color: _secondaryTextColor)),
+        ],
       ),
     );
   }

@@ -2,17 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
+import 'package:headscalemanager/widgets/cli_command_display_dialog.dart';
+import 'package:headscalemanager/widgets/edit_tags_dialog.dart';
 import 'package:provider/provider.dart';
-import 'package:headscalemanager/widgets/node_management_tile.dart';
 import 'package:headscalemanager/widgets/registration_dialogs.dart';
 import 'package:flutter/foundation.dart'; // For debugPrint
 
+// Dialogs for node actions
+import 'package:headscalemanager/widgets/rename_node_dialog.dart';
+import 'package:headscalemanager/widgets/move_node_dialog.dart';
+import 'package:headscalemanager/widgets/exit_node_command_dialog.dart';
+import 'package:headscalemanager/widgets/share_subnet_dialog.dart';
+import 'package:headscalemanager/utils/snack_bar_utils.dart';
+
+// Couleurs pour le thème épuré style iOS
+const Color _backgroundColor = Color(0xFFF2F2F7);
+const Color _primaryTextColor = Colors.black87;
+const Color _secondaryTextColor = Colors.black54;
+
 /// Écran affichant les détails d'un utilisateur spécifique et ses nœuds associés.
-///
-/// Permet de visualiser les informations de l'utilisateur et de gérer les appareils
-/// (nœuds) qui lui sont liés.
 class UserDetailScreen extends StatefulWidget {
-  /// L'utilisateur dont les détails doivent être affichés.
   final User user;
 
   const UserDetailScreen({super.key, required this.user});
@@ -22,18 +31,14 @@ class UserDetailScreen extends StatefulWidget {
 }
 
 class _UserDetailScreenState extends State<UserDetailScreen> {
-  /// Notifier de valeur pour le Future qui contiendra la liste des nœuds.
-  /// Utilisé pour rafraîchir la liste des nœuds de manière réactive.
   late ValueNotifier<Future<List<Node>>> _nodesFutureNotifier;
 
   @override
   void initState() {
     super.initState();
-    // Initialise le Future pour récupérer tous les nœuds.
     _nodesFutureNotifier = ValueNotifier(context.read<AppProvider>().apiService.getNodes());
   }
 
-  /// Rafraîchit la liste des nœuds en effectuant un nouvel appel API.
   void _refreshNodes() {
     _nodesFutureNotifier.value = context.read<AppProvider>().apiService.getNodes();
   }
@@ -41,79 +46,263 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
-        title: Text(widget.user.name), // Affiche le nom de l'utilisateur dans la barre d'application.
+        title: Text(widget.user.name, style: const TextStyle(color: _primaryTextColor)),
+        backgroundColor: _backgroundColor,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: _primaryTextColor),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Affiche l'ID de l'utilisateur.
-            Text('ID : ${widget.user.id}', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            // Affiche la date de création de l'utilisateur.
-            Text('Créé le : ${widget.user.createdAt?.toLocal() ?? 'N/A'}', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 24),
-            // Bouton pour enregistrer un nouvel appareil sous cet utilisateur.
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: () => showTailscaleUpCommandDialog(context, widget.user),
-                icon: const Icon(Icons.add_to_queue_sharp),
-                label: const Text('Enregistrer un nouvel appareil'),
-              ),
+            _buildUserInfoCard(),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              child: Text('Appareils', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _primaryTextColor)),
             ),
-            const SizedBox(height: 24),
-            const Divider(), // Séparateur visuel.
-            // Titre de la section des appareils.
-            Text('Appareils', style: Theme.of(context).textTheme.headlineSmall),
-            // Liste extensible des nœuds associés à l'utilisateur.
-            Expanded(
-              child: ValueListenableBuilder<Future<List<Node>>>(
-                valueListenable: _nodesFutureNotifier,
-                builder: (context, nodesFuture, child) {
-                  return FutureBuilder<List<Node>>(
-                    future: nodesFuture,
-                    builder: (context, snapshot) {
-                      // Affiche un indicateur de chargement pendant la récupération des nœuds.
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      // Affiche un message d'erreur si la récupération des nœuds échoue.
-                      if (snapshot.hasError) {
-                        debugPrint('Erreur lors du chargement des nœuds : ${snapshot.error}');
-                        return Center(child: Text('Erreur : ${snapshot.error}'));
-                      }
-                      // Affiche un message si aucun appareil n'est trouvé pour cet utilisateur.
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return const Center(child: Text('Aucun appareil trouvé pour cet utilisateur.'));
-                      }
-
-                      // Filtre les nœuds pour n'afficher que ceux appartenant à l'utilisateur actuel.
-                      final userNodes = snapshot.data!.where((node) => node.user == widget.user.name).toList();
-
-                      // Affiche un message si, après filtrage, aucun appareil n'est trouvé.
-                      if (userNodes.isEmpty) {
-                        return const Center(child: Text('Aucun appareil trouvé pour cet utilisateur.'));
-                      }
-
-                      // Construit une liste des nœuds de l'utilisateur.
-                      return ListView.builder(
-                        itemCount: userNodes.length,
-                        itemBuilder: (context, index) {
-                          final node = userNodes[index];
-                          // Utilise NodeManagementTile pour chaque nœud, permettant des actions de gestion.
-                          return NodeManagementTile(node: node, onNodeUpdate: _refreshNodes);
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
+            Expanded(child: _buildNodesGrid()),
           ],
         ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => showTailscaleUpCommandDialog(context, widget.user),
+        label: const Text('Nouvel Appareil'),
+        icon: const Icon(Icons.add_to_queue_sharp),
+        backgroundColor: Colors.blue,
+      ),
+    );
+  }
+
+  Widget _buildUserInfoCard() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: const EdgeInsets.all(20.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.0),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('ID: ${widget.user.id}', style: const TextStyle(color: _secondaryTextColor, fontSize: 14)),
+          const SizedBox(height: 8),
+          Text('Créé le: ${widget.user.createdAt?.toLocal() ?? 'N/A'}', style: const TextStyle(color: _secondaryTextColor, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNodesGrid() {
+    return ValueListenableBuilder<Future<List<Node>>>(
+      valueListenable: _nodesFutureNotifier,
+      builder: (context, nodesFuture, child) {
+        return FutureBuilder<List<Node>>(
+          future: nodesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              debugPrint('Erreur lors du chargement des nœuds : ${snapshot.error}');
+              return Center(child: Text('Erreur : ${snapshot.error}'));
+            }
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(child: Text('Aucun appareil trouvé.'));
+            }
+
+            final userNodes = snapshot.data!.where((node) => node.user == widget.user.name).toList();
+
+            if (userNodes.isEmpty) {
+              return const Center(child: Text('Aucun appareil trouvé pour cet utilisateur.'));
+            }
+
+            return GridView.builder(
+              padding: const EdgeInsets.all(16.0),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.8,
+              ),
+              itemCount: userNodes.length,
+              itemBuilder: (context, index) {
+                final node = userNodes[index];
+                return _NodeCard(node: node, onNodeUpdate: _refreshNodes);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _NodeCard extends StatelessWidget {
+  final Node node;
+  final VoidCallback onNodeUpdate;
+
+  const _NodeCard({required this.node, required this.onNodeUpdate});
+
+  Future<void> _runAction(BuildContext context, Future<void> Function() action, String successMessage) async {
+    try {
+      await action();
+      showSafeSnackBar(context, successMessage);
+      onNodeUpdate();
+    } catch (e) {
+      debugPrint('Action échouée : $e');
+      showSafeSnackBar(context, 'Erreur : $e');
+    }
+  }
+
+  void _showEditTagsFlow(BuildContext context) async {
+    final String? generatedCommand = await showDialog<String>(
+      context: context,
+      builder: (context) => EditTagsDialog(
+        node: node,
+      ),
+    );
+
+    if (generatedCommand != null && generatedCommand.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => CliCommandDisplayDialog(command: generatedCommand),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Commande CLI générée. Exécutez-la et actualisez la page pour voir les changements.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.read<AppProvider>();
+    final onlineColor = node.online ? Colors.green : Colors.grey.shade400;
+    final isExitNode = node.isExitNode;
+    final hasSharedRoutes = node.sharedRoutes.isNotEmpty;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.0),
+        border: isExitNode ? Border.all(color: Colors.blueAccent, width: 2) : null,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(Icons.circle, color: onlineColor, size: 12),
+                _buildPopupMenu(context, provider),
+              ],
+            ),
+            const Spacer(),
+            Text(node.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _primaryTextColor), maxLines: 2, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            Text(node.ipAddresses.join('\n'), style: const TextStyle(fontSize: 12, color: _secondaryTextColor)),
+            const Spacer(),
+            if (isExitNode)
+              const Row(
+                children: [
+                  Icon(Icons.exit_to_app, size: 14, color: Colors.blueAccent),
+                  SizedBox(width: 4),
+                  Text('Exit Node', style: TextStyle(fontSize: 12, color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            if (hasSharedRoutes)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.router_outlined, size: 14, color: _secondaryTextColor),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        node.sharedRoutes.join(", "),
+                        style: const TextStyle(fontSize: 12, color: _secondaryTextColor),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const Spacer(),
+            Text('Dernière connexion:', style: const TextStyle(fontSize: 10, color: _secondaryTextColor)),
+            Text(node.lastSeen.toLocal().toString(), style: const TextStyle(fontSize: 10, color: _secondaryTextColor)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPopupMenu(BuildContext context, AppProvider provider) {
+    return PopupMenuButton<String>(
+      icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
+      onSelected: (String value) {
+        switch (value) {
+          case 'rename':
+            showDialog(context: context, builder: (ctx) => RenameNodeDialog(node: node, onNodeRenamed: onNodeUpdate));
+            break;
+          case 'move':
+            showDialog(context: context, builder: (ctx) => MoveNodeDialog(node: node, onNodeMoved: onNodeUpdate));
+            break;
+          case 'edit_tags':
+            _showEditTagsFlow(context);
+            break;
+          case 'enable_exit_node':
+            showDialog(context: context, builder: (ctx) => ExitNodeCommandDialog(node: node, onExitNodeEnabled: onNodeUpdate));
+            break;
+          case 'disable_exit_node':
+            _runAction(context, () => provider.apiService.setNodeRoutes(node.id, []), 'Nœud de sortie désactivé.');
+            break;
+          case 'share_subnet':
+            showDialog(context: context, builder: (ctx) => ShareSubnetDialog(node: node, onSubnetShared: onNodeUpdate));
+            break;
+          case 'disable_subnet':
+            _runAction(context, () => provider.apiService.setNodeRoutes(node.id, []), 'Routes de sous-réseau désactivées.');
+            break;
+          case 'delete_device':
+            showDialog(
+              context: context,
+              builder: (dialogCtx) => AlertDialog(
+                title: const Text('Supprimer l\'appareil ?'),
+                content: Text('Êtes-vous sûr de vouloir supprimer ${node.name} ?'),
+                actions: <Widget>[
+                  TextButton(child: const Text('Annuler'), onPressed: () => Navigator.of(dialogCtx).pop()),
+                  TextButton(
+                    child: const Text('Confirmer', style: TextStyle(color: Colors.red)),
+                    onPressed: () {
+                      Navigator.of(dialogCtx).pop();
+                      _runAction(context, () => provider.apiService.deleteNode(node.id), 'Appareil supprimé.');
+                    },
+                  ),
+                ],
+              ),
+            );
+            break;
+        }
+      },
+      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+        const PopupMenuItem<String>(value: 'rename', child: Text('Renommer')),
+        const PopupMenuItem<String>(value: 'move', child: Text('Changer d\'utilisateur')),
+        const PopupMenuItem<String>(value: 'edit_tags', child: Text('Modifier les tags')),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(value: 'enable_exit_node', child: Text('Activer nœud de sortie')),
+        const PopupMenuItem<String>(value: 'disable_exit_node', child: Text('Désactiver nœud de sortie')),
+        const PopupMenuItem<String>(value: 'share_subnet', child: Text('Partager sous-réseau')),
+        const PopupMenuItem<String>(value: 'disable_subnet', child: Text('Désactiver sous-réseau')),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(value: 'delete_device', child: Text('Supprimer', style: TextStyle(color: Colors.red))),
+      ],
     );
   }
 }

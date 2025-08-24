@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/node.dart';
-import 'package:headscalemanager/widgets/cli_command_display_dialog.dart';
-import 'package:headscalemanager/widgets/edit_tags_dialog.dart';
 import 'package:dart_ping/dart_ping.dart';
 import 'dart:async';
 
+// Couleurs pour le thème épuré style iOS
+const Color _backgroundColor = Color(0xFFF2F2F7);
+const Color _primaryTextColor = Colors.black87;
+const Color _secondaryTextColor = Colors.black54;
+const Color _accentColor = Colors.blue;
+const Color _cardBackgroundColor = Colors.white;
+
 /// Écran affichant les détails d'un nœud Headscale spécifique.
-///
-/// Permet de visualiser les informations du nœud et de gérer ses tags.
 class NodeDetailScreen extends StatefulWidget {
-  /// Le nœud dont les détails doivent être affichés.
   final Node node;
 
   const NodeDetailScreen({super.key, required this.node});
@@ -20,18 +22,16 @@ class NodeDetailScreen extends StatefulWidget {
 }
 
 class _NodeDetailScreenState extends State<NodeDetailScreen> {
-  /// Liste des tags actuels du nœud.
-  late List<String> _currentTags;
-  bool _isPinging = false;
-  PingSummary? _pingSummary;
   bool _isPingingContinuously = false;
   StreamSubscription<PingData>? _pingSubscription;
   final List<PingData> _pingResponses = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _currentTags = List<String>.from(widget.node.tags);
+  String get _ipv4 {
+    return widget.node.ipAddresses.firstWhere((ip) => !ip.contains(':'), orElse: () => '');
+  }
+
+  String get _ipv6 {
+     return widget.node.ipAddresses.firstWhere((ip) => ip.contains(':'), orElse: () => '');
   }
 
   @override
@@ -40,214 +40,170 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     super.dispose();
   }
 
-  /// Lance un ping sur l'adresse IPv4 du nœud.
-  void _pingNode() async {
-    setState(() {
-      _isPinging = true;
-      _pingSummary = null;
-    });
-
-    final ipv4 = widget.node.ipAddresses.firstWhere((ip) => !ip.contains(':'), orElse: () => '');
-    if (ipv4.isEmpty) {
-      setState(() {
-        _isPinging = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Aucune adresse IPv4 trouvée pour ce nœud.')),
-      );
-      return;
-    }
-
-    final ping = Ping(ipv4, count: 5);
-    final completer = Completer<PingSummary?>();
-
-    final subscription = ping.stream.listen((event) {
-      if (event.summary != null) {
-        if (!completer.isCompleted) {
-          completer.complete(event.summary);
-        }
-      }
-    });
-
-    final summary = await completer.future.timeout(const Duration(seconds: 10), onTimeout: () {
-      return null;
-    });
-
-    subscription.cancel();
-
-    setState(() {
-      _isPinging = false;
-      _pingSummary = summary;
-    });
-  }
-
   void _toggleContinuousPing(bool value) {
     setState(() {
       _isPingingContinuously = value;
-      _pingSummary = null; // Clear previous results
       _pingResponses.clear();
     });
 
     if (_isPingingContinuously) {
-      final ipv4 = widget.node.ipAddresses.firstWhere((ip) => !ip.contains(':'), orElse: () => '');
-      if (ipv4.isEmpty) {
-        setState(() {
-          _isPingingContinuously = false;
-        });
+      if (_ipv4.isEmpty) {
+        setState(() => _isPingingContinuously = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Aucune adresse IPv4 trouvée pour ce nœud.')),
         );
         return;
       }
 
-      final ping = Ping(ipv4, count: 10000); // Effectively continuous
+      final ping = Ping(_ipv4, count: 10000); // Effectively continuous
       _pingSubscription = ping.stream.listen((event) {
-        setState(() {
-          _pingResponses.add(event);
-        });
+        if(mounted) setState(() => _pingResponses.add(event));
       }, onDone: () {
-        setState(() {
-          _isPingingContinuously = false;
-        });
+        if(mounted) setState(() => _isPingingContinuously = false);
       });
     } else {
       _pingSubscription?.cancel();
     }
   }
 
-
-  /// Affiche un dialogue pour modifier les tags du nœud.
-  ///
-  /// Le dialogue permet à l'utilisateur de saisir de nouveaux tags et génère
-  /// une commande CLI correspondante. Cette commande doit être exécutée
-  /// manuellement par l'utilisateur.
-  void _showEditTagsFlow() async {
-    final String? generatedCommand = await showDialog<String>( // Await the dialog dismissal and get returned value
-      context: context,
-      builder: (context) => EditTagsDialog(
-        node: widget.node,
-      ),
-    );
-
-    if (generatedCommand != null && generatedCommand.isNotEmpty) {
-      // Affiche le dialogue de commande CLI après la génération.
-      showDialog(
-        context: context,
-        builder: (ctx) => CliCommandDisplayDialog(command: generatedCommand),
-      );
-      // Affiche un SnackBar pour informer l'utilisateur.
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Commande CLI générée. Exécutez-la et actualisez la page pour voir les changements.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
-        title: Text(widget.node.name),
-        actions: [
-          // Bouton pour modifier les tags du nœud.
-          IconButton(
-            icon: const Icon(Icons.edit),
-            tooltip: 'Modifier les tags',
-            onPressed: _showEditTagsFlow,
-          ),
-        ],
+        title: Text(widget.node.name, style: const TextStyle(color: _primaryTextColor)),
+        backgroundColor: _backgroundColor,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: _primaryTextColor),
       ),
-      body: Padding(
+      body: ListView(
         padding: const EdgeInsets.all(16.0),
-        child: ListView(
-          children: [
-            // Affichage des différentes propriétés du nœud.
-            _buildDetailRow('Nom : ', widget.node.name),
-            _buildDetailRow('Hostname : ', widget.node.hostname),
-            _buildDetailRow('Nom de domaine complet (FQDN) : ', widget.node.fqdn),
-            _buildDetailRow('ID : ', widget.node.id),
-            _buildDetailRow('Clé machine : ', widget.node.machineKey),
-            _buildDetailRow('Utilisateur : ', widget.node.user),
-            _buildDetailRow('En ligne : ', widget.node.online ? 'Oui' : 'Non'),
-            _buildDetailRow(
-                'Dernière connexion : ', widget.node.lastSeen.toLocal().toString()),
-            _buildDetailRow(
-                'Adresses IP : ', widget.node.ipAddresses.join(', ')),
-            _buildDetailRow(
-                'Routes partagées : ',
-                widget.node.sharedRoutes.isEmpty
-                    ? 'Aucune'
-                    : widget.node.sharedRoutes.join(', ')),
-            _buildDetailRow('Tags : ',
-                _currentTags.isEmpty ? 'Aucun' : _currentTags.join(', ')),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                ElevatedButton.icon(
-                  onPressed: _isPingingContinuously ? null : _pingNode,
-                  icon: const Icon(Icons.network_ping),
-                  label: const Text('Ping'),
-                ),
-                const SizedBox(width: 16),
-                if (_isPinging && !_isPingingContinuously)
-                  const CircularProgressIndicator()
-                else if (_pingSummary != null && !_isPingingContinuously)
-                  _buildPingResults(_pingSummary!)
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                const Text("Ping en continu"),
-                Switch(
-                  value: _isPingingContinuously,
-                  onChanged: _toggleContinuousPing,
-                ),
-              ],
-            ),
-            if (_isPingingContinuously)
-              _buildContinuousPingResults(),
-          ],
-        ),
+        children: [
+          _buildMainInfoCard(),
+          const SizedBox(height: 16),
+          _buildIpAddressesCard(),
+          const SizedBox(height: 16),
+          _buildIdentifiersCard(),
+          const SizedBox(height: 16),
+          _buildTagsAndRoutesCard(),
+          const SizedBox(height: 16),
+          _buildPingCard(),
+        ],
       ),
     );
   }
 
-  Widget _buildPingResults(PingSummary summary) {
-    final received = summary.received;
-    final transmitted = summary.transmitted;
-    final time = summary.time;
-
-    if (received == 0) {
-      return const Row(
+  Widget _buildMainInfoCard() {
+    return _SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.cancel, color: Colors.red),
-          SizedBox(width: 8),
-          Text("Échec du Ping", style: TextStyle(fontWeight: FontWeight.bold)),
+          Row(
+            children: [
+              Icon(Icons.circle, color: widget.node.online ? Colors.green : Colors.grey, size: 16),
+              const SizedBox(width: 8),
+              Text(widget.node.online ? 'En ligne' : 'Hors ligne', style: TextStyle(color: widget.node.online ? Colors.green : Colors.grey, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              if (widget.node.isExitNode)
+                const Chip(label: Text('Exit Node'), backgroundColor: _accentColor, labelStyle: TextStyle(color: Colors.white)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(widget.node.hostname, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _primaryTextColor)),
+          const SizedBox(height: 4),
+          Text('Utilisateur: ${widget.node.user}', style: const TextStyle(color: _secondaryTextColor, fontSize: 16)),
+          const SizedBox(height: 8),
+          Text('Dernière connexion: ${widget.node.lastSeen.toLocal()}', style: const TextStyle(color: _secondaryTextColor, fontSize: 12)),
         ],
-      );
-    }
+      ),
+    );
+  }
 
-    final loss = transmitted > 0 ? (1 - received / transmitted) * 100 : 0;
-    final avgLatency = time != null && received > 0 ? (time.inMicroseconds / 1000 / received) : 0;
+  Widget _buildIpAddressesCard() {
+    return _SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Adresses IP', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primaryTextColor)),
+          const Divider(height: 20),
+          if (_ipv4.isNotEmpty) _DetailRowWithCopy(label: 'IPv4', value: _ipv4),
+          if (_ipv6.isNotEmpty) _DetailRowWithCopy(label: 'IPv6', value: _ipv6),
+        ],
+      ),
+    );
+  }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green),
-            SizedBox(width: 8),
-            Text("Succès", style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        SizedBox(height: 8),
-        Text("Latence moyenne: ${avgLatency.toStringAsFixed(2)} ms"),
-        Text("Paquets perdus: ${loss.toStringAsFixed(0)}% ($received/$transmitted reçus)"),
-      ],
+  Widget _buildIdentifiersCard() {
+    return _SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Identifiants', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primaryTextColor)),
+          const Divider(height: 20),
+          _DetailRowWithCopy(label: 'ID Nœud', value: widget.node.id),
+          _DetailRowWithCopy(label: 'Clé Machine', value: widget.node.machineKey),
+          _DetailRowWithCopy(label: 'FQDN', value: widget.node.fqdn),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTagsAndRoutesCard() {
+    return _SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Tags & Routes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primaryTextColor)),
+          const Divider(height: 20),
+          const Text('Tags:', style: TextStyle(fontWeight: FontWeight.bold, color: _secondaryTextColor)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8.0,
+            children: widget.node.tags.isEmpty
+                ? [const Text('Aucun tag', style: TextStyle(color: _secondaryTextColor))]
+                : widget.node.tags.map((tag) => Chip(label: Text(tag))).toList(),
+          ),
+          const SizedBox(height: 16),
+          const Text('Routes partagées:', style: TextStyle(fontWeight: FontWeight.bold, color: _secondaryTextColor)),
+          const SizedBox(height: 8),
+           widget.node.sharedRoutes.isEmpty
+              ? const Text('Aucune', style: TextStyle(color: _secondaryTextColor))
+              : Text(widget.node.sharedRoutes.join(', '), style: const TextStyle(color: _primaryTextColor)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPingCard() {
+    return Card(
+      elevation: 0,
+      color: _cardBackgroundColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+      child: ExpansionTile(
+        title: const Text('Outils de diagnostic', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primaryTextColor)),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Text("Ping en continu"),
+                    const Spacer(),
+                    Switch(
+                      value: _isPingingContinuously,
+                      onChanged: _toggleContinuousPing,
+                      activeColor: _accentColor,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (_isPingingContinuously) _buildContinuousPingResults(),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -257,7 +213,6 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     }
 
     final responses = _pingResponses.where((e) => e.response != null).map((e) => e.response!).toList();
-    final errors = _pingResponses.where((e) => e.error != null).toList();
     final transmitted = _pingResponses.length;
     final received = responses.length;
     final loss = transmitted > 0 ? (1 - received / transmitted) * 100 : 0;
@@ -268,26 +223,27 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Statistiques en direct :", style: Theme.of(context).textTheme.titleMedium),
-        Text("Latence moyenne: ${avgLatency.toStringAsFixed(2)} ms"),
-        Text("Paquets perdus: ${loss.toStringAsFixed(0)}% ($received/$transmitted reçus)"),
+        Text("Latence moyenne: ${avgLatency.toStringAsFixed(2)} ms", style: const TextStyle(color: _primaryTextColor)),
+        Text("Paquets perdus: ${loss.toStringAsFixed(0)}% ($received/$transmitted reçus)", style: const TextStyle(color: _primaryTextColor)),
         const SizedBox(height: 10),
-        Text("Journal du ping :", style: Theme.of(context).textTheme.titleMedium),
+        const Text("Journal du ping:"),
         Container(
           height: 150,
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey),
-            borderRadius: BorderRadius.circular(4),
+            color: _backgroundColor,
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: ListView.builder(
+            padding: const EdgeInsets.all(8.0),
             reverse: true,
             itemCount: _pingResponses.length,
             itemBuilder: (context, index) {
               final data = _pingResponses.reversed.toList()[index];
               if (data.response != null) {
-                return Text("  Réponse de ${data.response!.ip}: temps=${data.response!.time?.inMilliseconds}ms");
+                return Text("Réponse de ${data.response!.ip}: temps=${data.response!.time?.inMilliseconds}ms", style: const TextStyle(fontFamily: 'monospace', fontSize: 12));
               } else if (data.error != null) {
-                return Text("  Erreur: ${data.error!.error.toString()}", style: TextStyle(color: Colors.red));
+                return Text("Erreur: ${data.error!.error.toString()}", style: const TextStyle(color: Colors.red, fontFamily: 'monospace', fontSize: 12));
               }
               return const SizedBox.shrink();
             },
@@ -296,37 +252,57 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       ],
     );
   }
+}
 
-  /// Construit une ligne pour afficher un détail du nœud (libellé et valeur).
-  ///
-  /// [label] : Le libellé du détail (ex: "Nom :").
-  /// [value] : La valeur du détail.
-  Widget _buildDetailRow(String label, String value) {
+class _SectionCard extends StatelessWidget {
+  final Widget child;
+  const _SectionCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      color: _cardBackgroundColor,
+      margin: const EdgeInsets.symmetric(vertical: 0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _DetailRowWithCopy extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _DetailRowWithCopy({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 150, // Largeur ajustée pour un meilleur affichage du libellé.
-            child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+            width: 100,
+            child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: _secondaryTextColor)),
           ),
           Expanded(
-            child: SelectableText(value), // Texte sélectionnable pour faciliter la copie.
+            child: SelectableText(value, style: const TextStyle(color: _primaryTextColor, fontFamily: 'monospace')),
           ),
-          if (label == 'Nom de domaine complet (FQDN) : ')
-            IconButton(
-              icon: const Icon(Icons.copy),
-              tooltip: 'Copier le FQDN',
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: value));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('FQDN copié dans le presse-papiers.'),
-                  ),
-                );
-              },
-            ),
+          IconButton(
+            icon: const Icon(Icons.copy, size: 18, color: Colors.grey),
+            tooltip: 'Copier',
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: value));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Copié dans le presse-papiers')),
+              );
+            },
+          ),
         ],
       ),
     );

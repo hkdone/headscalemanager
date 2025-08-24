@@ -4,13 +4,16 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/user_detail_screen.dart';
 import 'package:headscalemanager/screens/pre_auth_keys_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:headscalemanager/widgets/create_user_dialog.dart'; // New import
-import 'package:headscalemanager/widgets/delete_user_dialog.dart'; // New import
+import 'package:headscalemanager/widgets/create_user_dialog.dart';
+import 'package:headscalemanager/widgets/delete_user_dialog.dart';
+
+// Couleurs pour le thème épuré style iOS
+const Color _backgroundColor = Color(0xFFF2F2F7);
+const Color _primaryTextColor = Colors.black87;
+const Color _secondaryTextColor = Colors.black54;
+const Color _accentColor = Colors.blue;
 
 /// Écran de gestion des utilisateurs Headscale.
-///
-/// Permet de visualiser, créer et supprimer des utilisateurs, ainsi que de
-/// générer des clés de pré-authentification.
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
 
@@ -19,7 +22,6 @@ class UsersScreen extends StatefulWidget {
 }
 
 class _UsersScreenState extends State<UsersScreen> {
-  /// Future qui contiendra la liste des utilisateurs récupérés depuis l'API.
   late Future<List<User>> _usersFuture;
 
   @override
@@ -28,7 +30,6 @@ class _UsersScreenState extends State<UsersScreen> {
     _refreshUsers();
   }
 
-  /// Rafraîchit la liste des utilisateurs en effectuant un nouvel appel API.
   void _refreshUsers() {
     setState(() {
       _usersFuture = context.read<AppProvider>().apiService.getUsers();
@@ -38,93 +39,146 @@ class _UsersScreenState extends State<UsersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: FutureBuilder<List<User>>(
-        future: _usersFuture,
-        builder: (context, snapshot) {
-          // Affiche un indicateur de chargement pendant la récupération des utilisateurs.
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          // Affiche un message d'erreur si la récupération des utilisateurs échoue.
-          if (snapshot.hasError) {
-            debugPrint('Erreur lors du chargement des utilisateurs : ${snapshot.error}');
-            return Center(child: Text('Erreur : ${snapshot.error}'));
-          }
-          // Affiche un message si aucun utilisateur n'est trouvé.
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Aucun utilisateur trouvé.'));
-          }
+      backgroundColor: _backgroundColor,
+      body: SafeArea(
+        child: FutureBuilder<List<User>>(
+          future: _usersFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              debugPrint('Erreur lors du chargement des utilisateurs : ${snapshot.error}');
+              return Center(child: Text('Erreur : ${snapshot.error}'));
+            }
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(child: Text('Aucun utilisateur trouvé.'));
+            }
 
-          final users = snapshot.data!;
+            final users = snapshot.data!;
 
-          // Construit une liste déroulante des utilisateurs.
-          return ListView.builder(
-            itemCount: users.length,
-            itemBuilder: (context, index) {
-              final user = users[index];
-              return ListTile(
-                title: Text(user.name),
-                subtitle: Text('Créé le : ${user.createdAt?.toLocal() ?? 'N/A'}'),
-                trailing: PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'delete') {
-                      // Affiche le dialogue de suppression d'utilisateur.
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => DeleteUserDialog(
-                          user: user,
-                          onUserDeleted: _refreshUsers, // Rafraîchit la liste après suppression
-                        ),
-                      );
-                    }
-                  },
-                  itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                    const PopupMenuItem<String>(
-                      value: 'delete',
-                      child: ListTile(
-                        leading: Icon(Icons.delete, color: Colors.red),
-                        title: Text('Supprimer l\'utilisateur'),
-                      ),
-                    ),
-                  ],
-                ),
-                onTap: () {
-                  // Navigue vers l'écran de détails de l'utilisateur au tap.
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => UserDetailScreen(user: user),
-                  )).then((_) => _refreshUsers()); // Rafraîchit la liste après le retour.
-                },
-              );
-            },
-          );
-        },
+            return GridView.builder(
+              padding: const EdgeInsets.all(16.0),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 1,
+              ),
+              itemCount: users.length,
+              itemBuilder: (context, index) {
+                final user = users[index];
+                return _UserCard(user: user, onUserAction: _refreshUsers);
+              },
+            );
+          },
+        ),
       ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          // Bouton flottant pour gérer les clés de pré-authentification.
-          FloatingActionButton(
-            onPressed: () {
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PreAuthKeysScreen()));
-            },
-            heroTag: 'managePreAuthKeys',
-            child: const Icon(Icons.vpn_key),
-          ),
-          const SizedBox(height: 16),
-          // Bouton flottant pour créer un nouvel utilisateur.
-          FloatingActionButton(
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => CreateUserDialog(
-                  onUserCreated: _refreshUsers, // Rafraîchit la liste après création
-                ),
-              );
-            },
-            heroTag: 'createUser',
-            child: const Icon(Icons.add),
-          ),
-        ],
+      floatingActionButton: _buildFloatingActionButtons(),
+    );
+  }
+
+  Widget _buildFloatingActionButtons() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        FloatingActionButton(
+          onPressed: () {
+            Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PreAuthKeysScreen()));
+          },
+          heroTag: 'managePreAuthKeys',
+          tooltip: 'Gérer les clés d\'accès',
+          backgroundColor: _accentColor,
+          child: const Icon(Icons.vpn_key, color: Colors.white),
+        ),
+        const SizedBox(height: 16),
+        FloatingActionButton(
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (ctx) => CreateUserDialog(onUserCreated: _refreshUsers),
+            );
+          },
+          heroTag: 'createUser',
+          tooltip: 'Créer un utilisateur',
+          backgroundColor: _accentColor,
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
+      ],
+    );
+  }
+}
+
+class _UserCard extends StatelessWidget {
+  final User user;
+  final VoidCallback onUserAction;
+
+  const _UserCard({required this.user, required this.onUserAction});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => UserDetailScreen(user: user),
+        )).then((_) => onUserAction());
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Icon(Icons.person, size: 48, color: _accentColor),
+                  const SizedBox(height: 12),
+                  Text(
+                    user.name,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _primaryTextColor),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Créé le: ${user.createdAt?.toLocal().toString().substring(0, 10) ?? 'N/A'}',
+                    style: const TextStyle(fontSize: 12, color: _secondaryTextColor),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
+                onSelected: (value) {
+                  if (value == 'delete') {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => DeleteUserDialog(user: user, onUserDeleted: onUserAction),
+                    );
+                  }
+                },
+                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                  const PopupMenuItem<String>(
+                    value: 'delete',
+                    child: ListTile(
+                      leading: Icon(Icons.delete, color: Colors.red),
+                      title: Text('Supprimer l\'utilisateur'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -3,10 +3,12 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/home_screen.dart';
 import 'package:provider/provider.dart';
 
+// Couleurs pour le thème épuré style iOS
+const Color _backgroundColor = Color(0xFFF2F2F7);
+const Color _primaryTextColor = Colors.black87;
+const Color _accentColor = Colors.blue;
+
 /// Écran des paramètres de l'application.
-///
-/// Permet à l'utilisateur de configurer l'URL du serveur Headscale et la clé API
-/// nécessaires pour la connexion et l'interaction avec le serveur.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -15,24 +17,19 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  /// Clé globale pour le formulaire, utilisée pour la validation.
   final _formKey = GlobalKey<FormState>();
-
-  /// Contrôleur pour le champ de texte de l'URL du serveur.
   late TextEditingController _serverUrlController;
-
-  /// Contrôleur pour le champ de texte de la clé API.
   late TextEditingController _apiKeyController;
+  bool _obscureApiKey = true;
 
   @override
   void initState() {
     super.initState();
     _serverUrlController = TextEditingController();
     _apiKeyController = TextEditingController();
-    _loadCredentials(); // Charge les identifiants sauvegardés au démarrage.
+    _loadCredentials();
   }
 
-  /// Charge les identifiants (URL du serveur et clé API) depuis le service de stockage.
   Future<void> _loadCredentials() async {
     final storage = context.read<AppProvider>().storageService;
     final serverUrl = await storage.getServerUrl();
@@ -53,72 +50,110 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
-        title: const Text('Paramètres'),
+        title: const Text('Paramètres', style: TextStyle(color: _primaryTextColor)),
+        backgroundColor: _backgroundColor,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: _primaryTextColor),
       ),
-      body: Form(
-        key: _formKey, // Associe la clé du formulaire pour la validation.
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              // Champ de texte pour l'URL du serveur Headscale.
-              TextFormField(
-                controller: _serverUrlController,
-                decoration: const InputDecoration(
-                  labelText: 'URL du serveur',
-                  hintText: 'https://headscale.example.com',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer une URL de serveur';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              // Champ de texte pour la clé API Headscale.
-              TextFormField(
-                controller: _apiKeyController,
-                obscureText: true, // Masque le texte pour la sécurité.
-                decoration: const InputDecoration(
-                  labelText: 'Clé API',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer une clé API';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-              // Bouton pour enregistrer les paramètres.
-              ElevatedButton(
-                onPressed: () async {
-                  // Valide le formulaire avant de sauvegarder.
-                  if (_formKey.currentState!.validate()) {
-                    await context.read<AppProvider>().storageService.saveCredentials(
-                          serverUrl: _serverUrlController.text,
-                          apiKey: _apiKeyController.text,
-                        );
-                    // Vérifie si le widget est toujours monté avant d'afficher le SnackBar et de naviguer.
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Paramètres enregistrés')),
-                      );
-                      // Navigue vers l'écran d'accueil et remplace l'écran actuel.
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (_) => const HomeScreen()),
-                      );
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _serverUrlController,
+                  decoration: _buildInputDecoration('URL du serveur', 'https://headscale.example.com'),
+                  validator: (value) {
+                    if (value == null || value.isEmpty || !Uri.parse(value).isAbsolute) {
+                      return 'Veuillez entrer une URL valide';
                     }
-                  }
-                },
-                child: const Text('Enregistrer'),
-              ),
-            ],
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _apiKeyController,
+                  obscureText: _obscureApiKey,
+                  decoration: _buildInputDecoration('Clé API', 'Votre clé secrète').copyWith(
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureApiKey ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                      onPressed: () {
+                        setState(() {
+                          _obscureApiKey = !_obscureApiKey;
+                        });
+                      },
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Veuillez entrer une clé API';
+                    }
+                    return null;
+                  },
+                ),
+                const Spacer(),
+                ElevatedButton(
+                  onPressed: _saveSettings,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _accentColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.0),
+                    ),
+                  ),
+                  child: const Text('Enregistrer', style: TextStyle(fontSize: 16, color: Colors.white)),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  InputDecoration _buildInputDecoration(String label, String hint) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.0),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.0),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.0),
+        borderSide: const BorderSide(color: _accentColor, width: 2),
+      ),
+    );
+  }
+
+  void _saveSettings() async {
+    if (_formKey.currentState!.validate()) {
+      await context.read<AppProvider>().storageService.saveCredentials(
+            serverUrl: _serverUrlController.text,
+            apiKey: _apiKeyController.text,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Paramètres enregistrés')),
+        );
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
+        );
+      }
+    }
   }
 }
