@@ -27,16 +27,17 @@ Si ce n'est pas déjà fait, allez dans l'onglet "Utilisateurs" et créez un nou
 
 Il existe deux méthodes principales :
 
-**A) Avec une clé de pré-authentification (Recommandé)**
+**A) Avec une clé de pré-authentification**
 
 1. Dans l'onglet "Utilisateurs", cliquez sur l'icône de clé et créez une clé pour votre utilisateur. Même si aucune case n'est cochée, il est nécessaire de mettre 1 jour d'expiration de la clé pour générer une clé valide.
+2. Notez qu'une clé éphémére deconnectera l'utilisateur aprés le délai.
 2. Copiez la commande `tailscale up ...` fournie.
 3. Exécutez cette commande sur l'appareil que vous souhaitez ajouter. Il sera automatiquement enregistré et apparaîtra dans votre tableau de bord.
 
 **B) Enregistrement via l'application (pour les clients mobiles)**
 
 1.  **Sur l'appareil client (iOS/Android) :** Dans l'application Tailscale, allez dans les paramètres, sélectionnez "Use alternate server", et collez l'URL de votre serveur Headscale.
-2.  **Dans l'application Headscale Manager :** Après avoir effectué l'étape 1, le client Tailscale vous fournira une URL d'enregistrement unique. Dans l'application Headscale Manager, allez dans les détails de l'utilisateur, cliquez sur "Enregistrer un nouvel appareil", et collez l'URL fournie par le client. L'appareil sera enregistré directement via l'API.
+2.  **Dans l'application Headscale Manager :** Après avoir effectué l'étape 1, le client Tailscale vous fournira une URL d'enregistrement unique ainsi q'une commande contenant une clé d'enregistrement. Dans l'application Headscale Manager, collez l'URL fournie par le client ou la clé d'enregistrement seule. L'appareil sera enregistré directement via l'API.
 
 ### Étape 3 (Optionnel) : Renommer le nœud et ajouter des tags
 

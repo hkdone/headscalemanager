@@ -139,7 +139,7 @@ Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user)
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                  'Après avoir suivi l\'étape 1 sur votre appareil, le client Tailscale vous fournira une URL d\'enregistrement unique. Collez cette URL ci-dessous pour enregistrer l\'appareil.'),
+                  'Après avoir suivi l\'étape 1 sur votre appareil, le client Tailscale vous fournira une URL d\'enregistrement unique contenant une clé d\'identification unique. Collez cette URL compléte ou la clé d\'identification seule dans le champ ci-dessous pour enregistrer l\'appareil.'),
               const SizedBox(height: 16),
               TextField(
                 controller: urlController,
@@ -147,12 +147,16 @@ Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user)
                   labelText: 'Coller l\'URL du client ici',
                   border: OutlineInputBorder(),
                 ),
-                onChanged: (url) {
-                  final Uri? uri = Uri.tryParse(url);
-                  if (uri != null && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'register') {
+                onChanged: (value) {
+                  final trimmedValue = value.trim();
+                  final Uri? uri = Uri.tryParse(trimmedValue);
+
+                  // Essaye d'extraire la clé d'une URL complète
+                  if (uri != null && uri.hasScheme && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'register') {
                     machineKey.value = uri.pathSegments[1];
                   } else {
-                    machineKey.value = '';
+                    // Sinon, suppose que l'entrée est la clé elle-même
+                    machineKey.value = trimmedValue;
                   }
                 },
               ),

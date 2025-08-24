@@ -464,7 +464,7 @@ routes:
             ),
             const SizedBox(height: 4),
             Text(
-              '1.  **Étape 1 : Charger une configuration de base**\n'              '    *   Utilisez le bouton **Récupérer** (nuage avec flèche vers le bas) pour charger la politique actuelle de votre serveur. C\'est le point de départ recommandé.\n'              '    *   Alternativement, si vous souhaitez repartir de zéro, le bouton **Générer** (icône de restauration) créera une politique de base avec l\'isolation stricte pour tous vos nœuds actuels.',
+              '1.  **Étape 1 : Charger une configuration de base**\n'              '    *   Utilisez le bouton **Récupérer** (nuage avec flèche vers le bas) pour charger la politique actuelle de votre serveur ou **Generer** pour générer une configuration stricte basé sur vos utilisateurs.Cette configuration stricte obei à la régle suivante : chaque utilisateur accéde a ses ces noeuds exclusivement. Attention, les exit nodes sont visibles et accessibles par tous les utilisateurs possédant la régle "autogroup:internet:*". Cela implique que si plusieurs utilisateurs veulent un exit node alors ils accédent aux exits nodes des autres utilisateurs aussi. C\'est le point de départ recommandé.\n'              '    *   Alternativement, si vous souhaitez repartir de zéro, le bouton **Générer** (icône de restauration) créera une politique de base avec l\'isolation stricte pour tous vos nœuds actuels.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 4),
@@ -510,7 +510,7 @@ routes:
             ),
             const SizedBox(height: 4),
             Text(
-              '- **Enregistrer un nouvel appareil (bouton central) :** Ouvre un dialogue en deux étapes pour enregistrer un nouvel appareil sous cet utilisateur. La première étape fournit une commande `tailscale up` à exécuter sur l\'appareil, et la seconde étape génère la commande `headscale nodes register` à exécuter sur votre serveur Headscale après avoir collé le lien web obtenu.',
+              '- **Enregistrer un nouvel appareil (bouton central) :** Ouvre un dialogue en deux étapes pour enregistrer un nouvel appareil sous cet utilisateur. La première étape fournit une commande `tailscale up` à exécuter sur l\'appareil, et la seconde étape génère la commande `headscale nodes register` sur votre serveur Headscale après avoir collé le lien web obtenu ou la clé d\'identification unique obtenue.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 4),
