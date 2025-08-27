@@ -8,7 +8,7 @@ Telechargement de l'application mobile android : https://play.google.com/store/a
 
 Cette application est une application flutter et vous permet de compiler pour IOS,MAC,WEB,Windows au besoin.
 Le code est libre d'utilisation.
-Sachez toutefois que j'ai publier gratuitement l'application sur le playstore et que je ne suis pas responsable d'une version payante sur applestore qu'un utilisateur pourrais publier.
+Sachez toutefois que j'ai publié gratuitement l'application sur le playstore et que je ne suis pas responsable d'une version payante sur applestore qu'un utilisateur pourrais publier.
 
 
 ## Fonctionnement : API
