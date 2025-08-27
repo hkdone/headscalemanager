@@ -3,7 +3,7 @@ import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart'; // For debugPrint
+// For debugPrint
 import 'package:headscalemanager/widgets/subnet_command_dialog.dart'; // Import the new dialog
 
 /// Dialogue pour partager un sous-réseau local via un nœud Headscale.
@@ -25,7 +25,7 @@ class ShareSubnetDialog extends StatefulWidget {
 
 class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _subnetController = TextEditingController();
+  final TextEditingController _subnetController = TextEditingController(text: '192.168.1.0/24');
 
   @override
   void dispose() {
@@ -102,7 +102,7 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
                     tailscaleCommand: 'tailscale up --advertise-routes=$newSubnet --login-server=$loginServer',
                     linuxInstructions: 'Sur votre appareil Linux, activez le transfert IP et le NAT, puis exécutez la commande Tailscale :',
                     windowsInstructions: 'Sur votre appareil Windows, activez le transfert IP et le NAT (partage de connexion Internet), puis exécutez la commande Tailscale :',
-                    mobileInstructions: 'Sur Android/iOS, le routage de sous-réseau est configuré directement dans les paramètres de l\'application Tailscale. Assurez-vous que l\'appareil est connecté à Tailscale, puis activez "Annoncer les routes" pour les sous-réseaux souhaités dans les paramètres de l\'application.',
+                    mobileInstructions: 'Sur votre appareil mobile (Android/iOS), allez dans les paramètres du client Tailscale et activez l\'option "Allow LAN access".',
                   ),
                 );
               } catch (e) {

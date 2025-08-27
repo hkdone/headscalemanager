@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
 
 // Couleurs pour le thème épuré style iOS
 const Color _backgroundColor = Color(0xFFF2F2F7);
 const Color _primaryTextColor = Colors.black87;
 const Color _secondaryTextColor = Colors.black54;
-const Color _cardBackgroundColor = Colors.white;
-const Color _codeBlockColor = Color(0xFFE8E8ED);
+const Color _accentColor = Colors.blue;
 
 /// Écran d'aide de l'application.
+///
+/// Fournit des informations sur les prérequis, l'installation du serveur Headscale,
+/// et un guide d'utilisation de l'application page par page.
 class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key});
 
@@ -15,124 +19,453 @@ class HelpScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _backgroundColor,
-      appBar: AppBar(
-        title: const Text('Aide et Guide', style: TextStyle(color: _primaryTextColor)),
-        backgroundColor: _backgroundColor,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: _primaryTextColor),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: const [
-          _SectionCard(
-            title: 'Bienvenue !',
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
+                'Aide et Guide d\'Utilisation',
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: _primaryTextColor),
+              ),
+              const SizedBox(height: 16),
+              _buildBodyText(
+                'Bienvenue dans le guide d\'utilisation de l\'application Headscale Manager !',
+              ),
+              const SizedBox(height: 8),
+              _buildBodyText(
                 'Cette application vous permet de gérer facilement votre serveur Headscale. Ce guide vous aidera à configurer votre serveur et à utiliser l\'application.',
               ),
-            ],
-          ),
-          _SectionCard(
-            title: 'Fonctionnement : API VS CLI (Command Line Interface)',
-            children: [
-              Text(
-                'L\'application utilise des appels directs à l\'API de Headscale pour la majorité des opérations. Certaines actions, génèrent une commande CLI que vous devez exécuter manuellement sur votre client pour des raisons de sécurité et de flexibilité.',
-              ),
-              SizedBox(height: 16),
-              Text('Actions directes (via API) :', style: TextStyle(fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              _CodeBlock(
-                text:
-                    '- Lister les utilisateurs et les nœuds.\n'
-                    '- Créer et supprimer des utilisateurs.\n'
-                    '- Créer et invalider des clés de pré-authentification.\n'
-                    '- Gérer les clés d\'API.\n'
-                    '- Déplacer un nœud vers un autre utilisateur.\n'
-                    '- Supprimer un nœud.\n'
-                    '- Activer/Désactiver les routes (subnets et exit node).',
-              ),
-            ],
-          ),
-          _SectionCard(
-            title: 'Tutoriel : Ajouter un appareil',
-            children: [
-              Text('Voici les étapes complètes pour ajouter un nouvel appareil (nœud) à votre réseau Headscale.'),
-              SizedBox(height: 16),
-              Text('1. Créer un utilisateur', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('Si ce n\'est pas déjà fait, allez dans l\'onglet "Utilisateurs" et créez un nouvel utilisateur.'),
-              SizedBox(height: 16),
-              Text('2. Enregistrer l\'appareil', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('A) Avec une clé de pré-authentification (Recommandé) :\n1. Dans l\'onglet "Utilisateurs", cliquez sur l\'icône de clé et créez une clé pour votre utilisateur.\n2. Copiez la commande `tailscale up ...` fournie.\n3. Exécutez cette commande sur l\'appareil que vous souhaitez ajouter.'),
-              SizedBox(height: 8),
-              Text('B) Enregistrement via l\'application (pour les clients mobiles) :\n1. Sur le client Tailscale, utilisez un serveur alternatif et entrez l\'URL de votre Headscale.\n2. Dans cette application, allez dans les détails de l\'utilisateur, cliquez sur "Enregistrer un nouvel appareil", et collez l\'URL fournie par le client Tailscale.'),
-            ],
-          ),
-          _SectionCard(
-            title: 'Gestion des ACLs',
-            children: [
-              Text('La section ACLs vous permet de gérer finement qui peut communiquer avec qui.'),
-              SizedBox(height: 16),
-              Text('Workflow recommandé :', style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('1. Récupérez la politique actuelle du serveur ou générez une politique de base stricte.\n'                  '2. Ajoutez des autorisations temporaires si besoin (ex: autoriser un nœud A à parler à un nœud B).\n'                  '3. Générez la politique finale pour la contrôler dans le champ de texte.\n'                  '4. Exportez la politique vers le serveur pour l\'appliquer.'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
+              const SizedBox(height: 24),
 
-class _SectionCard extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
+              // Section API
+              _buildSectionTitle('Fonctionnement : API'),
+              _buildInfoCard(children: [
+                _buildBodyText('L\'application utilise des appels directs à l\'API de Headscale pour toutes les opérations de gestion.'),
+                const SizedBox(height: 16),
+                _buildSubTitle('Actions directes (via API) :'),
+                const SizedBox(height: 8),
+                _buildCodeBlock(
+                  'Ces actions sont effectuées directement par l\'application :\n'
+                  '- Lister les utilisateurs et les nœuds.\n'
+                  '- Créer et supprimer des utilisateurs.\n'
+                  '- Créer et invalider des clés de pré-authentification.\n'
+                  '- Gérer les clés d\'API.\n'
+                  '- Déplacer un nœud vers un autre utilisateur.\n'
+                  '- Supprimer un nœud.\n'
+                  '- Activer/Désactiver les routes (subnets et exit node).',
+                ),
+              ]),
+              const SizedBox(height: 24),
 
-  const _SectionCard({required this.title, required this.children});
+              // Section Tutoriel
+              _buildSectionTitle('Tutoriel : Ajouter un appareil et le configurer'),
+              _buildInfoCard(children: [
+                _buildBodyText('Voici les étapes complètes pour ajouter un nouvel appareil (nœud) à votre réseau Headscale.'),
+                const SizedBox(height: 16),
+                _buildSubTitle('Étape 1 : Créer un utilisateur'),
+                const SizedBox(height: 8),
+                _buildBodyText('Si ce n\'est pas déjà fait, allez dans l\'onglet "Utilisateurs" et créez un nouvel utilisateur (par exemple, "mon-user").'),
+                const SizedBox(height: 16),
+                _buildSubTitle('Étape 2 : Enregistrer l\'appareil'),
+                const SizedBox(height: 8),
+                _buildBodyText('Il existe deux méthodes principales :'),
+                const SizedBox(height: 8),
+                _buildBodyText('A) Avec une clé de pré-authentification (Recommandé)', isBold: true),
+                const SizedBox(height: 4),
+                _buildBodyText(
+                  '1. Dans l\'onglet "Utilisateurs", cliquez sur l\'icône de clé et créez une clé pour votre utilisateur. Même si aucune case n\'est cochée, il est nécessaire de mettre 1 jour d\'expiration de la clé pour générer une clé valide.\n'
+                  '2. Copiez la commande `tailscale up ...` fournie.\n'
+                  '3. Exécutez cette commande sur l\'appareil que vous souhaitez ajouter. Il sera automatiquement enregistré et apparaîtra dans votre tableau de bord.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 8),
+                _buildBodyText('B) Enregistrement via l\'application (pour les clients mobiles)', isBold: true),
+                const SizedBox(height: 4),
+                _buildBodyText(
+                  '1.  Sur l\'appareil client (iOS/Android) : Dans l\'application Tailscale, allez dans les paramètres, sélectionnez "Use alternate server", et collez l\'URL de votre serveur Headscale.\n'
+                  '2.  Dans l\'application Headscale Manager : Après avoir effectué l\'étape 1, le client Tailscale vous fournira une URL d\'enregistrement unique. Dans l\'application Headscale Manager, allez dans les détails de l\'utilisateur, cliquez sur "Enregistrer un nouvel appareil", et collez l\'URL fournie par le client. L\'appareil sera enregistré directement via l\'API.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 16),
+                _buildSubTitle('Étape 3 (Optionnel) : Renommer le nœud et ajouter des tags'),
+                const SizedBox(height: 8),
+                _buildBodyText('Une fois le nœud apparu dans le tableau de bord, vous pouvez le configurer. C\'est une étape cruciale si vous utilisez les ACLs basées sur les tags.'),
+                const SizedBox(height: 8),
+                _buildBodyText(
+                  '1. Allez dans les détails du nœud en cliquant dessus.\n'
+                  '2. Utilisez le menu pour le renommer (par exemple, "mon-telephone").\n'
+                  '3. Cliquez sur l\'icône de crayon pour modifier les tags. Ajoutez les tags pertinents (par exemple, `tag:user-phone`, `tag:user-laptop`). L\'application mettra à jour les tags directement via l\'API.',
+                  isSmall: true,
+                ),
+              ]),
+              const SizedBox(height: 24),
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: _cardBackgroundColor,
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _primaryTextColor),
-            ),
-            const SizedBox(height: 12),
-            ...children.map((child) => DefaultTextStyle(
-                  style: const TextStyle(color: _secondaryTextColor, fontSize: 14, height: 1.5),
-                  child: child,
-                )),
-          ],
+              // Section Prérequis
+              _buildSectionTitle('1. Prérequis et Installation du Serveur Headscale'),
+              _buildInfoCard(children: [
+                _buildBodyText('Pour utiliser cette application, vous devez disposer d\'un serveur Headscale fonctionnel. Voici comment le configurer :'),
+                const SizedBox(height: 16),
+                _buildSubTitle('1.1. Installation de Headscale avec Docker'),
+                const SizedBox(height: 8),
+                _buildBodyText('Il est recommandé d\'installer Headscale via Docker en utilisant l\'image officielle `headscale/headscale`. Assurez-vous de configurer la persistance des données en montant les volumes nécessaires.'),
+                const SizedBox(height: 8),
+                _buildBodyText('Exemple de commande Docker (à adapter) :'),
+                const SizedBox(height: 4),
+                _buildCodeBlock(
+                  '''docker run -d --name headscale 
+  -v <chemin_local_config>:/etc/headscale 
+  -v <chemin_local_data>:/var/lib/headscale 
+  -p 8080:8080 
+  headscale/headscale:latest''',
+                ),
+                const SizedBox(height: 8),
+                _buildBodyText(
+                  '- `<chemin_local_config>` : Chemin sur votre machine hôte où se trouvera le fichier `config.yaml`.\n'
+                  '- `<chemin_local_data>` : Chemin sur votre machine hôte pour la persistance des données de Headscale (base de données, etc.).',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 16),
+                _buildSubTitle('1.2. Fichiers de Configuration'),
+                const SizedBox(height: 8),
+                _buildBodyText('Dans le volume de configuration (`<chemin_local_config>`), vous aurez besoin de deux fichiers :'),
+                const SizedBox(height: 8),
+                _buildBodyText('- **`config.yaml`** : Le fichier de configuration principal de Headscale. Voici un exemple de configuration "clé en main" :'),
+                const SizedBox(height: 4),
+                _buildCodeBlock(
+                  '''server_url: https://<VOTRE_FQDN_PUBLIC>:8081
+listen_addr: 0.0.0.0:8080
+metrics_listen_addr: 127.0.0.1:9090
+grpc_listen_addr: 127.0.0.1:50443
+grpc_allow_insecure: false
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+  allocation: sequential
+derp:
+  server:
+    enabled: false
+    region_id: 999
+    region_code: "headscale"
+    region_name: "Headscale Embedded DERP"
+    verify_clients: true
+    stun_listen_addr: "0.0.0.0:3478"
+    private_key_path: /var/lib/headscale/derp_server_private.key
+    automatically_add_embedded_derp_region: true
+    ipv4: 1.2.3.4
+    ipv6: 2001:db8::1
+  urls:
+    - https://controlplane.tailscale.com/derpmap/default
+  paths: []
+  auto_update_enabled: true
+  update_frequency: 24h
+disable_check_updates: false
+ephemeral_node_inactivity_timeout: 30m
+database:
+  type: sqlite
+  debug: false
+  gorm:
+    prepare_stmt: true
+    parameterized_queries: true
+    skip_err_record_not_found: true
+    slow_threshold: 1000
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+    write_ahead_log: true
+    wal_autocheckpoint: 1000
+acme_url: https://acme-v02.api.letsencrypt.org/directory
+acme_email: ""
+tls_letsencrypt_hostname: ""
+tls_letsencrypt_cache_dir: /var/lib/headscale/cache
+tls_letsencrypt_challenge_type: HTTP-01
+tls_letsencrypt_listen: ":http"
+tls_cert_path: ""
+tls_key_path: ""
+log:
+  level: info
+  format: text
+policy:
+   mode: database
+   path: ""
+dns:
+  magic_dns: true
+  base_domain: <VOTRE_DOMAINE_DE_BASE>.com
+  override_local_dns: false
+  nameservers:
+    global:
+      - 1.1.1.1
+      - 1.0.0.1
+      - 2606:4700:4700::1111
+      - 2606:4700:4700::1001
+    split:
+      {}
+  search_domains: []
+  extra_records: []
+unix_socket: /var/run/headscale/headscale.sock
+unix_socket_permission: "0770"
+logtail:
+  enabled: false
+randomize_client_port: false
+preauthkey_expiry: 5m
+routes:
+   enabled: true''', 
+                ),
+                const SizedBox(height: 8),
+                _buildBodyText('**N\'oubliez pas de remplacer `<VOTRE_FQDN_PUBLIC>` par le nom de domaine public que vous utiliserez.**', isBold: true),
+                const SizedBox(height: 16),
+                _buildSubTitle('1.3. Configuration d\'un Proxy Inverse (Recommandé)'),
+                const SizedBox(height: 8),
+                _buildBodyText('Pour des raisons de sécurité et d\'accessibilité, il est fortement recommandé de placer votre serveur Headscale derrière un proxy inverse (comme Nginx, Caddy, ou Traefik).'),
+                const SizedBox(height: 8),
+                _buildBodyText('Assurez-vous que :'),
+                const SizedBox(height: 4),
+                _buildBodyText(
+                  '- Vous avez un **FQDN (Fully Qualified Domain Name) public** (ex: `headscale.mondomaine.com`).\n'
+                  '- Vous avez un **certificat SSL/TLS valide** pour ce FQDN (ex: via Let\'s Encrypt).\n'
+                  '- Le proxy inverse redirige le **port externe HTTPS (8081)** vers le **port interne HTTP (8080)** de votre conteneur Headscale.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 16),
+                _buildSubTitle('1.4. Génération de la Clé API Headscale'),
+                const SizedBox(height: 8),
+                _buildBodyText('Une fois votre serveur Headscale opérationnel et accessible via votre FQDN public, vous devrez générer une clé API pour que l\'application puisse s\'y connecter.'),
+                const SizedBox(height: 8),
+                _buildBodyText('Connectez-vous à votre serveur Headscale (par exemple, via SSH sur la machine hôte de Docker) et utilisez la commande :'),
+                const SizedBox(height: 4),
+                _buildCodeBlock('headscale apikeys create'),
+                const SizedBox(height: 8),
+                _buildBodyText('**Gardez précieusement cette clé API unique dans un gestionnaire de mots de passe.** Elle est essentielle pour l\'authentification de l\'application.', isBold: true),
+              ]),
+              const SizedBox(height: 24),
+
+              const SizedBox(height: 24),
+              _buildSectionTitle('2. Configuration de l\'Application'),
+              _buildInfoCard(children: [
+                _buildBodyText('Dans l\'application Headscale Manager :'),
+                const SizedBox(height: 8),
+                _buildBodyText('1.  Allez dans l\'écran **Paramètres** (icône d\'engrenage en haut à droite).'),
+                const SizedBox(height: 4),
+                _buildBodyText('2.  Entrez l\'**adresse publique de votre serveur Headscale** (votre FQDN public, ex: `https://headscale.mondomaine.com`).'),
+                const SizedBox(height: 4),
+                _buildBodyText('3.  Collez la **clé API** que vous avez générée précédemment.'),
+                const SizedBox(height: 4),
+                _buildBodyText('4.  Sauvegardez les paramètres. L\'application est maintenant prête à se connecter à votre serveur !'),
+              ]),
+              const SizedBox(height: 24),
+
+              _buildSectionTitle('3. Utilisation de l\'Application'),
+              _buildInfoCard(children: [
+                _buildBodyText('L\'application est divisée en plusieurs sections accessibles via la barre de navigation inférieure :'),
+                const SizedBox(height: 16),
+                _buildSubTitle('3.1. Tableau de Bord (Dashboard)'),
+                const SizedBox(height: 8),
+                _buildBodyText('Cet écran affiche un aperçu de l\'état de votre réseau Headscale. Vous y trouverez des informations sur le nombre de nœuds en ligne/hors ligne, le nombre d\'utilisateurs, etc. Les nœuds sont regroupés par utilisateur et peuvent être développés pour afficher plus de détails. Taper sur un nœud vous mènera à son écran de détails.'),
+                const SizedBox(height: 8),
+                _buildBodyText('**Boutons et Fonctionnalités :**', isBold: true),
+                const SizedBox(height: 4),
+                _buildBodyText(
+                  '- **Développer/Réduire les groupes d\'utilisateurs :** Tapez sur le nom d\'un utilisateur pour afficher ou masquer les nœuds qui lui sont associés.\n'
+                  '- **Afficher les détails du nœud :** Tapez sur n\'importe quel nœud dans la liste pour naviguer vers son écran de détails (`Détails du Nœud`).\n'
+                  '- **Gérer les clés d\'API (icône \'api\') :** Ouvre un écran pour gérer les clés d\'API de votre serveur Headscale.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 16),
+                _buildSubTitle('3.2. Utilisateurs (Users)'),
+                const SizedBox(height: 8),
+                _buildBodyText('Gérez les utilisateurs de votre serveur Headscale. Vous pouvez voir la liste des utilisateurs existants, en créer de nouveaux et les supprimer.'),
+                const SizedBox(height: 8),
+                _buildBodyText('**Boutons et Fonctionnalités :**', isBold: true),
+                const SizedBox(height: 4),
+                _buildBodyText(
+                  '- **Ajouter Utilisateur (icône \'+\' en bas à droite) :** Ouvre un dialogue pour créer un nouvel utilisateur. Entrez simplement le nom d\'utilisateur souhaité. L\'application ajoutera automatiquement `le suffixe de domaine de votre serveur Headscale (par exemple, \'@votre_domaine.com\')` au nom d\'utilisateur si non présent.\n'
+                  '- **Gérer les clés de pré-authentification (icône \'vpn_key\' en bas à droite) :** Ouvre un écran pour gérer les clés de pré-authentification de votre serveur Headscale.\n'
+                  '- **Supprimer Utilisateur (icône de poubelle à côté de chaque utilisateur) :** Supprime l\'utilisateur sélectionné. Une confirmation vous sera demandée. Notez que la suppression échouera si l\'utilisateur possède encore des appareils.\n'
+                  '- **Détails Utilisateur (clic sur un utilisateur) :** Affiche les détails de l\'utilisateur, y compris les nœuds qui lui sont associés et les clés de pré-authentification.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 16),
+                _buildSubTitle('3.3. ACLs (Access Control Lists)'),
+                const SizedBox(height: 8),
+                _buildBodyText('Cette section vous permet de gérer finement qui peut communiquer avec qui. Le nouveau système est plus simple et plus sécurisé : par défaut, tout est isolé. Vous ne créez que des exceptions.'),
+                const SizedBox(height: 8),
+                _buildBodyText('**Philosophie : Isolation Stricte + Exceptions Uniques**', isBold: true),
+                const SizedBox(height: 4),
+                _buildBodyText(
+                  'Le système génère une politique de base où chaque utilisateur est dans son propre "groupe". Les appareils d\'un utilisateur ne peuvent communiquer qu\'entre eux.\n'
+                  'Pour autoriser une communication entre deux appareils (s\'ils appartiennent à deux groupes d\'utilisateurs différents), vous devez créer une **autorisation temporaire unique**.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 16),
+                _buildBodyText('**Workflow pour autoriser une communication :**', isBold: true),
+                const SizedBox(height: 4),
+                _buildBodyText(
+                  '1.  **Prérequis :** Assurez-vous que le nœud source et le nœud destination possèdent chacun au moins un **tag**. L\'autorisation se basera sur le premier tag de chaque nœud.\n'
+                  '2.  **Sélectionnez les Nœuds :** Utilisez les menus déroulants pour choisir un nœud **Source** et un nœud **Destination**.\n' 
+                  '3.  **Appliquez la Règle :** Cliquez sur le bouton **"Ajouter et Appliquer"**.\n' 
+                  '4.  **C\'est tout !** La nouvelle politique ACL est **automatiquement générée et appliquée** à votre serveur Headscale. La communication est maintenant autorisée.\n'
+                  '5.  **Suppression :** Pour retirer l\'autorisation, cliquez sur l\'icône de poubelle sur la règle active. La politique sera également mise à jour automatiquement sur le serveur.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 16),
+                _buildBodyText('**Actions Manuelles et Avancées :**', isBold: true),
+                const SizedBox(height: 4),
+                _buildBodyText(
+                  '- **Générer la politique (bouton flottant) :** Génére la politique adéquat (en prenant en compte vos utilisateurs et nodes) dans le champ de texte pour inspection, sans l\'appliquer.\n'
+                  '- **Menu (⋮) > Exporter vers le serveur :** Applique manuellement le contenu du champ de texte au serveur. Utile pour des modifications avancées.\n' 
+                  '- **Menu (⋮) > Récupérer du serveur :** Charge la politique actuellement active sur le serveur dans le champ de texte.\n' 
+                  '- **Menu (⋮) > Partager en fichier :** Exporte le contenu du champ de texte dans un fichier `acl.json`.',
+                  isSmall: true,
+                ),
+              ]),
+              const SizedBox(height: 24),
+
+              _buildBodyText('Pour toute question ou problème, veuillez consulter la documentation officielle de Headscale ou les ressources de la communauté.'),
+              const SizedBox(height: 24),
+
+              // Carte GitHub
+              _buildLinkCard(context),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
   }
-}
 
-class _CodeBlock extends StatelessWidget {
-  final String text;
+  Widget _buildLinkCard(BuildContext context) {
+    final Uri githubUri = Uri.parse('https://github.com/hkdone/headscalemanager');
+    const String githubUrl = 'https://github.com/hkdone/headscalemanager';
 
-  const _CodeBlock({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12.0),
-      decoration: BoxDecoration(
-        color: _codeBlockColor,
-        borderRadius: BorderRadius.circular(8.0),
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      child: InkWell(
+        onTap: () async {
+          if (await canLaunchUrl(githubUri)) {
+            await launchUrl(githubUri, mode: LaunchMode.externalApplication);
+          }
+        },
+        borderRadius: BorderRadius.circular(12.0),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.code_rounded, color: _accentColor),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  githubUrl,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: _accentColor,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy, color: _accentColor),
+                onPressed: () async {
+                  await Clipboard.setData(const ClipboardData(text: githubUrl));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Lien GitHub copié !')),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
       ),
+    );
+  }
+
+  Widget _buildInfoCard({required List<Widget> children}) {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: children,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4.0, bottom: 8.0, top: 16.0),
       child: Text(
         text,
-        style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: _primaryTextColor),
+        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _primaryTextColor),
+      ),
+    );
+  }
+
+  Widget _buildSubTitle(String text) {
+    return Text(
+      text,
+      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _primaryTextColor),
+    );
+  }
+
+  Widget _buildBodyText(String text, {bool isBold = false, bool isSmall = false}) {
+    // Utiliser RichText pour gérer le gras avec les astérisques
+    List<TextSpan> spans = [];
+    text.splitMapJoin(
+      RegExp(r'\*\*(.*?)\*\*'),
+      onMatch: (m) {
+        spans.add(TextSpan(
+          text: m.group(1),
+          style: TextStyle(
+            fontSize: isSmall ? 13 : 15,
+            color: _secondaryTextColor,
+            fontWeight: FontWeight.bold, // Toujours en gras pour ce qui est matché
+            height: 1.5,
+          ),
+        ));
+        return '';
+      },
+      onNonMatch: (n) {
+        spans.add(TextSpan(
+          text: n,
+          style: TextStyle(
+            fontSize: isSmall ? 13 : 15,
+            color: _secondaryTextColor,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            height: 1.5,
+          ),
+        ));
+        return '';
+      },
+    );
+
+    return RichText(
+      text: TextSpan(children: spans),
+    );
+  }
+
+  Widget _buildCodeBlock(String text) {
+    return Container(
+      padding: const EdgeInsets.all(12.0),
+      decoration: BoxDecoration(
+        color: _backgroundColor,
+        borderRadius: BorderRadius.circular(8.0),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      width: double.infinity,
+      child: SelectableText(
+        text,
+        style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5, color: Colors.black87),
       ),
     );
   }

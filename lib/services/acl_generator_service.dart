@@ -22,7 +22,9 @@ class AclGeneratorService {
   }) {
     // --- Étape 1: Extraire toutes les informations des nœuds et utilisateurs ---
     final groups = <String, List<String>>{};
-    users.forEach((user) => groups['group:${user.name}'] = [user.name]);
+    for (var user in users) {
+      groups['group:${user.name}'] = [user.name];
+    }
 
     final tagOwners = <String, List<String>>{};
     final autoApprovers = {'routes': <String, List<String>>{}, 'exitNodes': <String>[]};

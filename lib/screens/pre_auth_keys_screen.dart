@@ -46,13 +46,6 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
         backgroundColor: _backgroundColor,
         elevation: 0,
         iconTheme: const IconThemeData(color: _primaryTextColor),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.timer_off),
-            tooltip: 'Expirer toutes les clés',
-            onPressed: _expireAllKeys,
-          ),
-        ],
       ),
       body: FutureBuilder<List<PreAuthKey>>(
         future: _preAuthKeysFuture,
@@ -63,24 +56,25 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
           if (snapshot.hasError) {
             return Center(child: Text('Erreur : ${snapshot.error}'));
           }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          if (!snapshot.hasData) {
             return const Center(child: Text('Aucune clé de pré-authentification trouvée.'));
           }
 
-          final preAuthKeys = snapshot.data!;
-          preAuthKeys.sort((a, b) {
-            final aExpired = a.expiration != null && a.expiration!.isBefore(DateTime.now());
-            final bExpired = b.expiration != null && b.expiration!.isBefore(DateTime.now());
-            if (aExpired && !bExpired) return 1;
-            if (!aExpired && bExpired) return -1;
-            return 0;
-          });
+          final allKeys = snapshot.data!;
+          final activeKeys = allKeys.where((key) {
+            final isExpired = key.expiration != null && key.expiration!.isBefore(DateTime.now());
+            return !isExpired && !key.used;
+          }).toList();
+
+          if (activeKeys.isEmpty) {
+            return const Center(child: Text('Aucune clé de pré-authentification active.'));
+          }
 
           return ListView.builder(
             padding: const EdgeInsets.all(8.0),
-            itemCount: preAuthKeys.length,
+            itemCount: activeKeys.length,
             itemBuilder: (context, index) {
-              final key = preAuthKeys[index];
+              final key = activeKeys[index];
               return _PreAuthKeyCard(apiKey: key, onAction: _refreshData);
             },
           );
@@ -95,35 +89,7 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
     );
   }
 
-  Future<void> _expireAllKeys() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Expirer toutes les clés ?'),
-        content: const Text('Êtes-vous sûr de vouloir expirer toutes les clés de pré-authentification ?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Annuler')),
-          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Expirer tout', style: TextStyle(color: Colors.red))),
-        ],
-      ),
-    ) ?? false;
-
-    if (confirm && mounted) {
-      final preAuthKeys = await _preAuthKeysFuture;
-      final apiService = context.read<AppProvider>().apiService;
-      for (final key in preAuthKeys) {
-        if (key.user != null && key.key.isNotEmpty) {
-          try {
-            await apiService.expirePreAuthKey(key.user!.id, key.key);
-          } catch (e) {
-            debugPrint('Erreur lors de l\'expiration de la clé ${key.key}: $e');
-          }
-        }
-      }
-      _refreshData();
-      showSafeSnackBar(context, 'Toutes les clés ont été expirées.');
-    }
-  }
+  
 
   Future<void> _createNewKey() async {
     final result = await showDialog<PreAuthKey?>( 
@@ -192,52 +158,68 @@ class _PreAuthKeyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isExpired = apiKey.expiration != null && apiKey.expiration!.isBefore(DateTime.now());
-    final isUsed = apiKey.used;
-
-    return Opacity(
-      opacity: isExpired || isUsed ? 0.5 : 1.0,
-      child: Card(
-        elevation: 0,
-        color: Colors.white,
-        margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          leading: Icon(isExpired || isUsed ? Icons.do_not_disturb_on : Icons.check_circle, color: isExpired || isUsed ? Colors.grey : Colors.green),
-          title: Text('Clé: ...${apiKey.key.substring(apiKey.key.length - 6)}', style: const TextStyle(fontWeight: FontWeight.w500, color: _primaryTextColor, fontSize: 16, fontFamily: 'monospace')),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 4),
-              Text('Utilisateur: ${apiKey.user?.name ?? 'N/A'}', style: const TextStyle(color: _secondaryTextColor)),
-              Text('Expiration: ${apiKey.expiration?.toLocal() ?? 'Jamais'}', style: const TextStyle(color: _secondaryTextColor)),
-              Row(
-                children: [
-                  Text('Réutilisable: ${apiKey.reusable ? 'Oui' : 'Non'}', style: const TextStyle(color: _secondaryTextColor)),
-                  const SizedBox(width: 8),
-                  Text('Éphémère: ${apiKey.ephemeral ? 'Oui' : 'Non'}', style: const TextStyle(color: _secondaryTextColor)),
-                ],
-              ),
-            ],
-          ),
-          onTap: () => _handleTap(context),
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        leading: const Icon(Icons.check_circle, color: Colors.green),
+        title: Text('Clé: ...${apiKey.key.substring(apiKey.key.length - 6)}', style: const TextStyle(fontWeight: FontWeight.w500, color: _primaryTextColor, fontSize: 16, fontFamily: 'monospace')),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text('Utilisateur: ${apiKey.user?.name ?? 'N/A'}', style: const TextStyle(color: _secondaryTextColor)),
+            Text('Expiration: ${apiKey.expiration?.toLocal() ?? 'Jamais'}', style: const TextStyle(color: _secondaryTextColor)),
+            Row(
+              children: [
+                Text('Réutilisable: ${apiKey.reusable ? 'Oui' : 'Non'}', style: const TextStyle(color: _secondaryTextColor)),
+                const SizedBox(width: 8),
+                Text('Éphémère: ${apiKey.ephemeral ? 'Oui' : 'Non'}', style: const TextStyle(color: _secondaryTextColor)),
+              ],
+            ),
+          ],
         ),
+        trailing: IconButton(
+          icon: const Icon(Icons.timer_off, color: Colors.redAccent),
+          tooltip: 'Expirer la clé',
+          onPressed: () => _expireKey(context),
+        ),
+        onTap: () => _handleTap(context),
       ),
     );
   }
 
-  void _handleTap(BuildContext context) async {
-    final isExpired = apiKey.expiration != null && apiKey.expiration!.isBefore(DateTime.now());
-    if (isExpired) {
-      showSafeSnackBar(context, 'Cette clé est expirée et ne peut pas être utilisée.');
-      return;
-    }
-    if (apiKey.used) {
-      showSafeSnackBar(context, 'Cette clé a déjà été utilisée.');
-      return;
-    }
+  Future<void> _expireKey(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Expirer la clé ?'),
+        content: const Text('Voulez-vous vraiment faire expirer cette clé ? L\'action est irréversible.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Expirer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    ) ?? false;
 
+    if (confirm && context.mounted) {
+      try {
+        await context.read<AppProvider>().apiService.expirePreAuthKey(apiKey.user!.id, apiKey.key);
+        showSafeSnackBar(context, 'Clé expirée avec succès.');
+        onAction(); // This will trigger the refresh
+      } catch (e) {
+        showSafeSnackBar(context, 'Erreur lors de l\'expiration de la clé: $e');
+      }
+    }
+  }
+
+  void _handleTap(BuildContext context) async {
     final appProvider = context.read<AppProvider>();
     final serverUrl = await appProvider.storageService.getServerUrl();
     final String loginServer = serverUrl?.endsWith('/') == true ? serverUrl!.substring(0, serverUrl.length - 1) : serverUrl ?? '';

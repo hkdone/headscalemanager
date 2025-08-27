@@ -6,7 +6,6 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:flutter/foundation.dart';
 import 'package:headscalemanager/services/acl_generator_service.dart';
 
 // Couleurs pour le thème épuré style iOS
@@ -145,6 +144,12 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Widget _buildTemporaryRulesSection() {
+    final sourceUser = _selectedSourceNode?.user;
+    List<Node> destinationNodes = _allNodes;
+    if (sourceUser != null) {
+      destinationNodes = _allNodes.where((node) => node.user != sourceUser).toList();
+    }
+
     return Card(
       elevation: 0,
       color: Colors.white,
@@ -154,13 +159,40 @@ class _AclScreenState extends State<AclScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Autorisation Temporaire', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: _primaryTextColor, fontSize: 20)),
+            Text('Autorisations Spécifiques', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: _primaryTextColor, fontSize: 20)),
+            const SizedBox(height: 8),
+            const Text(
+              'Créez ici des exceptions pour autoriser la communication entre les appareils de différents utilisateurs.',
+              style: TextStyle(color: Colors.black54, fontSize: 14),
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
-                Expanded(child: _buildNodeDropdown('Source', _selectedSourceNode, (node) => setState(() => _selectedSourceNode = node))),
+                Expanded(
+                  child: _buildNodeDropdown(
+                    'Source',
+                    _selectedSourceNode,
+                    _allNodes,
+                    (node) {
+                      setState(() {
+                        _selectedSourceNode = node;
+                        // Si le nouveau nœud source a le même utilisateur que la destination, réinitialiser la destination.
+                        if (node != null && _selectedDestinationNode != null && node.user == _selectedDestinationNode!.user) {
+                          _selectedDestinationNode = null;
+                        }
+                      });
+                    },
+                  ),
+                ),
                 const SizedBox(width: 10),
-                Expanded(child: _buildNodeDropdown('Destination', _selectedDestinationNode, (node) => setState(() => _selectedDestinationNode = node))),
+                Expanded(
+                  child: _buildNodeDropdown(
+                    'Destination',
+                    _selectedDestinationNode,
+                    destinationNodes,
+                    (node) => setState(() => _selectedDestinationNode = node),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -207,11 +239,11 @@ class _AclScreenState extends State<AclScreen> {
     );
   }
 
-  DropdownButtonFormField<Node> _buildNodeDropdown(String label, Node? selectedNode, ValueChanged<Node?> onChanged) {
+  DropdownButtonFormField<Node> _buildNodeDropdown(String label, Node? selectedNode, List<Node> nodes, ValueChanged<Node?> onChanged) {
     return DropdownButtonFormField<Node>(
       value: selectedNode,
       decoration: _buildInputDecoration(label, 'Choisir un nœud'),
-      items: _allNodes.map((Node node) {
+      items: nodes.map((Node node) {
         return DropdownMenuItem<Node>(
           value: node,
           child: Text(node.name, overflow: TextOverflow.ellipsis),

@@ -6,7 +6,7 @@ import 'package:headscalemanager/widgets/cli_command_display_dialog.dart';
 import 'package:headscalemanager/widgets/edit_tags_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/widgets/registration_dialogs.dart';
-import 'package:flutter/foundation.dart'; // For debugPrint
+// For debugPrint
 
 // Dialogs for node actions
 import 'package:headscalemanager/widgets/rename_node_dialog.dart';
@@ -160,15 +160,15 @@ class _NodeCard extends StatelessWidget {
   void _showEditTagsFlow(BuildContext context) async {
     final String? generatedCommand = await showDialog<String>(
       context: context,
-      builder: (context) => EditTagsDialog(
+      builder: (dialogContext) => EditTagsDialog(
         node: node,
       ),
     );
 
-    if (generatedCommand != null && generatedCommand.isNotEmpty) {
+    if (generatedCommand != null && generatedCommand.isNotEmpty && context.mounted) {
       showDialog(
         context: context,
-        builder: (ctx) => CliCommandDisplayDialog(command: generatedCommand),
+        builder: (dialogContext) => CliCommandDisplayDialog(command: generatedCommand),
       );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -176,6 +176,41 @@ class _NodeCard extends StatelessWidget {
               'Commande CLI générée. Exécutez-la et actualisez la page pour voir les changements.'),
           backgroundColor: Colors.orange,
         ),
+      );
+    }
+  }
+
+  void _showExitNodeWarningAndProceed(BuildContext context) async {
+    bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Avertissement sur les Nœuds de Sortie'),
+          content: const Text(
+              'Dans la configuration ACL actuelle, si plusieurs nœuds de sortie appartiennent à différents utilisateurs, ils ne peuvent pas être rendus exclusifs. Tout utilisateur autorisé pourra voir et utiliser tous les nœuds de sortie disponibles sur le réseau.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Annuler'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+            ),
+            TextButton(
+              child: const Text('Continuer', style: TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && context.mounted) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) =>
+            ExitNodeCommandDialog(node: node, onExitNodeEnabled: onNodeUpdate),
       );
     }
   }
@@ -236,7 +271,7 @@ class _NodeCard extends StatelessWidget {
                 ),
               ),
             const Spacer(),
-            Text('Dernière connexion:', style: const TextStyle(fontSize: 10, color: _secondaryTextColor)),
+            const Text('Dernière connexion:', style: TextStyle(fontSize: 10, color: _secondaryTextColor)),
             Text(node.lastSeen.toLocal().toString(), style: const TextStyle(fontSize: 10, color: _secondaryTextColor)),
           ],
         ),
@@ -250,22 +285,22 @@ class _NodeCard extends StatelessWidget {
       onSelected: (String value) {
         switch (value) {
           case 'rename':
-            showDialog(context: context, builder: (ctx) => RenameNodeDialog(node: node, onNodeRenamed: onNodeUpdate));
+            showDialog(context: context, builder: (dialogContext) => RenameNodeDialog(node: node, onNodeRenamed: onNodeUpdate));
             break;
           case 'move':
-            showDialog(context: context, builder: (ctx) => MoveNodeDialog(node: node, onNodeMoved: onNodeUpdate));
+            showDialog(context: context, builder: (dialogContext) => MoveNodeDialog(node: node, onNodeMoved: onNodeUpdate));
             break;
           case 'edit_tags':
             _showEditTagsFlow(context);
             break;
           case 'enable_exit_node':
-            showDialog(context: context, builder: (ctx) => ExitNodeCommandDialog(node: node, onExitNodeEnabled: onNodeUpdate));
+            _showExitNodeWarningAndProceed(context);
             break;
           case 'disable_exit_node':
             _runAction(context, () => provider.apiService.setNodeRoutes(node.id, []), 'Nœud de sortie désactivé.');
             break;
           case 'share_subnet':
-            showDialog(context: context, builder: (ctx) => ShareSubnetDialog(node: node, onSubnetShared: onNodeUpdate));
+            showDialog(context: context, builder: (dialogContext) => ShareSubnetDialog(node: node, onSubnetShared: onNodeUpdate));
             break;
           case 'disable_subnet':
             _runAction(context, () => provider.apiService.setNodeRoutes(node.id, []), 'Routes de sous-réseau désactivées.');
@@ -273,15 +308,15 @@ class _NodeCard extends StatelessWidget {
           case 'delete_device':
             showDialog(
               context: context,
-              builder: (dialogCtx) => AlertDialog(
+              builder: (dialogContext) => AlertDialog(
                 title: const Text('Supprimer l\'appareil ?'),
                 content: Text('Êtes-vous sûr de vouloir supprimer ${node.name} ?'),
                 actions: <Widget>[
-                  TextButton(child: const Text('Annuler'), onPressed: () => Navigator.of(dialogCtx).pop()),
+                  TextButton(child: const Text('Annuler'), onPressed: () => Navigator.of(dialogContext).pop()),
                   TextButton(
                     child: const Text('Confirmer', style: TextStyle(color: Colors.red)),
                     onPressed: () {
-                      Navigator.of(dialogCtx).pop();
+                      Navigator.of(dialogContext).pop();
                       _runAction(context, () => provider.apiService.deleteNode(node.id), 'Appareil supprimé.');
                     },
                   ),

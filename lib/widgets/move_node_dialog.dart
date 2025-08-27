@@ -4,7 +4,7 @@ import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart'; // For debugPrint
+// For debugPrint
 
 /// Dialogue pour déplacer un nœud vers un autre utilisateur.
 ///
@@ -65,9 +65,7 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
           }
 
           // Sélectionne le premier utilisateur différent par défaut si aucun n'est sélectionné.
-          if (_selectedUser == null) {
-            _selectedUser = otherUsers.first;
-          }
+          _selectedUser ??= otherUsers.first;
 
           return DropdownButtonFormField<User>(
             value: _selectedUser,

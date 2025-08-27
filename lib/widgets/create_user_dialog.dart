@@ -3,7 +3,7 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart'; // For debugPrint
+// For debugPrint
 
 /// Dialogue pour créer un nouvel utilisateur Headscale.
 ///

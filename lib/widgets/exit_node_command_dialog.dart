@@ -134,18 +134,11 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog> with Sing
                         ),
                       ),
                       // Instructions mobiles
-                      SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                                'Sur Android/iOS, la fonctionnalité de nœud de sortie est configurée directement dans les paramètres de l\'application Tailscale. Assurez-vous que l\'appareil est connecté à Tailscale, puis activez "Utiliser comme nœud de sortie" dans les paramètres de l\'application.'),
-                            const SizedBox(height: 8),
-                            SelectableText(
-                              tailscaleCommand,
-                              style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-                            ),
-                          ],
+                      const SingleChildScrollView(
+                        child: Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: Text(
+                              'Sur votre appareil mobile (Android/iOS), allez dans les paramètres du client Tailscale, sélectionnez l\'option "Exit nodes", puis activez l\'option "Run as exit node". Aucune ligne de commande n\'est nécessaire.'),
                         ),
                       ),
                     ],

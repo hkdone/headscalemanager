@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/home_screen.dart';
+import 'package:headscalemanager/screens/help_screen.dart';
 import 'package:provider/provider.dart';
 
 // Couleurs pour le thème épuré style iOS
@@ -96,6 +97,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 24), // Added space for help button
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => const HelpScreen()),
+                    );
+                  },
+                  child: const Text('Besoin d\'aide ?', style: TextStyle(color: _accentColor)),
                 ),
                 const Spacer(),
                 ElevatedButton(

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For Clipboard
+// For Clipboard
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart'; // For debugPrint
+// For debugPrint
 
 /// Dialogue pour créer une nouvelle clé de pré-authentification.
 ///
@@ -114,8 +114,18 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
           child: const Text('Créer'),
           onPressed: () async {
             if (_selectedUser != null) {
-              final expirationDays = int.tryParse(_expirationController.text);
-              final expiration = expirationDays != null ? DateTime.now().add(Duration(days: expirationDays)) : null;
+              final expirationText = _expirationController.text.trim();
+              // Par défaut, 1 jour si le champ est vide ou invalide.
+              int expirationDays = 1;
+              if (expirationText.isNotEmpty) {
+                final parsedDays = int.tryParse(expirationText);
+                // Utilise la valeur analysée uniquement si c'est un nombre positif.
+                if (parsedDays != null && parsedDays > 0) {
+                  expirationDays = parsedDays;
+                }
+              }
+              final expiration = DateTime.now().add(Duration(days: expirationDays));
+
               try {
                 final key = await provider.apiService.createPreAuthKey(
                   _selectedUser!.id,
