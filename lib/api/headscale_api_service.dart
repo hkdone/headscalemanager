@@ -69,28 +69,11 @@ class HeadscaleApiService {
       // Extrait la liste des nœuds JSON.
       final List<dynamic> nodesJson = data['nodes'];
 
-      // Liste pour stocker les nœuds avec leurs détails complets.
-      final List<Node> detailedNodes = [];
-      // Itère sur chaque nœud sommaire pour récupérer ses détails complets.
-      for (var nodeJson in nodesJson) {
-        // Le JSON de base de la liste peut ne pas contenir tous les champs,
-        // nous extrayons donc uniquement l'ID pour ensuite récupérer les détails complets.
-        final nodeId = nodeJson['id'];
-        if (nodeId != null) {
-          try {
-            // Récupère les détails complets du nœud en utilisant son ID.
-            // Passe le baseDomain au constructeur fromJson du Node.
-            final detailedNode = await getNodeDetails(nodeId); // getNodeDetails already passes baseDomain
-            detailedNodes.add(detailedNode);
-          } catch (e) {
-            // Affiche une erreur si la récupération des détails d'un nœud échoue.
-            print('Erreur lors de la récupération des détails pour le nœud $nodeId: $e');
-            // Optionnellement, on pourrait ajouter un nœud de remplacement ou ignorer ce nœud.
-          }
-        }
-      }
-      // Retourne la liste des nœuds avec leurs détails complets.
-      return detailedNodes;
+      // Mappe directement la liste JSON en une liste d'objets Node.
+      // L'endpoint /api/v1/node retourne déjà les détails suffisants.
+      return nodesJson
+          .map((nodeJson) => Node.fromJson(nodeJson as Map<String, dynamic>, baseDomain))
+          .toList();
     } else {
       // Lève une exception si la requête a échoué.
       throw Exception(_handleError('charger les nœuds', response));
@@ -247,15 +230,18 @@ class HeadscaleApiService {
     }
   }
 
-  /// Définit la politique ACL (Access Control List) avec la carte fournie.
-  Future<void> setAclPolicy(Map<dynamic, dynamic> aclMap) async {
+  /// Définit la politique ACL (Access Control List) avec la chaîne de caractères fournie.
+  Future<void> setAclPolicy(String aclPolicy) async {
     // Récupère l'URL de base du serveur.
     final baseUrl = await _getBaseUrl();
+    // La politique doit être envoyée dans un objet JSON sous la clé "policy".
+    final body = jsonEncode({'policy': aclPolicy});
+
     // Effectue la requête PUT pour définir la politique ACL.
     final response = await http.put(
       Uri.parse('${baseUrl}api/v1/policy'),
       headers: await _getHeaders(),
-      body: jsonEncode({'policy': jsonEncode(aclMap)}),
+      body: body,
     );
 
     // Lève une exception si la requête n'a pas réussi.

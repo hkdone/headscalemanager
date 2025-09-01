@@ -27,7 +27,10 @@ class AclGeneratorService {
     }
 
     final tagOwners = <String, List<String>>{};
-    final autoApprovers = {'routes': <String, List<String>>{}, 'exitNodes': <String>[]};
+    final autoApprovers = {
+      'routes': <String, List<String>>{},
+      'exitNodes': <String>[]
+    };
 
     final tagsByUser = <String, Set<String>>{};
     final routesByUser = <String, Set<String>>{};
@@ -37,22 +40,29 @@ class AclGeneratorService {
       final userName = node.user;
 
       if (node.tags.isNotEmpty) {
-        if (!tagsByUser.containsKey(userName)) tagsByUser[userName] = <String>{};
+        if (!tagsByUser.containsKey(userName)) {
+          tagsByUser[userName] = <String>{};
+        }
         tagsByUser[userName]!.addAll(node.tags);
 
         for (var tag in node.tags) {
           if (!tagOwners.containsKey(tag)) tagOwners[tag] = [];
-          if (!tagOwners[tag]!.contains(groupName)) tagOwners[tag]!.add(groupName);
+          if (!tagOwners[tag]!.contains(groupName)) {
+            tagOwners[tag]!.add(groupName);
+          }
         }
       }
 
       final subnetRoutes = node.sharedRoutes;
       if (subnetRoutes.isNotEmpty) {
-        if (!routesByUser.containsKey(userName)) routesByUser[userName] = <String>{};
+        if (!routesByUser.containsKey(userName)) {
+          routesByUser[userName] = <String>{};
+        }
         routesByUser[userName]!.addAll(subnetRoutes);
 
         if (node.tags.isNotEmpty) {
-          final routesMap = autoApprovers['routes'] as Map<String, List<String>>;
+          final routesMap =
+              autoApprovers['routes'] as Map<String, List<String>>;
           for (var tag in node.tags) {
             for (var route in subnetRoutes) {
               if (!routesMap.containsKey(route)) routesMap[route] = [];
@@ -108,7 +118,8 @@ class AclGeneratorService {
     }
 
     // 2.2: Ajouter les règles de base avec isolation 100% stricte APRÈS
-    final allExitNodeTags = (autoApprovers['exitNodes'] as List<String>).toSet();
+    final allExitNodeTags =
+        (autoApprovers['exitNodes'] as List<String>).toSet();
 
     tagsByUser.forEach((userName, userTags) {
       if (userTags.isEmpty) return;
@@ -121,7 +132,8 @@ class AclGeneratorService {
 
       // Accès aux routes que CET utilisateur annonce, en excluant les routes de sortie
       if (routesByUser.containsKey(userName)) {
-        final nonExitRoutes = routesByUser[userName]!.where((route) => route != '0.0.0.0/0' && route != '::/0');
+        final nonExitRoutes = routesByUser[userName]!
+            .where((route) => route != '0.0.0.0/0' && route != '::/0');
         destinations.addAll(nonExitRoutes.map((r) => '$r:*'));
       }
 

@@ -84,22 +84,23 @@ class _AclScreenState extends State<AclScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                children: [
-                  _buildTemporaryRulesSection(),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: TextField(
+          : GestureDetector(
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  children: [
+                    _buildTemporaryRulesSection(),
+                    const SizedBox(height: 10),
+                    TextField(
                       controller: _aclController,
-                      maxLines: null,
-                      expands: true,
+                      maxLines: 20, // Donne une bonne taille de départ
+                      minLines: 5,  // Et une taille minimale
                       decoration: _buildInputDecoration('Politique ACL', '').copyWith(filled: true, fillColor: Colors.white),
                       style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
       floatingActionButton: FloatingActionButton.extended(
@@ -390,8 +391,7 @@ class _AclScreenState extends State<AclScreen> {
     setState(() => _isLoading = true);
     try {
       final apiService = context.read<AppProvider>().apiService;
-      final aclMap = json.decode(_aclController.text);
-      await apiService.setAclPolicy(aclMap);
+      await apiService.setAclPolicy(_aclController.text);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(successMessage ?? 'Politique ACL exportée avec succès vers le serveur.')),

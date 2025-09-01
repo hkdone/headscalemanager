@@ -213,6 +213,8 @@ Gérez les utilisateurs de votre serveur Headscale. Vous pouvez voir la liste de
 
 Cette section vous permet de générer et de gérer la politique de contrôle d'accès de votre réseau. Elle définit qui a le droit de communiquer avec qui.
 
+> **Note Importante :** L'ajout d'un ou plusieurs utilisateurs nécessite un redémarrage du serveur Headscale après avoir mis en place les tags et les ACLs correctement pour que cela fonctionne. Par la suite, la modification des ACLs sur un utilisateur existant se fait sans avoir besoin de redémarrer.
+
 **Principe de base : l'Isolation**
 
 Le générateur de politique de cette application est basé sur un principe de sécurité fondamental : **chaque utilisateur est isolé dans sa propre "bulle"**. Par défaut, un utilisateur ne peut communiquer qu'avec les appareils qui lui appartiennent. Jean ne peut pas voir ou contacter les appareils de Clarisse, et vice-versa.

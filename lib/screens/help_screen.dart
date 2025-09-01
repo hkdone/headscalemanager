@@ -290,6 +290,11 @@ routes:
                 _buildSubTitle('3.3. ACLs (Access Control Lists)'),
                 const SizedBox(height: 8),
                 _buildBodyText('Cette section vous permet de gérer finement qui peut communiquer avec qui. Le nouveau système est plus simple et plus sécurisé : par défaut, tout est isolé. Vous ne créez que des exceptions.'),
+                const SizedBox(height: 16),
+                _buildBodyText(
+                  '**Note Importante :** L\'ajout d\'un ou plusieurs utilisateurs nécessite un redémarrage du serveur Headscale après avoir mis en place les tags et les ACLs correctement pour que cela fonctionne. Par la suite, la modification des ACLs sur un utilisateur existant se fait sans avoir besoin de redémarrer.',
+                  isBold: true,
+                ),
                 const SizedBox(height: 8),
                 _buildBodyText('**Philosophie : Isolation Stricte + Exceptions Uniques**', isBold: true),
                 const SizedBox(height: 4),

@@ -152,8 +152,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _saveSettings() async {
     if (_formKey.currentState!.validate()) {
       await context.read<AppProvider>().storageService.saveCredentials(
-            serverUrl: _serverUrlController.text,
-            apiKey: _apiKeyController.text,
+            serverUrl: _serverUrlController.text.trim(),
+            apiKey: _apiKeyController.text.trim(),
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
