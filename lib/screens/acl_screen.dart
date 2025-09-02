@@ -74,7 +74,8 @@ class _AclScreenState extends State<AclScreen> {
     return Scaffold(
       backgroundColor: _backgroundColor,
       appBar: AppBar(
-        title: const Text('Gestion des ACLs', style: TextStyle(color: _primaryTextColor)),
+        title: const Text('Gestion des ACLs',
+            style: TextStyle(color: _primaryTextColor)),
         backgroundColor: _backgroundColor,
         elevation: 0,
         iconTheme: const IconThemeData(color: _primaryTextColor),
@@ -95,9 +96,11 @@ class _AclScreenState extends State<AclScreen> {
                     TextField(
                       controller: _aclController,
                       maxLines: 20, // Donne une bonne taille de départ
-                      minLines: 5,  // Et une taille minimale
-                      decoration: _buildInputDecoration('Politique ACL', '').copyWith(filled: true, fillColor: Colors.white),
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                      minLines: 5, // Et une taille minimale
+                      decoration: _buildInputDecoration('Politique ACL', '')
+                          .copyWith(filled: true, fillColor: Colors.white),
+                      style: const TextStyle(
+                          fontFamily: 'monospace', fontSize: 12),
                     ),
                   ],
                 ),
@@ -125,20 +128,36 @@ class _AclScreenState extends State<AclScreen> {
           case 'share':
             _shareAclFile();
             break;
+          case 'reset':
+            _resetAclPolicy();
+            break;
         }
       },
       itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
         const PopupMenuItem<String>(
           value: 'export',
-          child: ListTile(leading: Icon(Icons.cloud_upload), title: Text('Exporter vers le serveur')),
+          child: ListTile(
+              leading: Icon(Icons.cloud_upload),
+              title: Text('Exporter vers le serveur')),
         ),
         const PopupMenuItem<String>(
           value: 'fetch',
-          child: ListTile(leading: Icon(Icons.cloud_download), title: Text('Récupérer du serveur')),
+          child: ListTile(
+              leading: Icon(Icons.cloud_download),
+              title: Text('Récupérer du serveur')),
         ),
         const PopupMenuItem<String>(
           value: 'share',
-          child: ListTile(leading: Icon(Icons.share), title: Text('Partager en fichier')),
+          child: ListTile(
+              leading: Icon(Icons.share), title: Text('Partager en fichier')),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'reset',
+          child: ListTile(
+            leading: Icon(Icons.lock_open, color: Colors.orange),
+            title: Text('Autoriser tout (Réinitialiser)', style: TextStyle(color: Colors.orange)),
+          ),
         ),
       ],
     );
@@ -148,7 +167,8 @@ class _AclScreenState extends State<AclScreen> {
     final sourceUser = _selectedSourceNode?.user;
     List<Node> destinationNodes = _allNodes;
     if (sourceUser != null) {
-      destinationNodes = _allNodes.where((node) => node.user != sourceUser).toList();
+      destinationNodes =
+          _allNodes.where((node) => node.user != sourceUser).toList();
     }
 
     return Card(
@@ -160,7 +180,11 @@ class _AclScreenState extends State<AclScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Autorisations Spécifiques', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: _primaryTextColor, fontSize: 20)),
+            Text('Autorisations Spécifiques',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(color: _primaryTextColor, fontSize: 20)),
             const SizedBox(height: 8),
             const Text(
               'Créez ici des exceptions pour autoriser la communication entre les appareils de différents utilisateurs.',
@@ -178,7 +202,9 @@ class _AclScreenState extends State<AclScreen> {
                       setState(() {
                         _selectedSourceNode = node;
                         // Si le nouveau nœud source a le même utilisateur que la destination, réinitialiser la destination.
-                        if (node != null && _selectedDestinationNode != null && node.user == _selectedDestinationNode!.user) {
+                        if (node != null &&
+                            _selectedDestinationNode != null &&
+                            node.user == _selectedDestinationNode!.user) {
                           _selectedDestinationNode = null;
                         }
                       });
@@ -201,10 +227,12 @@ class _AclScreenState extends State<AclScreen> {
               child: ElevatedButton.icon(
                 onPressed: _addTemporaryRule,
                 icon: const Icon(Icons.add_link, color: Colors.white),
-                label: const Text('Ajouter et Appliquer', style: TextStyle(color: Colors.white)),
+                label: const Text('Ajouter et Appliquer',
+                    style: TextStyle(color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _accentColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.0)),
                 ),
               ),
             ),
@@ -212,7 +240,11 @@ class _AclScreenState extends State<AclScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Règles actives:', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: _primaryTextColor)),
+                Text('Règles actives:',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(color: _primaryTextColor)),
                 IconButton(
                   icon: const Icon(Icons.delete_sweep, color: Colors.grey),
                   tooltip: 'Effacer toutes les règles',
@@ -240,7 +272,8 @@ class _AclScreenState extends State<AclScreen> {
     );
   }
 
-  DropdownButtonFormField<Node> _buildNodeDropdown(String label, Node? selectedNode, List<Node> nodes, ValueChanged<Node?> onChanged) {
+  DropdownButtonFormField<Node> _buildNodeDropdown(String label,
+      Node? selectedNode, List<Node> nodes, ValueChanged<Node?> onChanged) {
     return DropdownButtonFormField<Node>(
       value: selectedNode,
       decoration: _buildInputDecoration(label, 'Choisir un nœud'),
@@ -270,20 +303,28 @@ class _AclScreenState extends State<AclScreen> {
 
   Future<void> _addTemporaryRule() async {
     if (_temporaryRules.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vous ne pouvez ajouter qu\'une seule autorisation à la fois.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Vous ne pouvez ajouter qu\'une seule autorisation à la fois.')));
       return;
     }
 
     if (_selectedSourceNode == null || _selectedDestinationNode == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veuillez sélectionner un nœud source et un nœud destination.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Veuillez sélectionner un nœud source et un nœud destination.')));
       return;
     }
     if (_selectedSourceNode!.id == _selectedDestinationNode!.id) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La source et la destination ne peuvent pas être identiques.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'La source et la destination ne peuvent pas être identiques.')));
       return;
     }
-    if (_selectedSourceNode!.tags.isEmpty || _selectedDestinationNode!.tags.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Les deux nœuds doivent avoir au moins un tag.')));
+    if (_selectedSourceNode!.tags.isEmpty ||
+        _selectedDestinationNode!.tags.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Les deux nœuds doivent avoir au moins un tag.')));
       return;
     }
 
@@ -292,12 +333,13 @@ class _AclScreenState extends State<AclScreen> {
       'dst': _selectedDestinationNode!.tags.first,
     };
 
-    bool ruleExists = _temporaryRules.any((rule) => 
+    bool ruleExists = _temporaryRules.any((rule) =>
         (rule['src'] == newRule['src'] && rule['dst'] == newRule['dst']) ||
         (rule['src'] == newRule['dst'] && rule['dst'] == newRule['src']));
 
     if (ruleExists) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cette règle existe déjà.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cette règle existe déjà.')));
       return;
     }
 
@@ -307,21 +349,29 @@ class _AclScreenState extends State<AclScreen> {
 
     final storage = context.read<AppProvider>().storageService;
     await storage.saveTemporaryRules(_temporaryRules);
-    await _generateAndExportPolicy(message: 'Règle ajoutée et politique appliquée avec succès.');
+    await _generateAndExportPolicy(
+        message: 'Règle ajoutée et politique appliquée avec succès.');
   }
 
   Future<void> _removeTemporaryRule(int index) async {
     final bool confirm = await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmer la suppression'),
-        content: const Text('Cela va supprimer la règle et appliquer immédiatement la nouvelle politique au serveur. Continuer ?'),
-        actions: [
-          TextButton(child: const Text('Annuler'), onPressed: () => Navigator.of(ctx).pop(false)),
-          TextButton(child: const Text('Confirmer', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.of(ctx).pop(true)),
-        ],
-      ),
-    ) ?? false;
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Confirmer la suppression'),
+            content: const Text(
+                'Cela va supprimer la règle et appliquer immédiatement la nouvelle politique au serveur. Continuer ?'),
+            actions: [
+              TextButton(
+                  child: const Text('Annuler'),
+                  onPressed: () => Navigator.of(ctx).pop(false)),
+              TextButton(
+                  child: const Text('Confirmer',
+                      style: TextStyle(color: Colors.red)),
+                  onPressed: () => Navigator.of(ctx).pop(true)),
+            ],
+          ),
+        ) ??
+        false;
 
     if (!confirm || !mounted) return;
 
@@ -331,21 +381,29 @@ class _AclScreenState extends State<AclScreen> {
 
     final storage = context.read<AppProvider>().storageService;
     await storage.saveTemporaryRules(_temporaryRules);
-    await _generateAndExportPolicy(message: 'Règle supprimée et politique mise à jour.');
+    await _generateAndExportPolicy(
+        message: 'Règle supprimée et politique mise à jour.');
   }
 
   Future<void> _clearTemporaryRules() async {
-     final bool confirm = await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmer la suppression'),
-        content: const Text('Cela va supprimer TOUTES les règles et appliquer la nouvelle politique au serveur. Continuer ?'),
-        actions: [
-          TextButton(child: const Text('Annuler'), onPressed: () => Navigator.of(ctx).pop(false)),
-          TextButton(child: const Text('Confirmer', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.of(ctx).pop(true)),
-        ],
-      ),
-    ) ?? false;
+    final bool confirm = await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Confirmer la suppression'),
+            content: const Text(
+                'Cela va supprimer TOUTES les règles et appliquer la nouvelle politique au serveur. Continuer ?'),
+            actions: [
+              TextButton(
+                  child: const Text('Annuler'),
+                  onPressed: () => Navigator.of(ctx).pop(false)),
+              TextButton(
+                  child: const Text('Confirmer',
+                      style: TextStyle(color: Colors.red)),
+                  onPressed: () => Navigator.of(ctx).pop(true)),
+            ],
+          ),
+        ) ??
+        false;
 
     if (!confirm || !mounted) return;
 
@@ -354,36 +412,42 @@ class _AclScreenState extends State<AclScreen> {
     });
     final storage = context.read<AppProvider>().storageService;
     await storage.saveTemporaryRules(_temporaryRules);
-    await _generateAndExportPolicy(message: 'Toutes les règles ont été supprimées et la politique a été mise à jour.');
+    await _generateAndExportPolicy(
+        message:
+            'Toutes les règles ont été supprimées et la politique a été mise à jour.');
   }
 
   Future<void> _generateAndExportPolicy({String? message}) async {
     await _generateAclPolicy(showSnackbar: false);
-    await _exportAclPolicyToServer(showConfirmation: false, successMessage: message);
+    await _exportAclPolicyToServer(
+        showConfirmation: false, successMessage: message);
   }
 
-  Future<void> _exportAclPolicyToServer({bool showConfirmation = true, String? successMessage}) async {
+  Future<void> _exportAclPolicyToServer(
+      {bool showConfirmation = true, String? successMessage}) async {
     if (showConfirmation) {
       final bool confirm = await showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Confirmer l\'exportation'),
-            content: const Text(
-                'Vous allez appliquer la politique ACL définie dans le champ de texte sur votre serveur. Êtes-vous sûr ?'),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Annuler'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Confirmer', style: TextStyle(color: Colors.red)),
-              ),
-            ],
-          );
-        },
-      ) ?? false;
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('Confirmer l\'exportation'),
+                content: const Text(
+                    'Vous allez appliquer la politique ACL définie dans le champ de texte sur votre serveur. Êtes-vous sûr ?'),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Annuler'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Confirmer',
+                        style: TextStyle(color: Colors.red)),
+                  ),
+                ],
+              );
+            },
+          ) ??
+          false;
 
       if (!confirm) return;
     }
@@ -394,14 +458,19 @@ class _AclScreenState extends State<AclScreen> {
       await apiService.setAclPolicy(_aclController.text);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(successMessage ?? 'Politique ACL exportée avec succès vers le serveur.')),
+          SnackBar(
+              content: Text(successMessage ??
+                  'Politique ACL exportée avec succès vers le serveur.')),
         );
       }
     } catch (e) {
-      debugPrint('Erreur lors de l\'exportation de la politique ACL vers le serveur : $e');
+      debugPrint(
+          'Erreur lors de l\'exportation de la politique ACL vers le serveur : $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Échec de l\'exportation de la politique ACL : $e')),
+          SnackBar(
+              content:
+                  Text('Échec de l\'exportation de la politique ACL : $e')),
         );
       }
     } finally {
@@ -423,10 +492,13 @@ class _AclScreenState extends State<AclScreen> {
         );
       }
     } catch (e) {
-      debugPrint('Erreur lors de la récupération de la politique ACL du serveur : $e');
+      debugPrint(
+          'Erreur lors de la récupération de la politique ACL du serveur : $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Échec de la récupération de la politique ACL : $e')),
+          SnackBar(
+              content:
+                  Text('Échec de la récupération de la politique ACL : $e')),
         );
       }
     } finally {
@@ -441,7 +513,8 @@ class _AclScreenState extends State<AclScreen> {
       final apiService = appProvider.apiService;
 
       final users = await apiService.getUsers();
-      final nodes = _allNodes.isNotEmpty ? _allNodes : await apiService.getNodes();
+      final nodes =
+          _allNodes.isNotEmpty ? _allNodes : await apiService.getNodes();
       if (_allNodes.isEmpty) _allNodes = nodes;
 
       _currentAclPolicy = _aclGeneratorService.generateAclPolicy(
@@ -461,7 +534,8 @@ class _AclScreenState extends State<AclScreen> {
               children: [
                 Text('Politique ACL générée dans le champ de texte.'),
                 SizedBox(height: 4),
-                Text('Utilisez le menu (⋮) pour l\'exporter.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                Text('Utilisez le menu (⋮) pour l\'exporter.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12)),
               ],
             ),
           ),
@@ -471,7 +545,8 @@ class _AclScreenState extends State<AclScreen> {
       debugPrint('Erreur lors de la génération de la politique ACL : $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Échec de la génération de la politique ACL : $e')),
+          SnackBar(
+              content: Text('Échec de la génération de la politique ACL : $e')),
         );
       }
     } finally {
@@ -486,7 +561,9 @@ class _AclScreenState extends State<AclScreen> {
 
       if (aclJsonString.isEmpty || aclJsonString == encoder.convert({})) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Le contenu ACL est vide. Générez d\'abord une politique.')),
+          const SnackBar(
+              content: Text(
+                  'Le contenu ACL est vide. Générez d\'abord une politique.')),
         );
         return;
       }
@@ -495,7 +572,8 @@ class _AclScreenState extends State<AclScreen> {
       final file = File('${directory.path}/acl.json');
       await file.writeAsString(aclJsonString);
 
-      await Share.shareXFiles([XFile(file.path)], text: 'Voici votre politique ACL Headscale.');
+      await Share.shareXFiles([XFile(file.path)],
+          text: 'Voici votre politique ACL Headscale.');
     } catch (e) {
       debugPrint('Erreur lors du partage du fichier ACL : $e');
       if (mounted) {
@@ -504,5 +582,52 @@ class _AclScreenState extends State<AclScreen> {
         );
       }
     }
+  }
+
+  Future<void> _resetAclPolicy() async {
+    final bool confirm = await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirmer la réinitialisation'),
+          content: const Text(
+              'Vous allez remplacer la politique actuelle par une politique qui autorise TOUT le trafic entre TOUS les appareils. Êtes-vous sûr ?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Confirmer', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    ) ?? false;
+
+    if (!confirm || !mounted) return;
+
+    const defaultPolicy = {
+      "acls": [
+        {
+          "action": "accept",
+          "src": ["*"],
+          "dst": ["*:*"]
+        }
+      ]
+    };
+    
+    const JsonEncoder encoder = JsonEncoder.withIndent('  ');
+    _aclController.text = encoder.convert(defaultPolicy);
+    
+    // Also clear temporary rules as they are now irrelevant
+    setState(() {
+      _temporaryRules.clear();
+    });
+    final storage = context.read<AppProvider>().storageService;
+    await storage.saveTemporaryRules(_temporaryRules);
+
+    await _exportAclPolicyToServer(showConfirmation: false, successMessage: 'Politique réinitialisée : tout le trafic est maintenant autorisé.');
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:dart_ping/dart_ping.dart';
 import 'dart:async';
+import 'package:fl_chart/fl_chart.dart';
 
 // Couleurs pour le thème épuré style iOS
 const Color _backgroundColor = Color(0xFFF2F2F7);
@@ -76,19 +77,21 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: _primaryTextColor),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          _buildMainInfoCard(),
-          const SizedBox(height: 16),
-          _buildIpAddressesCard(),
-          const SizedBox(height: 16),
-          _buildIdentifiersCard(),
-          const SizedBox(height: 16),
-          _buildTagsAndRoutesCard(),
-          const SizedBox(height: 16),
-          _buildPingCard(),
-        ],
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            _buildMainInfoCard(),
+            const SizedBox(height: 16),
+            _buildIpAddressesCard(),
+            const SizedBox(height: 16),
+            _buildIdentifiersCard(),
+            const SizedBox(height: 16),
+            _buildTagsAndRoutesCard(),
+            const SizedBox(height: 16),
+            _buildPingCard(),
+          ],
+        ),
       ),
     );
   }
@@ -225,7 +228,9 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       children: [
         Text("Latence moyenne: ${avgLatency.toStringAsFixed(2)} ms", style: const TextStyle(color: _primaryTextColor)),
         Text("Paquets perdus: ${loss.toStringAsFixed(0)}% ($received/$transmitted reçus)", style: const TextStyle(color: _primaryTextColor)),
-        const SizedBox(height: 10),
+        const SizedBox(height: 20),
+        _buildPingChart(),
+        const SizedBox(height: 20),
         const Text("Journal du ping:"),
         Container(
           height: 150,
@@ -250,6 +255,51 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPingChart() {
+    final List<FlSpot> spots = [];
+    final relevantPings = _pingResponses.where((p) => p.response?.time != null).toList();
+    
+    // Limiter le nombre de points affichés pour la lisibilité
+    final start = relevantPings.length > 30 ? relevantPings.length - 30 : 0;
+    for (int i = start; i < relevantPings.length; i++) {
+      final ping = relevantPings[i];
+      spots.add(FlSpot(i.toDouble(), ping.response!.time!.inMilliseconds.toDouble()));
+    }
+
+    if (spots.isEmpty) {
+      return const SizedBox(height: 150, child: Center(child: Text("En attente de données de ping...")));
+    }
+
+    return SizedBox(
+      height: 150,
+      child: LineChart(
+        LineChartData(
+          gridData: FlGridData(show: true, drawVerticalLine: true, getDrawingHorizontalLine: (value) => const FlLine(color: Color(0xff37434d), strokeWidth: 0.1), getDrawingVerticalLine: (value) => const FlLine(color: Color(0xff37434d), strokeWidth: 0.1)),
+          titlesData: const FlTitlesData(
+            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
+            bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          ),
+          borderData: FlBorderData(show: true, border: Border.all(color: const Color(0xff37434d), width: 1)),
+          minX: spots.first.x,
+          maxX: spots.last.x,
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              color: _accentColor,
+              barWidth: 3,
+              isStrokeCapRound: true,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(show: true, color: _accentColor.withOpacity(0.3)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

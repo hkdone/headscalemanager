@@ -30,8 +30,10 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         /// Titre de l'application, affiché dans la barre des tâches ou le sélecteur d'applications.
         title: 'Gestionnaire Headscale',
+
         /// Désactive la bannière "DEBUG" en mode développement.
         debugShowCheckedModeBanner: false,
+
         /// Thème visuel de l'application pour le mode clair.
         ///
         /// Note : `primarySwatch` est déprécié. Pour un theming plus moderne,
@@ -40,7 +42,8 @@ class MyApp extends StatelessWidget {
         theme: ThemeData(
           brightness: Brightness.light,
           primarySwatch: Colors.blue,
-          scaffoldBackgroundColor: Colors.grey[100], // Fond d'écran légèrement gris
+          scaffoldBackgroundColor:
+              Colors.grey[100], // Fond d'écran légèrement gris
           visualDensity: VisualDensity.adaptivePlatformDensity,
           bottomNavigationBarTheme: const BottomNavigationBarThemeData(
             backgroundColor: Colors.white, // Barre de nav blanche
@@ -49,22 +52,27 @@ class MyApp extends StatelessWidget {
             type: BottomNavigationBarType.fixed,
           ),
         ),
+
         /// Thème visuel de l'application pour le mode sombre.
-                darkTheme: ThemeData(
+        darkTheme: ThemeData(
           brightness: Brightness.dark,
           primarySwatch: Colors.blue,
-          scaffoldBackgroundColor: const Color(0xFF121212), // Fond d'écran sombre
+          scaffoldBackgroundColor:
+              const Color(0xFF121212), // Fond d'écran sombre
           visualDensity: VisualDensity.adaptivePlatformDensity,
           bottomNavigationBarTheme: BottomNavigationBarThemeData(
-            backgroundColor: const Color(0xFF212121), // Barre de nav plus claire
+            backgroundColor:
+                const Color(0xFF212121), // Barre de nav plus claire
             selectedItemColor: Colors.blue[300],
             unselectedItemColor: Colors.grey,
             type: BottomNavigationBarType.fixed,
           ),
         ),
+
         /// Définit le mode de thème à utiliser (système, clair ou sombre).
         /// `ThemeMode.system` respecte les préférences de thème du système d'exploitation.
         themeMode: ThemeMode.system,
+
         /// Le premier écran affiché au lancement de l'application.
         home: const SplashScreen(),
       ),
