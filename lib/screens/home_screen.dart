@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/screens/acl_screen.dart';
 import 'package:headscalemanager/screens/dashboard_screen.dart';
+import 'package:headscalemanager/screens/network_overview_screen.dart';
 import 'package:headscalemanager/screens/settings_screen.dart';
 import 'package:headscalemanager/screens/users_screen.dart';
 import 'package:eva_icons_flutter/eva_icons_flutter.dart';
@@ -27,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
     DashboardScreen(),
     UsersScreen(),
     AclScreen(),
+    NetworkOverviewScreen(),
   ];
 
   /// Gère le changement d'élément sélectionné dans la barre de navigation.
@@ -82,6 +84,11 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(EvaIcons.shield),
             label: 'ACLs',
+          ),
+          // Élément pour la vue d'ensemble du réseau.
+          BottomNavigationBarItem(
+            icon: Icon(EvaIcons.globe2Outline),
+            label: 'Réseau',
           ),
         ],
         currentIndex: _selectedIndex, // Index de l'élément actuellement actif.

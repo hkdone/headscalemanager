@@ -324,6 +324,21 @@ routes:
                   '- **Menu (⋮) > Partager en fichier :** Exporte le contenu du champ de texte dans un fichier `acl.json`.',
                   isSmall: true,
                 ),
+                const SizedBox(height: 16),
+                _buildSubTitle('3.4. Vue d\'ensemble du réseau'),
+                const SizedBox(height: 8),
+                _buildBodyText('Cet écran, accessible depuis la barre de navigation, offre une vue dynamique et en temps réel de votre topologie réseau du point de vue de l\'appareil actuel. Il est particulièrement utile pour diagnostiquer les connexions et vérifier quel `exit node` est utilisé.'),
+                const SizedBox(height: 8),
+                _buildBodyText('**Fonctionnalités principales :**', isBold: true),
+                const SizedBox(height: 4),
+                _buildBodyText(
+                  '- **Sélecteur de Nœud Actuel :** En haut de la page, un menu déroulant vous permet de sélectionner l\'appareil que vous considérez comme votre point de départ.\n'
+                  '- **Visualisation du Chemin :** Un graphique simple montre le chemin réseau depuis votre appareil sélectionné vers Internet. Si le trafic passe par un `exit node` de votre réseau Headscale, celui-ci sera affiché comme intermédiaire.\n'
+                  '- **Détection d\'Exit Node :** La page effectue un `traceroute` vers une destination publique (Google DNS) pour cartographier les sauts. Si l\'un des sauts correspond à l\'adresse IP d\'un de vos nœuds, ce dernier est identifié comme l\'exit node en cours d\'utilisation.\n'
+                  '- **Statut des Pings :** Une liste de tous les autres nœuds de votre réseau s\'affiche avec leur statut (en ligne/hors ligne) et la latence moyenne.\n'
+                  '- **Détails du Traceroute :** Une section dépliable vous montre le résultat brut du `traceroute`, listant chaque saut (adresse IP) entre votre appareil et la destination finale.',
+                  isSmall: true,
+                ),
               ]),
               const SizedBox(height: 24),
 

@@ -262,7 +262,19 @@ Cet écran affiche toutes les informations détaillées d'un nœud spécifique, 
   - **Supprimer l'appareil :** Supprime le nœud du serveur Headscale après confirmation.
 
 
- ### 3.6. Clés de Pré-authentification
+### 3.6. Vue d'ensemble du réseau
+
+Cet écran, accessible depuis la barre de navigation, offre une vue dynamique et en temps réel de votre topologie réseau du point de vue de l'appareil actuel. Il est particulièrement utile pour diagnostiquer les connexions et vérifier quel `exit node` est utilisé.
+
+**Fonctionnalités principales :**
+- **Sélecteur de Nœud Actuel :** En haut de la page, un menu déroulant vous permet de sélectionner l'appareil que vous considérez comme votre point de départ.
+- **Visualisation du Chemin :** Un graphique simple montre le chemin réseau depuis votre appareil vers Internet. Si le trafic passe par un `exit node` de votre réseau Headscale, celui-ci sera affiché comme intermédiaire.
+- **Détection d'Exit Node :** La page effectue un `traceroute` vers une destination publique (Google DNS) pour cartographier les sauts. Si l'un des sauts correspond à l'adresse IP d'un de vos nœuds, ce dernier est identifié comme l'exit node en cours d'utilisation.
+- **Statut des Pings :** Une liste de tous les autres nœuds de votre réseau s'affiche avec leur statut (en ligne/hors ligne) et la latence moyenne, vous donnant un aperçu rapide de la connectivité globale.
+- **Détails du Traceroute :** Une section dépliable vous montre le résultat brut du `traceroute`, listant chaque saut (adresse IP) entre votre appareil et la destination finale.
+
+
+ ### 3.7. Clés de Pré-authentification
 
  Cet écran (accessible via le bouton `vpn_key` sur l'écran Utilisateurs) vous permet de visualiser, créer et expirer des clés de pré-authentification. Ces clés sont utilisées pour enregistrer
 de nouveaux appareils sans intervention manuelle sur le serveur.
@@ -283,7 +295,16 @@ Cet écran vous permet de configurer l'application pour qu'elle se connecte à v
 
 Pour toute question ou problème, veuillez consulter la documentation officielle de Headscale ou les ressources de la communauté.
 
-### 3.8. Gestion des clés API
+### 3.8. Paramètres
+
+Cet écran vous permet de configurer l'application pour qu'elle se connecte à votre serveur Headscale.
+
+**Champs et Fonctionnalités :**
+- **URL du Serveur :** Entrez l'adresse publique (FQDN) de votre serveur Headscale (ex: `https://headscale.mondomaine.com`).
+- **Clé API :** Collez la clé API unique que vous avez générée depuis votre serveur Headscale. Ce champ est masqué pour des raisons de sécurité.
+- **Bouton Enregistrer :** Sauvegarde les identifiants saisis. L'application redémarrera pour appliquer les nouveaux paramètres.
+
+### 3.9. Gestion des clés API
 
 Cet écran (accessible via le bouton `api` sur l'écran du tableau de bord) vous permet de visualiser, créer, et supprimer des clés d'API. Ces clés sont utilisées pour authentifier les requêtes à l'API de Headscale.
 
