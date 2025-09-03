@@ -1,17 +1,12 @@
 import 'package:flutter/material.dart';
-// For Clipboard
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
+import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:provider/provider.dart';
-// For debugPrint
 
-/// Dialogue pour créer une nouvelle clé de pré-authentification.
-///
-/// Permet de sélectionner un utilisateur, de définir les propriétés de la clé
-/// (réutilisable, éphémère, expiration).
+/// Dialogue pour créer une nouvelle clé de pré-authentification avec gestion des tags ACL.
 class CreatePreAuthKeyDialog extends StatefulWidget {
-  /// Future qui contiendra la liste des utilisateurs.
   final Future<List<User>> usersFuture;
 
   const CreatePreAuthKeyDialog({super.key, required this.usersFuture});
@@ -24,6 +19,8 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
   User? _selectedUser;
   bool _isReusable = false;
   bool _isEphemeral = false;
+  bool _isExitNode = false;
+  bool _isLanSharer = false;
   final TextEditingController _expirationController = TextEditingController();
 
   @override
@@ -102,6 +99,28 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
               ),
               keyboardType: TextInputType.number,
             ),
+            const SizedBox(height: 16),
+            const Text('Tags ACL (Nouveau)', style: TextStyle(fontWeight: FontWeight.bold)),
+            CheckboxListTile(
+              title: const Text('Exit Node'),
+              subtitle: const Text('Autoriser ce nœud à être une sortie internet.'),
+              value: _isExitNode,
+              onChanged: (value) {
+                setState(() {
+                  _isExitNode = value!;
+                });
+              },
+            ),
+            CheckboxListTile(
+              title: const Text('LAN Sharer'),
+              subtitle: const Text('Autoriser ce nœud à partager son réseau local.'),
+              value: _isLanSharer,
+              onChanged: (value) {
+                setState(() {
+                  _isLanSharer = value!;
+                });
+              },
+            ),
           ],
         ),
       ),
@@ -126,12 +145,26 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
               }
               final expiration = DateTime.now().add(Duration(days: expirationDays));
 
+              // Construction des tags ACL
+              final List<String> aclTags = [];
+              if (_selectedUser != null) {
+                String baseTag = 'tag:${normalizeUserName(_selectedUser!.name)}-client';
+                if (_isExitNode) {
+                  baseTag += ';exit-node';
+                }
+                if (_isLanSharer) {
+                  baseTag += ';lan-sharer';
+                }
+                aclTags.add(baseTag);
+              }
+
               try {
                 final key = await provider.apiService.createPreAuthKey(
                   _selectedUser!.id,
                   _isReusable,
                   _isEphemeral,
                   expiration: expiration,
+                  aclTags: aclTags,
                 );
                 Navigator.of(context).pop(key); // Return the created key
               } catch (e) {

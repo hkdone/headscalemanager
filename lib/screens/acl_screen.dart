@@ -6,7 +6,7 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:headscalemanager/services/acl_generator_service.dart';
+import 'package:headscalemanager/services/advanced_acl_generator_service.dart';
 
 // Couleurs pour le thème épuré style iOS
 const Color _backgroundColor = Color(0xFFF2F2F7);
@@ -24,11 +24,13 @@ class _AclScreenState extends State<AclScreen> {
   final TextEditingController _aclController = TextEditingController();
   bool _isLoading = true;
   Map<String, dynamic> _currentAclPolicy = {};
-  final AclGeneratorService _aclGeneratorService = AclGeneratorService();
+  final AdvancedAclGeneratorService _advancedAclGeneratorService =
+      AdvancedAclGeneratorService();
 
   List<Node> _allNodes = [];
-  Node? _selectedSourceNode;
-  Node? _selectedDestinationNode;
+  List<String> _allTags = [];
+  String? _selectedSourceTag;
+  String? _selectedDestinationTag;
   final List<Map<String, String>> _temporaryRules = [];
 
   @override
@@ -45,7 +47,7 @@ class _AclScreenState extends State<AclScreen> {
     setState(() {
       _temporaryRules.addAll(loadedRules);
     });
-    await _generateAclPolicy(showSnackbar: false);
+    await _generateAdvancedAclPolicy(showSnackbar: false);
     setState(() => _isLoading = false);
   }
 
@@ -53,6 +55,11 @@ class _AclScreenState extends State<AclScreen> {
     try {
       final apiService = context.read<AppProvider>().apiService;
       _allNodes = await apiService.getNodes();
+      final Set<String> tags = {};
+      for (var node in _allNodes) {
+        tags.addAll(node.tags);
+      }
+      _allTags = tags.toList()..sort();
     } catch (e) {
       debugPrint('Error fetching nodes: $e');
       if (mounted) {
@@ -107,10 +114,11 @@ class _AclScreenState extends State<AclScreen> {
               ),
             ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _generateAclPolicy(showSnackbar: true),
-        label: const Text('Générer la politique'),
+        onPressed: () => _generateAdvancedAclPolicy(showSnackbar: true),
+        label: const Text('Générer la Politique'),
         icon: const Icon(Icons.settings_backup_restore),
         backgroundColor: _accentColor,
+        heroTag: 'generate_policy_fab',
       ),
     );
   }
@@ -164,13 +172,6 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Widget _buildTemporaryRulesSection() {
-    final sourceUser = _selectedSourceNode?.user;
-    List<Node> destinationNodes = _allNodes;
-    if (sourceUser != null) {
-      destinationNodes =
-          _allNodes.where((node) => node.user != sourceUser).toList();
-    }
-
     return Card(
       elevation: 0,
       color: Colors.white,
@@ -194,30 +195,24 @@ class _AclScreenState extends State<AclScreen> {
             Row(
               children: [
                 Expanded(
-                  child: _buildNodeDropdown(
-                    'Source',
-                    _selectedSourceNode,
-                    _allNodes,
-                    (node) {
+                  child: _buildTagDropdown(
+                    'Source (Tag)',
+                    _selectedSourceTag,
+                    _allTags,
+                    (tag) {
                       setState(() {
-                        _selectedSourceNode = node;
-                        // Si le nouveau nœud source a le même utilisateur que la destination, réinitialiser la destination.
-                        if (node != null &&
-                            _selectedDestinationNode != null &&
-                            node.user == _selectedDestinationNode!.user) {
-                          _selectedDestinationNode = null;
-                        }
+                        _selectedSourceTag = tag;
                       });
                     },
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _buildNodeDropdown(
-                    'Destination',
-                    _selectedDestinationNode,
-                    destinationNodes,
-                    (node) => setState(() => _selectedDestinationNode = node),
+                  child: _buildTagDropdown(
+                    'Destination (Tag)',
+                    _selectedDestinationTag,
+                    _allTags, // Using _allTags for destination as well for simplicity
+                    (tag) => setState(() => _selectedDestinationTag = tag),
                   ),
                 ),
               ],
@@ -272,15 +267,15 @@ class _AclScreenState extends State<AclScreen> {
     );
   }
 
-  DropdownButtonFormField<Node> _buildNodeDropdown(String label,
-      Node? selectedNode, List<Node> nodes, ValueChanged<Node?> onChanged) {
-    return DropdownButtonFormField<Node>(
-      value: selectedNode,
-      decoration: _buildInputDecoration(label, 'Choisir un nœud'),
-      items: nodes.map((Node node) {
-        return DropdownMenuItem<Node>(
-          value: node,
-          child: Text(node.name, overflow: TextOverflow.ellipsis),
+  DropdownButtonFormField<String> _buildTagDropdown(String label,
+      String? selectedTag, List<String> tags, ValueChanged<String?> onChanged) {
+    return DropdownButtonFormField<String>(
+      value: selectedTag,
+      decoration: _buildInputDecoration(label, 'Choisir un tag'),
+      items: tags.map((String tag) {
+        return DropdownMenuItem<String>(
+          value: tag,
+          child: Text(tag, overflow: TextOverflow.ellipsis),
         );
       }).toList(),
       onChanged: onChanged,
@@ -302,35 +297,22 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Future<void> _addTemporaryRule() async {
-    if (_temporaryRules.isNotEmpty) {
+    if (_selectedSourceTag == null || _selectedDestinationTag == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text(
-              'Vous ne pouvez ajouter qu\'une seule autorisation à la fois.')));
+              'Veuillez sélectionner un tag source et un tag destination.')));
       return;
     }
-
-    if (_selectedSourceNode == null || _selectedDestinationNode == null) {
+    if (_selectedSourceTag == _selectedDestinationTag) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text(
-              'Veuillez sélectionner un nœud source et un nœud destination.')));
-      return;
-    }
-    if (_selectedSourceNode!.id == _selectedDestinationNode!.id) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              'La source et la destination ne peuvent pas être identiques.')));
-      return;
-    }
-    if (_selectedSourceNode!.tags.isEmpty ||
-        _selectedDestinationNode!.tags.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Les deux nœuds doivent avoir au moins un tag.')));
+              'Le tag source et le tag destination ne peuvent pas être identiques.')));
       return;
     }
 
     final newRule = {
-      'src': _selectedSourceNode!.tags.first,
-      'dst': _selectedDestinationNode!.tags.first,
+      'src': _selectedSourceTag!,
+      'dst': _selectedDestinationTag!,
     };
 
     bool ruleExists = _temporaryRules.any((rule) =>
@@ -351,6 +333,56 @@ class _AclScreenState extends State<AclScreen> {
     await storage.saveTemporaryRules(_temporaryRules);
     await _generateAndExportPolicy(
         message: 'Règle ajoutée et politique appliquée avec succès.');
+  }
+
+  Future<void> _generateAdvancedAclPolicy({bool showSnackbar = true}) async {
+    setState(() => _isLoading = true);
+    try {
+      final appProvider = context.read<AppProvider>();
+      final apiService = appProvider.apiService;
+
+      final users = await apiService.getUsers();
+      final nodes =
+          _allNodes.isNotEmpty ? _allNodes : await apiService.getNodes();
+      if (_allNodes.isEmpty) _allNodes = nodes;
+
+      _currentAclPolicy = _advancedAclGeneratorService.generatePolicy(
+        users: users,
+        nodes: nodes,
+        temporaryRules: _temporaryRules,
+      );
+
+      _updateAclControllerText();
+
+      if (showSnackbar && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Politique ACL avancée générée dans le champ de texte.'),
+                SizedBox(height: 4),
+                Text('Utilisez le menu (⋮) pour l\'exporter.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint(
+          'Erreur lors de la génération de la politique ACL avancée : $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'Échec de la génération de la politique ACL avancée : $e')),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _removeTemporaryRule(int index) async {
@@ -418,7 +450,7 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Future<void> _generateAndExportPolicy({String? message}) async {
-    await _generateAclPolicy(showSnackbar: false);
+    await _generateAdvancedAclPolicy(showSnackbar: false);
     await _exportAclPolicyToServer(
         showConfirmation: false, successMessage: message);
   }
@@ -506,53 +538,6 @@ class _AclScreenState extends State<AclScreen> {
     }
   }
 
-  Future<void> _generateAclPolicy({bool showSnackbar = true}) async {
-    setState(() => _isLoading = true);
-    try {
-      final appProvider = context.read<AppProvider>();
-      final apiService = appProvider.apiService;
-
-      final users = await apiService.getUsers();
-      final nodes =
-          _allNodes.isNotEmpty ? _allNodes : await apiService.getNodes();
-      if (_allNodes.isEmpty) _allNodes = nodes;
-
-      _currentAclPolicy = _aclGeneratorService.generateAclPolicy(
-        users: users,
-        nodes: nodes,
-        temporaryRules: _temporaryRules,
-      );
-
-      _updateAclControllerText();
-
-      if (showSnackbar && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Politique ACL générée dans le champ de texte.'),
-                SizedBox(height: 4),
-                Text('Utilisez le menu (⋮) pour l\'exporter.',
-                    style: TextStyle(color: Colors.white70, fontSize: 12)),
-              ],
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Erreur lors de la génération de la politique ACL : $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Échec de la génération de la politique ACL : $e')),
-        );
-      }
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
 
   Future<void> _shareAclFile() async {
     try {

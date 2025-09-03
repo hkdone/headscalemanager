@@ -211,32 +211,34 @@ Gérez les utilisateurs de votre serveur Headscale. Vous pouvez voir la liste de
 
 ### 3.3. ACLs (Access Control Lists)
 
-Cette section vous permet de générer et de gérer la politique de contrôle d'accès de votre réseau. Elle définit qui a le droit de communiquer avec qui.
+Cette section vous permet de générer et de gérer la politique de contrôle d'accès de votre réseau.
 
-> **Note Importante :** L'ajout d'un ou plusieurs utilisateurs nécessite un redémarrage du serveur Headscale après avoir mis en place les tags et les ACLs correctement pour que cela fonctionne. Par la suite, la modification des ACLs sur un utilisateur existant se fait sans avoir besoin de redémarrer.
+> **Note Importante :** L'ajout d'un ou plusieurs utilisateurs peut nécessiter une mise à jour de la politique ACL pour que leurs appareils fonctionnent correctement.
 
-**Principe de base : l'Isolation**
+**Principe de base : Isolation Stricte par Utilisateur**
 
-Le générateur de politique de cette application est basé sur un principe de sécurité fondamental : **chaque utilisateur est isolé dans sa propre "bulle"**. Par défaut, un utilisateur ne peut communiquer qu'avec les appareils qui lui appartiennent. Jean ne peut pas voir ou contacter les appareils de Clarisse, et vice-versa.
-
-**Fonctionnalités Automatiques**
-
-Lorsque vous générez une politique, le système accorde automatiquement à chaque utilisateur l'accès à ses propres ressources avancées :
-- **Routes de sous-réseau :** Si un appareil de Jean partage un sous-réseau (ex: `192.168.1.0/24`), seuls les autres appareils de Jean pourront y accéder.
-- **Exit Nodes :** Si Jean possède un appareil configuré en "exit node", seuls les appareils de Jean pourront l'utiliser pour sortir sur internet.
-
-**Attention sur les Exit Nodes :**
-> Si plusieurs utilisateurs différents possèdent un "exit node" (par exemple, Jean a un exit node à Paris et Clarisse en a un à Lyon), la configuration actuelle des ACLs a une limitation importante : **tout utilisateur ayant la permission d'utiliser un exit node pourra voir et sélectionner n'importe lequel des exit nodes disponibles sur le réseau**. Il n'est pas possible de restreindre un utilisateur à un exit node spécifique. La gestion de "quel client utilise quel exit node" doit donc se faire manuellement sur l'appareil client.
+Le générateur de politique de cette application est basé sur un principe de sécurité fondamental : **chaque utilisateur est isolé dans sa propre "bulle"**. Par défaut :
+- Les appareils d'un utilisateur ne peuvent communiquer qu'avec les autres appareils de ce même utilisateur.
+- Si un utilisateur possède un **exit node**, seuls ses propres appareils peuvent l'utiliser.
+- Si un utilisateur partage un **sous-réseau local**, seuls ses propres appareils peuvent y accéder.
+- Jean ne peut pas voir ou contacter les appareils, exit nodes ou sous-réseaux de Clarisse, et vice-versa.
 
 **Workflow d'utilisation de la page ACL :**
 
-1.  **Générer la politique de base :** Appuyez sur le bouton **Générer** (icône de restauration). L'application va analyser tous vos utilisateurs et appareils et créer une politique ACL sécurisée basée sur les principes décrits ci-dessus.
-2.  **Contrôler (Optionnel) :** La politique générée s'affiche dans le champ de texte. Vous pouvez l'inspecter pour comprendre les règles qui seront appliquées.
-3.  **Exporter vers le serveur :** Une fois satisfait, appuyez sur le bouton **Exporter** (nuage avec flèche vers le haut) pour envoyer la politique à votre serveur Headscale. Les nouvelles règles seront appliquées sur votre réseau après un court délai.
+La page ACL a deux fonctions principales :
 
-**Autorisations Temporaires**
+1.  **Générer la politique de base sécurisée :**
+    - Appuyez sur le bouton **Générer la Politique**.
+    - L'application va analyser tous vos utilisateurs et appareils et créer une politique ACL sécurisée basée sur le principe d'isolation décrit ci-dessus.
+    - La politique générée s'affiche dans le champ de texte pour inspection.
+    - Utilisez le menu (⋮) et sélectionnez **Exporter vers le serveur** pour appliquer les règles.
 
-Si vous avez besoin de créer une exception temporaire (par exemple, autoriser l'ordinateur de Jean à communiquer avec le serveur de Clarisse), vous pouvez utiliser la section "Autorisations Temporaires" **avant** de cliquer sur "Générer". Ces règles seront ajoutées en priorité au début du fichier ACL, passant outre les règles d'isolation de base.
+2.  **Créer des exceptions pour la maintenance :**
+    - Si vous avez besoin d'autoriser temporairement un appareil de Jean à communiquer avec un appareil de Clarisse, utilisez la section **Autorisations Spécifiques**.
+    - Sélectionnez un tag `Source` et un tag `Destination`.
+    - Cliquez sur **Ajouter et Appliquer**.
+    - La politique sera **automatiquement mise à jour et appliquée** sur le serveur pour autoriser cette communication spécifique.
+    - Pour retirer l'autorisation, cliquez simplement sur la croix (x) de la règle active.
 
 ### 3.4. Détails Utilisateur
 

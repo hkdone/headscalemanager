@@ -56,7 +56,8 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
               return null; // Empty is valid (clears tags)
             }
             final rawTags = value.split(',').map((t) => t.trim()).toList();
-            final RegExp validTagPattern = RegExp(r'^[a-z]+$'); // Validation des tags Headscale
+            // Updated regex to allow lowercase letters, numbers, hyphens, and semicolons, to support tags like 'user-1-client;exit-node'
+            final RegExp validTagPattern = RegExp(r'^[a-z0-9-;]+$');
 
             List<String> invalidTagsExamples = [];
             bool allTagsValid = true;
@@ -73,7 +74,7 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
             }
 
             if (!allTagsValid) {
-              return 'Tags invalides : ${invalidTagsExamples.join(", ")}. Uniquement lettres minuscules, sans chiffres, espaces ou caractères spéciaux.';
+              return 'Tags invalides : ${invalidTagsExamples.join(", ")}. Caractères autorisés : lettres minuscules, chiffres, tirets (-) et points-virgules (;).';
             }
             return null;
           },

@@ -289,39 +289,47 @@ routes:
                 const SizedBox(height: 16),
                 _buildSubTitle('3.3. ACLs (Access Control Lists)'),
                 const SizedBox(height: 8),
-                _buildBodyText('Cette section vous permet de gérer finement qui peut communiquer avec qui. Le nouveau système est plus simple et plus sécurisé : par défaut, tout est isolé. Vous ne créez que des exceptions.'),
+                _buildBodyText('Cette section vous permet de générer et de gérer la politique de contrôle d\'accès de votre réseau.'),
                 const SizedBox(height: 16),
                 _buildBodyText(
-                  '**Note Importante :** L\'ajout d\'un ou plusieurs utilisateurs nécessite un redémarrage du serveur Headscale après avoir mis en place les tags et les ACLs correctement pour que cela fonctionne. Par la suite, la modification des ACLs sur un utilisateur existant se fait sans avoir besoin de redémarrer.',
+                  '**Note Importante :** L\'ajout d\'un ou plusieurs utilisateurs peut nécessiter une mise à jour de la politique ACL pour que leurs appareils fonctionnent correctement.',
                   isBold: true,
                 ),
                 const SizedBox(height: 8),
-                _buildBodyText('**Philosophie : Isolation Stricte + Exceptions Uniques**', isBold: true),
+                _buildBodyText('**Principe de base : Isolation Stricte par Utilisateur**', isBold: true),
                 const SizedBox(height: 4),
                 _buildBodyText(
-                  'Le système génère une politique de base où chaque utilisateur est dans son propre "groupe". Les appareils d\'un utilisateur ne peuvent communiquer qu\'entre eux.\n'
-                  'Pour autoriser une communication entre deux appareils (s\'ils appartiennent à deux groupes d\'utilisateurs différents), vous devez créer une **autorisation temporaire unique**.',
+                  'Le générateur de politique de cette application est basé sur un principe de sécurité fondamental : **chaque utilisateur est isolé dans sa propre "bulle"**. Par défaut :\n'
+                  '- Les appareils d\'un utilisateur ne peuvent communiquer qu\'avec les autres appareils de ce même utilisateur.\n'
+                  '- Si un utilisateur possède un **exit node**, seuls ses propres appareils peuvent l\'utiliser.\n'
+                  '- Si un utilisateur partage un **sous-réseau local**, seuls ses propres appareils peuvent y accéder.\n'
+                  '- Jean ne peut pas voir ou contacter les appareils, exit nodes ou sous-réseaux de Clarisse, et vice-versa.',
                   isSmall: true,
                 ),
                 const SizedBox(height: 16),
-                _buildBodyText('**Workflow pour autoriser une communication :**', isBold: true),
+                _buildBodyText('**Workflow d\'utilisation de la page ACL :**', isBold: true),
                 const SizedBox(height: 4),
                 _buildBodyText(
-                  '1.  **Prérequis :** Assurez-vous que le nœud source et le nœud destination possèdent chacun au moins un **tag**. L\'autorisation se basera sur le premier tag de chaque nœud.\n'
-                  '2.  **Sélectionnez les Nœuds :** Utilisez les menus déroulants pour choisir un nœud **Source** et un nœud **Destination**.\n' 
-                  '3.  **Appliquez la Règle :** Cliquez sur le bouton **"Ajouter et Appliquer"**.\n' 
-                  '4.  **C\'est tout !** La nouvelle politique ACL est **automatiquement générée et appliquée** à votre serveur Headscale. La communication est maintenant autorisée.\n'
-                  '5.  **Suppression :** Pour retirer l\'autorisation, cliquez sur l\'icône de poubelle sur la règle active. La politique sera également mise à jour automatiquement sur le serveur.',
+                  'La page ACL a deux fonctions principales :',
                   isSmall: true,
                 ),
-                const SizedBox(height: 16),
-                _buildBodyText('**Actions Manuelles et Avancées :**', isBold: true),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 _buildBodyText(
-                  '- **Générer la politique (bouton flottant) :** Génére la politique adéquat (en prenant en compte vos utilisateurs et nodes) dans le champ de texte pour inspection, sans l\'appliquer.\n'
-                  '- **Menu (⋮) > Exporter vers le serveur :** Applique manuellement le contenu du champ de texte au serveur. Utile pour des modifications avancées.\n' 
-                  '- **Menu (⋮) > Récupérer du serveur :** Charge la politique actuellement active sur le serveur dans le champ de texte.\n' 
-                  '- **Menu (⋮) > Partager en fichier :** Exporte le contenu du champ de texte dans un fichier `acl.json`.',
+                  '**1. Générer la politique de base sécurisée :**\n'
+                  '- Appuyez sur le bouton **Générer la Politique**.\n'
+                  '- L\'application va analyser tous vos utilisateurs et appareils et créer une politique ACL sécurisée.\n'
+                  '- La politique générée s\'affiche dans le champ de texte pour inspection.\n'
+                  '- Utilisez le menu (⋮) et sélectionnez **Exporter vers le serveur** pour appliquer les règles.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 8),
+                _buildBodyText(
+                  '**2. Créer des exceptions pour la maintenance :**\n'
+                  '- Si vous avez besoin d\'autoriser temporairement un appareil de Jean à communiquer avec un appareil de Clarisse, utilisez la section **Autorisations Spécifiques**.\n'
+                  '- Sélectionnez un tag `Source` et un tag `Destination`.\n'
+                  '- Cliquez sur **Ajouter et Appliquer**.\n'
+                  '- La politique sera **automatiquement mise à jour et appliquée** sur le serveur.\n'
+                  '- Pour retirer l\'autorisation, cliquez simplement sur la croix (x) de la règle active.',
                   isSmall: true,
                 ),
                 const SizedBox(height: 16),

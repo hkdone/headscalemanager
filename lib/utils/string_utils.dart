@@ -29,3 +29,10 @@ extension StringUtils on String {
     }
   }
 }
+
+/// Normalise un nom d'utilisateur en supprimant le domaine de l'e-mail et en le mettant en minuscule.
+///
+/// Par exemple: 'User@example.com' -> 'user'
+String normalizeUserName(String userName) {
+  return userName.split('@').first.toLowerCase();
+}

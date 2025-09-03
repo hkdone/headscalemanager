@@ -167,8 +167,8 @@ class HeadscaleApiService {
   }
 
   /// Crée une clé de pré-authentification pour un utilisateur.
-  /// Permet de spécifier si la clé est réutilisable, éphémère et sa date d'expiration.
-  Future<PreAuthKey> createPreAuthKey(String userId, bool reusable, bool ephemeral, {DateTime? expiration}) async {
+  /// Permet de spécifier si la clé est réutilisable, éphémère, sa date d'expiration et les tags ACL.
+  Future<PreAuthKey> createPreAuthKey(String userId, bool reusable, bool ephemeral, {DateTime? expiration, List<String>? aclTags}) async {
     // Récupère l'URL de base du serveur.
     final baseUrl = await _getBaseUrl();
     // Construit le corps de la requête avec les paramètres de la clé.
@@ -181,6 +181,11 @@ class HeadscaleApiService {
     // Ajoute la date d'expiration si elle est fournie, formatée en ISO 8601 UTC.
     if (expiration != null) {
       body['expiration'] = expiration.toUtc().toIso8601String();
+    }
+
+    // Ajoute les tags ACL s'ils sont fournis.
+    if (aclTags != null && aclTags.isNotEmpty) {
+      body['aclTags'] = aclTags;
     }
 
     // Effectue la requête POST pour créer la clé de pré-authentification.

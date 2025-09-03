@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
+import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:provider/provider.dart';
 
 /// Affiche un dialogue pour guider l'utilisateur dans l'enregistrement d'un appareil
@@ -179,11 +181,11 @@ Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user)
                     ? null
                     : () async {
                         try {
-                          await context.read<AppProvider>().apiService.registerMachine(key, user.name);
-                          Navigator.of(dialogContext).pop();
+                          final newNode = await context.read<AppProvider>().apiService.registerMachine(key, user.name);
+                          Navigator.of(dialogContext).pop(); // Close registration dialog
                           showSafeSnackBar(context, 'Appareil enregistré avec succès.');
-                          // Show the informational dialog about ACL tags
-                          _showAclTagInfoDialog(context);
+                          // Show the new dialog to add ACL tags
+                          _showAddTagsDialog(context, newNode);
                         } catch (e) {
                           showSafeSnackBar(context, 'Erreur lors de l\'enregistrement: $e');
                         }
@@ -197,22 +199,76 @@ Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user)
   );
 }
 
-/// Affiche un dialogue d'information sur l'importance des tags pour les ACLs.
-Future<void> _showAclTagInfoDialog(BuildContext context) async {
+/// Affiche un dialogue pour ajouter des tags ACL à un nœud nouvellement enregistré.
+Future<void> _showAddTagsDialog(BuildContext context, Node node) async {
+  bool isExitNode = false;
+  bool isLanSharer = false;
+
   return showDialog(
     context: context,
+    barrierDismissible: false, // User must make a choice
     builder: (dialogContext) {
-      return AlertDialog(
-        title: const Text('Information sur les Tags ACL'),
-        content: const Text(
-          'N\'oubliez pas d\'ajouter un tag à ce nouveau nœud. Si vous utilisez les ACLs, les tags sont essentiels pour définir les permissions d\'accès.'
-        ),
-        actions: [
-          TextButton(
-            child: const Text('Compris'),
-            onPressed: () => Navigator.of(dialogContext).pop(),
-          ),
-        ],
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Étape 3 : Ajouter des Tags ACL'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Configurez les capacités de "${node.name}".'),
+                const SizedBox(height: 16),
+                CheckboxListTile(
+                  title: const Text('Exit Node'),
+                  subtitle: const Text('Autoriser ce nœud à être une sortie internet.'),
+                  value: isExitNode,
+                  onChanged: (value) {
+                    setState(() {
+                      isExitNode = value!;
+                    });
+                  },
+                ),
+                CheckboxListTile(
+                  title: const Text('LAN Sharer'),
+                  subtitle: const Text('Autoriser ce nœud à partager son réseau local.'),
+                  value: isLanSharer,
+                  onChanged: (value) {
+                    setState(() {
+                      isLanSharer = value!;
+                    });
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                child: const Text('Ignorer'),
+                onPressed: () => Navigator.of(dialogContext).pop(),
+              ),
+              ElevatedButton(
+                child: const Text('Appliquer les Tags'),
+                onPressed: () async {
+                  final provider = context.read<AppProvider>();
+                  String baseTag = 'tag:${normalizeUserName(node.user)}-client';
+                  if (isExitNode) {
+                    baseTag += ';exit-node';
+                  }
+                  if (isLanSharer) {
+                    baseTag += ';lan-sharer';
+                  }
+
+                  try {
+                    await provider.apiService.setTags(node.id, [baseTag]);
+                    Navigator.of(dialogContext).pop();
+                    showSafeSnackBar(context, 'Tags appliqués avec succès.');
+                  } catch (e) {
+                    showSafeSnackBar(context, 'Erreur lors de l\'application des tags: $e');
+                  }
+                },
+              ),
+            ],
+          );
+        },
       );
     },
   );
