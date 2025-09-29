@@ -15,11 +15,6 @@ import 'package:headscalemanager/widgets/exit_node_command_dialog.dart';
 import 'package:headscalemanager/widgets/share_subnet_dialog.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 
-// Couleurs pour le thème épuré style iOS
-const Color _backgroundColor = Color(0xFFF2F2F7);
-const Color _primaryTextColor = Colors.black87;
-const Color _secondaryTextColor = Colors.black54;
-
 /// Écran affichant les détails d'un utilisateur spécifique et ses nœuds associés.
 class UserDetailScreen extends StatefulWidget {
   final User user;
@@ -45,57 +40,61 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(widget.user.name, style: const TextStyle(color: _primaryTextColor)),
-        backgroundColor: _backgroundColor,
+        title: Text(widget.user.name, style: theme.appBarTheme.titleTextStyle),
+        backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: _primaryTextColor),
+        iconTheme: theme.appBarTheme.iconTheme,
       ),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildUserInfoCard(),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-              child: Text('Appareils', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _primaryTextColor)),
+            _buildUserInfoCard(context),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              child: Text('Appareils', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
             ),
-            Expanded(child: _buildNodesGrid()),
+            Expanded(child: _buildNodesGrid(context)),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showTailscaleUpCommandDialog(context, widget.user),
-        label: const Text('Nouvel Appareil'),
-        icon: const Icon(Icons.add_to_queue_sharp),
-        backgroundColor: Colors.blue,
+        label: Text('Nouvel Appareil', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+        icon: Icon(Icons.add_to_queue_sharp, color: theme.colorScheme.onPrimary),
+        backgroundColor: theme.colorScheme.primary,
       ),
     );
   }
 
-  Widget _buildUserInfoCard() {
+  Widget _buildUserInfoCard(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('ID: ${widget.user.id}', style: const TextStyle(color: _secondaryTextColor, fontSize: 14)),
+          Text('ID: ${widget.user.id}', style: theme.textTheme.bodySmall),
           const SizedBox(height: 8),
-          Text('Créé le: ${widget.user.createdAt?.toLocal() ?? 'N/A'}', style: const TextStyle(color: _secondaryTextColor, fontSize: 14)),
+          Text('Créé le: ${widget.user.createdAt?.toLocal() ?? 'N/A'}', style: theme.textTheme.bodySmall),
         ],
       ),
     );
   }
 
-  Widget _buildNodesGrid() {
+  Widget _buildNodesGrid(BuildContext context) {
+    final theme = Theme.of(context);
     return ValueListenableBuilder<Future<List<Node>>>(
       valueListenable: _nodesFutureNotifier,
       builder: (context, nodesFuture, child) {
@@ -103,20 +102,20 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           future: nodesFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
             }
             if (snapshot.hasError) {
               debugPrint('Erreur lors du chargement des nœuds : ${snapshot.error}');
-              return Center(child: Text('Erreur : ${snapshot.error}'));
+              return Center(child: Text('Erreur : ${snapshot.error}', style: theme.textTheme.bodyMedium));
             }
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Text('Aucun appareil trouvé.'));
+              return Center(child: Text('Aucun appareil trouvé.', style: theme.textTheme.bodyMedium));
             }
 
             final userNodes = snapshot.data!.where((node) => node.user == widget.user.name).toList();
 
             if (userNodes.isEmpty) {
-              return const Center(child: Text('Aucun appareil trouvé pour cet utilisateur.'));
+              return Center(child: Text('Aucun appareil trouvé pour cet utilisateur.', style: theme.textTheme.bodyMedium));
             }
 
             return GridView.builder(
@@ -171,9 +170,9 @@ class _NodeCard extends StatelessWidget {
         builder: (dialogContext) => CliCommandDisplayDialog(command: generatedCommand),
       );
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-              'Commande CLI générée. Exécutez-la et actualisez la page pour voir les changements.'),
+              'Commande CLI générée. Exécutez-la et actualisez la page pour voir les changements.', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white)),
           backgroundColor: Colors.orange,
         ),
       );
@@ -181,22 +180,23 @@ class _NodeCard extends StatelessWidget {
   }
 
   void _showExitNodeWarningAndProceed(BuildContext context) async {
+    final theme = Theme.of(context);
     bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Avertissement sur les Nœuds de Sortie'),
-          content: const Text(
-              'Dans la configuration ACL actuelle, si plusieurs nœuds de sortie appartiennent à différents utilisateurs, ils ne peuvent pas être rendus exclusifs. Tout utilisateur autorisé pourra voir et utiliser tous les nœuds de sortie disponibles sur le réseau.'),
+          title: Text('Avertissement sur les Nœuds de Sortie', style: theme.textTheme.titleLarge),
+          content: Text(
+              'Dans la configuration ACL actuelle, si plusieurs nœuds de sortie appartiennent à différents utilisateurs, ils ne peuvent pas être rendus exclusifs. Tout utilisateur autorisé pourra voir et utiliser tous les nœuds de sortie disponibles sur le réseau.', style: theme.textTheme.bodyMedium),
           actions: <Widget>[
             TextButton(
-              child: const Text('Annuler'),
+              child: Text('Annuler', style: theme.textTheme.labelLarge),
               onPressed: () {
                 Navigator.of(dialogContext).pop(false);
               },
             ),
             TextButton(
-              child: const Text('Continuer', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text('Continuer', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
               onPressed: () {
                 Navigator.of(dialogContext).pop(true);
               },
@@ -217,6 +217,7 @@ class _NodeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final provider = context.read<AppProvider>();
     final onlineColor = node.online ? Colors.green : Colors.grey.shade400;
     final isExitNode = node.isExitNode;
@@ -224,9 +225,9 @@ class _NodeCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12.0),
-        border: isExitNode ? Border.all(color: Colors.blueAccent, width: 2) : null,
+        border: isExitNode ? Border.all(color: theme.colorScheme.primary, width: 2) : null,
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -241,16 +242,16 @@ class _NodeCard extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            Text(node.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _primaryTextColor), maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(node.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
-            Text(node.ipAddresses.join('\n'), style: const TextStyle(fontSize: 12, color: _secondaryTextColor)),
+            Text(node.ipAddresses.join('\n'), style: theme.textTheme.bodySmall),
             const Spacer(),
             if (isExitNode)
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.exit_to_app, size: 14, color: Colors.blueAccent),
-                  SizedBox(width: 4),
-                  Text('Exit Node', style: TextStyle(fontSize: 12, color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+                  Icon(Icons.exit_to_app, size: 14, color: theme.colorScheme.primary),
+                  const SizedBox(width: 4),
+                  Text('Exit Node', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
                 ],
               ),
             if (hasSharedRoutes)
@@ -258,12 +259,12 @@ class _NodeCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 4.0),
                 child: Row(
                   children: [
-                    const Icon(Icons.router_outlined, size: 14, color: _secondaryTextColor),
+                    Icon(Icons.router_outlined, size: 14, color: theme.textTheme.bodySmall?.color),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         node.sharedRoutes.join(", "),
-                        style: const TextStyle(fontSize: 12, color: _secondaryTextColor),
+                        style: theme.textTheme.bodySmall,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -271,8 +272,8 @@ class _NodeCard extends StatelessWidget {
                 ),
               ),
             const Spacer(),
-            const Text('Dernière connexion:', style: TextStyle(fontSize: 10, color: _secondaryTextColor)),
-            Text(node.lastSeen.toLocal().toString(), style: const TextStyle(fontSize: 10, color: _secondaryTextColor)),
+            Text('Dernière connexion:', style: theme.textTheme.bodySmall),
+            Text(node.lastSeen.toLocal().toString(), style: theme.textTheme.bodySmall),
           ],
         ),
       ),
@@ -280,8 +281,9 @@ class _NodeCard extends StatelessWidget {
   }
 
   Widget _buildPopupMenu(BuildContext context, AppProvider provider) {
+    final theme = Theme.of(context);
     return PopupMenuButton<String>(
-      icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
+      icon: Icon(Icons.more_vert, color: theme.iconTheme.color),
       onSelected: (String value) {
         switch (value) {
           case 'rename':
@@ -309,12 +311,12 @@ class _NodeCard extends StatelessWidget {
             showDialog(
               context: context,
               builder: (dialogContext) => AlertDialog(
-                title: const Text('Supprimer l\'appareil ?'),
-                content: Text('Êtes-vous sûr de vouloir supprimer ${node.name} ?'),
+                title: Text('Supprimer l\'appareil ?', style: theme.textTheme.titleLarge),
+                content: Text('Êtes-vous sûr de vouloir supprimer ${node.name} ?', style: theme.textTheme.bodyMedium),
                 actions: <Widget>[
-                  TextButton(child: const Text('Annuler'), onPressed: () => Navigator.of(dialogContext).pop()),
+                  TextButton(child: Text('Annuler', style: theme.textTheme.labelLarge), onPressed: () => Navigator.of(dialogContext).pop()),
                   TextButton(
-                    child: const Text('Confirmer', style: TextStyle(color: Colors.red)),
+                    child: Text('Confirmer', style: theme.textTheme.labelLarge?.copyWith(color: Colors.red)),
                     onPressed: () {
                       Navigator.of(dialogContext).pop();
                       _runAction(context, () => provider.apiService.deleteNode(node.id), 'Appareil supprimé.');
@@ -327,16 +329,16 @@ class _NodeCard extends StatelessWidget {
         }
       },
       itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-        const PopupMenuItem<String>(value: 'rename', child: Text('Renommer')),
-        const PopupMenuItem<String>(value: 'move', child: Text('Changer d\'utilisateur')),
-        const PopupMenuItem<String>(value: 'edit_tags', child: Text('Modifier les tags')),
+        PopupMenuItem<String>(value: 'rename', child: Text('Renommer', style: theme.textTheme.bodyMedium)),
+        PopupMenuItem<String>(value: 'move', child: Text('Changer d\'utilisateur', style: theme.textTheme.bodyMedium)),
+        PopupMenuItem<String>(value: 'edit_tags', child: Text('Modifier les tags', style: theme.textTheme.bodyMedium)),
         const PopupMenuDivider(),
-        const PopupMenuItem<String>(value: 'enable_exit_node', child: Text('Activer nœud de sortie')),
-        const PopupMenuItem<String>(value: 'disable_exit_node', child: Text('Désactiver nœud de sortie')),
-        const PopupMenuItem<String>(value: 'share_subnet', child: Text('Partager sous-réseau')),
-        const PopupMenuItem<String>(value: 'disable_subnet', child: Text('Désactiver sous-réseau')),
+        PopupMenuItem<String>(value: 'enable_exit_node', child: Text('Activer nœud de sortie', style: theme.textTheme.bodyMedium)),
+        PopupMenuItem<String>(value: 'disable_exit_node', child: Text('Désactiver nœud de sortie', style: theme.textTheme.bodyMedium)),
+        PopupMenuItem<String>(value: 'share_subnet', child: Text('Partager sous-réseau', style: theme.textTheme.bodyMedium)),
+        PopupMenuItem<String>(value: 'disable_subnet', child: Text('Désactiver sous-réseau', style: theme.textTheme.bodyMedium)),
         const PopupMenuDivider(),
-        const PopupMenuItem<String>(value: 'delete_device', child: Text('Supprimer', style: TextStyle(color: Colors.red))),
+        PopupMenuItem<String>(value: 'delete_device', child: Text('Supprimer', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.red))),
       ],
     );
   }

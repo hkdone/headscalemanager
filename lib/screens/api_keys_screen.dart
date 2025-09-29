@@ -3,12 +3,6 @@ import 'package:headscalemanager/models/api_key.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:provider/provider.dart';
 
-// Couleurs pour le thème épuré style iOS
-const Color _backgroundColor = Color(0xFFF2F2F7);
-const Color _primaryTextColor = Colors.black87;
-const Color _secondaryTextColor = Colors.black54;
-const Color _accentColor = Colors.blue;
-
 class ApiKeysScreen extends StatefulWidget {
   const ApiKeysScreen({super.key});
 
@@ -34,12 +28,12 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Clés API', style: TextStyle(color: _primaryTextColor)),
-        backgroundColor: _backgroundColor,
+        title: Text('Clés API', style: Theme.of(context).appBarTheme.titleTextStyle),
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: _primaryTextColor),
+        iconTheme: Theme.of(context).appBarTheme.iconTheme,
       ),
       body: FutureBuilder<List<ApiKey>>(
         future: _apiKeysFuture,
@@ -69,7 +63,7 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _createNewApiKey,
         tooltip: 'Créer une clé API',
-        backgroundColor: _accentColor,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -114,19 +108,23 @@ class _ApiKeyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        title: Text('Prefix: ${apiKey.prefix}', style: const TextStyle(fontWeight: FontWeight.w500, color: _primaryTextColor, fontSize: 16)),
+        title: Text('Prefix: ${apiKey.prefix}',
+            style: Theme.of(context).textTheme.titleMedium),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            Text('ID: ${apiKey.id}', style: const TextStyle(color: _secondaryTextColor)),
-            Text('Expiration: ${apiKey.expiration?.toLocal() ?? 'Jamais'}', style: const TextStyle(color: _secondaryTextColor)),
-            Text('Dernière utilisation: ${apiKey.lastSeen?.toLocal() ?? 'Jamais'}', style: const TextStyle(color: _secondaryTextColor)),
+            Text('ID: ${apiKey.id}',
+                style: Theme.of(context).textTheme.bodySmall),
+            Text('Expiration: ${apiKey.expiration?.toLocal() ?? 'Jamais'}',
+                style: Theme.of(context).textTheme.bodySmall),
+            Text('Dernière utilisation: ${apiKey.lastSeen?.toLocal() ?? 'Jamais'}',
+                style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
         trailing: PopupMenuButton<String>(
@@ -136,9 +134,9 @@ class _ApiKeyCard extends StatelessWidget {
               value: 'expire',
               child: ListTile(leading: Icon(Icons.hourglass_bottom), title: Text('Faire expirer')),
             ),
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'delete',
-              child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('Supprimer')),
+              child: ListTile(leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error), title: Text('Supprimer')),
             ),
           ],
         ),
@@ -169,8 +167,8 @@ class _ApiKeyCard extends StatelessWidget {
     return await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(content),
+        title: Text(title, style: Theme.of(context).textTheme.titleLarge),
+        content: Text(content, style: Theme.of(context).textTheme.bodyMedium),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -178,7 +176,7 @@ class _ApiKeyCard extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Confirmer', style: TextStyle(color: Colors.red)),
+            child: Text('Confirmer', style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),

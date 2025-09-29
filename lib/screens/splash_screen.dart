@@ -49,15 +49,17 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     // Affiche un indicateur de chargement pendant la vérification des identifiants.
-    return const Scaffold(
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(), // Indicateur visuel de chargement.
-            SizedBox(height: 20),
-            Text('Chargement...'), // Texte indiquant le chargement.
+            CircularProgressIndicator(color: theme.colorScheme.primary), // Indicateur visuel de chargement.
+            const SizedBox(height: 20),
+            Text('Chargement...', style: theme.textTheme.titleMedium), // Texte indiquant le chargement.
           ],
         ),
       ),

@@ -5,12 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:headscalemanager/screens/api_keys_screen.dart';
 import 'package:headscalemanager/screens/node_detail_screen.dart';
 
-// Couleurs pour le thème épuré style iOS
-const Color _backgroundColor = Color(0xFFF2F2F7);
-const Color _primaryTextColor = Colors.black87;
-const Color _secondaryTextColor = Colors.black54;
-const Color _accentColor = Colors.blue;
-
 /// Écran du tableau de bord affichant un aperçu des nœuds Headscale.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -37,7 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: FutureBuilder<List<Node>>(
           future: _nodesFuture,
@@ -90,17 +84,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Card(
         elevation: 0,
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 16.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _StatItem(title: 'Utilisateurs', value: userCount.toString(), color: Colors.grey, icon: Icons.people),
-              const SizedBox(height: 40, child: VerticalDivider(thickness: 1)),
+              _StatItem(title: 'Utilisateurs', value: userCount.toString(), color: Theme.of(context).textTheme.bodyMedium!.color!, icon: Icons.people),
+              SizedBox(height: 40, child: VerticalDivider(thickness: 1, color: Theme.of(context).dividerColor)),
               _StatItem(title: 'Connectés', value: connectedCount.toString(), color: Colors.green, icon: Icons.lan),
-              const SizedBox(height: 40, child: VerticalDivider(thickness: 1)),
+              SizedBox(height: 40, child: VerticalDivider(thickness: 1, color: Theme.of(context).dividerColor)),
               _StatItem(title: 'Déconnectés', value: disconnectedCount.toString(), color: Colors.red, icon: Icons.phonelink_off),
             ],
           ),
@@ -117,7 +111,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onPressed: _refreshNodes,
           heroTag: 'refreshNodes',
           tooltip: 'Rafraîchir les nœuds',
-          backgroundColor: _accentColor,
+          backgroundColor: Theme.of(context).colorScheme.primary,
           child: const Icon(Icons.refresh, color: Colors.white),
         ),
         const SizedBox(height: 16),
@@ -125,7 +119,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ApiKeysScreen())),
           heroTag: 'apiKeys',
           tooltip: 'Gérer les clés API',
-          backgroundColor: _accentColor,
+          backgroundColor: Theme.of(context).colorScheme.primary,
           child: const Icon(Icons.api, color: Colors.white),
         ),
       ],
@@ -156,7 +150,7 @@ class _StatItem extends StatelessWidget {
         Text(
           title,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: _secondaryTextColor, fontWeight: FontWeight.w500, fontSize: 12),
+          style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 4),
         Text(
@@ -178,12 +172,12 @@ class _UserNodeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       margin: const EdgeInsets.symmetric(vertical: 8.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       child: ExpansionTile(
         initiallyExpanded: true,
-        title: Text(user, style: const TextStyle(fontWeight: FontWeight.bold, color: _primaryTextColor, fontSize: 17)),
+        title: Text(user, style: Theme.of(context).textTheme.titleMedium),
         childrenPadding: const EdgeInsets.only(bottom: 8.0),
         children: nodes.map((node) => _buildNodeTile(context, node)).toList(),
       ),
@@ -193,10 +187,10 @@ class _UserNodeCard extends StatelessWidget {
   Widget _buildNodeTile(BuildContext context, Node node) {
     return ListTile(
       onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => NodeDetailScreen(node: node))),
-      leading: Icon(Icons.circle, color: node.online ? Colors.green : Colors.grey.shade300, size: 12),
+      leading: Icon(Icons.circle, color: node.online ? Colors.green : Theme.of(context).disabledColor, size: 12),
       title: Row(
         children: [
-          Text(node.name, style: const TextStyle(color: _primaryTextColor, fontWeight: FontWeight.w500)),
+          Text(node.name, style: Theme.of(context).textTheme.titleSmall),
           if (node.isExitNode)
             const Padding(
               padding: EdgeInsets.only(left: 8.0),
@@ -207,14 +201,14 @@ class _UserNodeCard extends StatelessWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(node.hostname, style: const TextStyle(fontSize: 13, color: _secondaryTextColor)),
-          Text(node.ipAddresses.join(', '), style: const TextStyle(fontSize: 13, color: _secondaryTextColor)),
+          Text(node.hostname, style: Theme.of(context).textTheme.bodySmall),
+          Text(node.ipAddresses.join(', '), style: Theme.of(context).textTheme.bodySmall),
           if (node.sharedRoutes.isNotEmpty)
             Text(
               'Routes: ${node.sharedRoutes.join(', ')}',
-              style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.secondary),
             ),
-          Text('Dernière connexion : ${node.lastSeen.toLocal()}', style: const TextStyle(fontSize: 12, color: _secondaryTextColor)),
+          Text('Dernière connexion : ${node.lastSeen.toLocal()}', style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );

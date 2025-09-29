@@ -4,11 +4,6 @@ import 'package:headscalemanager/screens/home_screen.dart';
 import 'package:headscalemanager/screens/help_screen.dart';
 import 'package:provider/provider.dart';
 
-// Couleurs pour le thème épuré style iOS
-const Color _backgroundColor = Color(0xFFF2F2F7);
-const Color _primaryTextColor = Colors.black87;
-const Color _accentColor = Colors.blue;
-
 /// Écran des paramètres de l'application.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -50,13 +45,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Paramètres', style: TextStyle(color: _primaryTextColor)),
-        backgroundColor: _backgroundColor,
+        title: Text('Paramètres', style: theme.appBarTheme.titleTextStyle),
+        backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: _primaryTextColor),
+        iconTheme: theme.appBarTheme.iconTheme,
       ),
       body: SafeArea(
         child: Form(
@@ -69,7 +66,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _serverUrlController,
-                  decoration: _buildInputDecoration('URL du serveur', 'https://headscale.example.com'),
+                  decoration: _buildInputDecoration(context, 'URL du serveur', 'https://headscale.example.com'),
+                  style: theme.textTheme.bodyMedium,
                   validator: (value) {
                     if (value == null || value.isEmpty || !Uri.parse(value).isAbsolute) {
                       return 'Veuillez entrer une URL valide';
@@ -81,9 +79,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 TextFormField(
                   controller: _apiKeyController,
                   obscureText: _obscureApiKey,
-                  decoration: _buildInputDecoration('Clé API', 'Votre clé secrète').copyWith(
+                  style: theme.textTheme.bodyMedium,
+                  decoration: _buildInputDecoration(context, 'Clé API', 'Votre clé secrète').copyWith(
                     suffixIcon: IconButton(
-                      icon: Icon(_obscureApiKey ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                      icon: Icon(_obscureApiKey ? Icons.visibility_off : Icons.visibility, color: theme.iconTheme.color),
                       onPressed: () {
                         setState(() {
                           _obscureApiKey = !_obscureApiKey;
@@ -105,19 +104,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       MaterialPageRoute(builder: (context) => const HelpScreen()),
                     );
                   },
-                  child: const Text('Besoin d\'aide ?', style: TextStyle(color: _accentColor)),
+                  child: Text('Besoin d\'aide ?', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
                 ),
                 const Spacer(),
                 ElevatedButton(
                   onPressed: _saveSettings,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _accentColor,
+                    backgroundColor: theme.colorScheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12.0),
                     ),
                   ),
-                  child: const Text('Enregistrer', style: TextStyle(fontSize: 16, color: Colors.white)),
+                  child: Text('Enregistrer', style: theme.textTheme.labelLarge?.copyWith(fontSize: 16, color: theme.colorScheme.onPrimary)),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -128,12 +127,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  InputDecoration _buildInputDecoration(String label, String hint) {
+  InputDecoration _buildInputDecoration(BuildContext context, String label, String hint) {
+    final theme = Theme.of(context);
     return InputDecoration(
       labelText: label,
       hintText: hint,
       filled: true,
-      fillColor: Colors.white,
+      fillColor: theme.inputDecorationTheme.fillColor ?? (theme.brightness == Brightness.dark ? Colors.grey[800] : Colors.white),
+      labelStyle: theme.inputDecorationTheme.labelStyle ?? theme.textTheme.titleMedium,
+      hintStyle: theme.inputDecorationTheme.hintStyle ?? theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12.0),
         borderSide: BorderSide.none,
@@ -144,7 +146,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12.0),
-        borderSide: const BorderSide(color: _accentColor, width: 2),
+        borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
       ),
     );
   }

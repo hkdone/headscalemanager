@@ -7,12 +7,6 @@ import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/widgets/create_pre_auth_key_dialog.dart';
 
-// Couleurs pour le thème épuré style iOS
-const Color _backgroundColor = Color(0xFFF2F2F7);
-const Color _primaryTextColor = Colors.black87;
-const Color _secondaryTextColor = Colors.black54;
-const Color _accentColor = Colors.blue;
-
 class PreAuthKeysScreen extends StatefulWidget {
   const PreAuthKeysScreen({super.key});
 
@@ -39,25 +33,27 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Clés de Pré-authentification', style: TextStyle(color: _primaryTextColor)),
-        backgroundColor: _backgroundColor,
+        title: Text('Clés de Pré-authentification', style: theme.appBarTheme.titleTextStyle),
+        backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: _primaryTextColor),
+        iconTheme: theme.appBarTheme.iconTheme,
       ),
       body: FutureBuilder<List<PreAuthKey>>(
         future: _preAuthKeysFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Erreur : ${snapshot.error}'));
+            return Center(child: Text('Erreur : ${snapshot.error}', style: theme.textTheme.bodyMedium));
           }
-          if (!snapshot.hasData) {
-            return const Center(child: Text('Aucune clé de pré-authentification trouvée.'));
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(child: Text('Aucune clé de pré-authentification trouvée.', style: theme.textTheme.bodyMedium));
           }
 
           final allKeys = snapshot.data!;
@@ -67,7 +63,7 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
           }).toList();
 
           if (activeKeys.isEmpty) {
-            return const Center(child: Text('Aucune clé de pré-authentification active.'));
+            return Center(child: Text('Aucune clé de pré-authentification active.', style: theme.textTheme.bodyMedium));
           }
 
           return ListView.builder(
@@ -83,8 +79,8 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _createNewKey,
         tooltip: 'Créer une clé de pré-authentification',
-        backgroundColor: _accentColor,
-        child: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: theme.colorScheme.primary,
+        child: Icon(Icons.add, color: theme.colorScheme.onPrimary),
       ),
     );
   }
@@ -107,23 +103,24 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
   }
 
   void _showTailscaleUpCommandDialog(BuildContext context, PreAuthKey key, String loginServer) {
+    final theme = Theme.of(context);
     final fullCommand = 'tailscale up --login-server=$loginServer --authkey=${key.key}';
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Commande d\'enregistrement'),
+        title: Text('Commande d\'enregistrement', style: theme.textTheme.titleLarge),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Copiez et exécutez cette commande sur votre appareil pour vous connecter.'),
+            Text('Copiez et exécutez cette commande sur votre appareil pour vous connecter.', style: theme.textTheme.bodyMedium),
             const SizedBox(height: 16),
-            SelectableText(fullCommand, style: const TextStyle(fontFamily: 'monospace', fontSize: 14)),
+            SelectableText(fullCommand, style: theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace')),
           ],
         ),
         actions: [
           TextButton(
-            child: const Text('Expirer la clé'),
+            child: Text('Expirer la clé', style: theme.textTheme.labelLarge?.copyWith(color: Colors.red)),
             onPressed: () async {
               try {
                 final apiService = context.read<AppProvider>().apiService;
@@ -137,12 +134,13 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
             },
           ),
           ElevatedButton.icon(
-            icon: const Icon(Icons.copy), 
-            label: const Text('Copier'),
+            icon: Icon(Icons.copy, color: theme.colorScheme.onPrimary), 
+            label: Text('Copier', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: fullCommand));
               showSafeSnackBar(context, 'Commande copiée dans le presse-papiers !');
             },
+            style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.primary),
           ),
         ],
       ),
@@ -158,26 +156,27 @@ class _PreAuthKeyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
       elevation: 0,
-      color: Colors.white,
+      color: theme.cardColor,
       margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         leading: const Icon(Icons.check_circle, color: Colors.green),
-        title: Text('Clé: ...${apiKey.key.substring(apiKey.key.length - 6)}', style: const TextStyle(fontWeight: FontWeight.w500, color: _primaryTextColor, fontSize: 16, fontFamily: 'monospace')),
+        title: Text('Clé: ...${apiKey.key.substring(apiKey.key.length - 6)}', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500, fontFamily: 'monospace')),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            Text('Utilisateur: ${apiKey.user?.name ?? 'N/A'}', style: const TextStyle(color: _secondaryTextColor)),
-            Text('Expiration: ${apiKey.expiration?.toLocal() ?? 'Jamais'}', style: const TextStyle(color: _secondaryTextColor)),
+            Text('Utilisateur: ${apiKey.user?.name ?? 'N/A'}', style: theme.textTheme.bodyMedium),
+            Text('Expiration: ${apiKey.expiration?.toLocal() ?? 'Jamais'}', style: theme.textTheme.bodyMedium),
             Row(
               children: [
-                Text('Réutilisable: ${apiKey.reusable ? 'Oui' : 'Non'}', style: const TextStyle(color: _secondaryTextColor)),
+                Text('Réutilisable: ${apiKey.reusable ? 'Oui' : 'Non'}', style: theme.textTheme.bodyMedium),
                 const SizedBox(width: 8),
-                Text('Éphémère: ${apiKey.ephemeral ? 'Oui' : 'Non'}', style: const TextStyle(color: _secondaryTextColor)),
+                Text('Éphémère: ${apiKey.ephemeral ? 'Oui' : 'Non'}', style: theme.textTheme.bodyMedium),
               ],
             ),
           ],
@@ -193,16 +192,17 @@ class _PreAuthKeyCard extends StatelessWidget {
   }
 
   Future<void> _expireKey(BuildContext context) async {
+    final theme = Theme.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Expirer la clé ?'),
-        content: const Text('Voulez-vous vraiment faire expirer cette clé ? L\'action est irréversible.'),
+        title: Text('Expirer la clé ?', style: theme.textTheme.titleLarge),
+        content: Text('Voulez-vous vraiment faire expirer cette clé ? L\'action est irréversible.', style: theme.textTheme.bodyMedium),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('Annuler', style: theme.textTheme.labelLarge)),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Expirer', style: TextStyle(color: Colors.red)),
+            child: Text('Expirer', style: theme.textTheme.labelLarge?.copyWith(color: Colors.red)),
           ),
         ],
       ),
@@ -220,6 +220,7 @@ class _PreAuthKeyCard extends StatelessWidget {
   }
 
   void _handleTap(BuildContext context) async {
+    final theme = Theme.of(context);
     final appProvider = context.read<AppProvider>();
     final serverUrl = await appProvider.storageService.getServerUrl();
     final String loginServer = serverUrl?.endsWith('/') == true ? serverUrl!.substring(0, serverUrl.length - 1) : serverUrl ?? '';
@@ -228,19 +229,19 @@ class _PreAuthKeyCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Commande d\'enregistrement'),
-        content: SelectableText(fullCommand, style: const TextStyle(fontFamily: 'monospace')),
+        title: Text('Commande d\'enregistrement', style: theme.textTheme.titleLarge),
+        content: SelectableText(fullCommand, style: theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace')),
         actions: [
           TextButton(
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: fullCommand));
               showSafeSnackBar(context, 'Commande copiée !');
             },
-            child: const Text('Copier'),
+            child: Text('Copier', style: theme.textTheme.labelLarge),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Fermer'),
+            child: Text('Fermer', style: theme.textTheme.labelLarge),
           ),
         ],
       ),

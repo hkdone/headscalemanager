@@ -325,33 +325,35 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            const Text('Visualisation du chemin réseau',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              'Visualisation du chemin réseau',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildVisualizerNode('Mon Appareil', Icons.phone_iphone,
+                _buildVisualizerNode(context, 'Mon Appareil', Icons.phone_iphone,
                     _selectedNode?.name ?? 'N/A'),
                 if (_exitNodeInUse != null) ...[
-                  const Icon(Icons.arrow_forward),
+                  Icon(Icons.arrow_forward, color: Theme.of(context).textTheme.bodyMedium?.color),
                   _buildVisualizerNode(
-                      'Exit Node', Icons.router, _exitNodeInUse!.name),
+                      context, 'Exit Node', Icons.router, _exitNodeInUse!.name),
                 ],
-                const Icon(Icons.arrow_forward),
+                Icon(Icons.arrow_forward, color: Theme.of(context).textTheme.bodyMedium?.color),
                 _buildVisualizerNode(
-                    'Internet', Icons.cloud, _publicIp ?? '...'),
+                    context, 'Internet', Icons.cloud, _publicIp ?? '...'),
               ],
             ),
             if (_isTracingRoute) ...[
               const SizedBox(height: 10),
-              const CircularProgressIndicator(),
-              const Text('Traceroute en cours...'),
+              CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
+              Text('Traceroute en cours...', style: Theme.of(context).textTheme.bodyMedium),
             ],
             if (_traceRouteHops.isNotEmpty) ...[
               const SizedBox(height: 16),
               ExpansionTile(
-                title: const Text('Détails du traceroute'),
+                title: Text('Détails du traceroute', style: Theme.of(context).textTheme.titleMedium),
                 children: _traceRouteHops.map((hop) {
                   String nodeName = '';
                   try {
@@ -364,7 +366,8 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
                   return ListTile(
                     dense: true,
                     title: Text(
-                        '${_traceRouteHops.indexOf(hop) + 1}: $hop$nodeName'),
+                        '${_traceRouteHops.indexOf(hop) + 1}: $hop$nodeName',
+                        style: Theme.of(context).textTheme.bodyMedium),
                   );
                 }).toList(),
               )
@@ -375,12 +378,12 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
     );
   }
 
-  Widget _buildVisualizerNode(String title, IconData icon, String subtitle) {
+  Widget _buildVisualizerNode(BuildContext context, String title, IconData icon, String subtitle) {
     return Column(
       children: [
-        Icon(icon, size: 40),
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        Text(subtitle),
+        Icon(icon, size: 40, color: Theme.of(context).colorScheme.primary),
+        Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+        Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }
@@ -390,7 +393,7 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
       padding: const EdgeInsets.all(8.0),
       child: DropdownButton<Node>(
         value: _selectedNode,
-        hint: const Text('Sélectionnez un nœud'),
+        hint: Text('Sélectionnez un nœud', style: Theme.of(context).textTheme.bodyMedium),
         isExpanded: true,
         onChanged: (Node? newValue) {
           setState(() {
@@ -400,7 +403,7 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
         items: _nodes.map<DropdownMenuItem<Node>>((Node node) {
           return DropdownMenuItem<Node>(
             value: node,
-            child: Text(node.name),
+            child: Text(node.name, style: Theme.of(context).textTheme.bodyMedium),
           );
         }).toList(),
       ),

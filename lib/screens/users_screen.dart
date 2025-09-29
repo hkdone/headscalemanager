@@ -7,12 +7,6 @@ import 'package:provider/provider.dart';
 import 'package:headscalemanager/widgets/create_user_dialog.dart';
 import 'package:headscalemanager/widgets/delete_user_dialog.dart';
 
-// Couleurs pour le thème épuré style iOS
-const Color _backgroundColor = Color(0xFFF2F2F7);
-const Color _primaryTextColor = Colors.black87;
-const Color _secondaryTextColor = Colors.black54;
-const Color _accentColor = Colors.blue;
-
 /// Écran de gestion des utilisateurs Headscale.
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
@@ -38,21 +32,23 @@ class _UsersScreenState extends State<UsersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: FutureBuilder<List<User>>(
           future: _usersFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
             }
             if (snapshot.hasError) {
               debugPrint('Erreur lors du chargement des utilisateurs : ${snapshot.error}');
-              return Center(child: Text('Erreur : ${snapshot.error}'));
+              return Center(child: Text('Erreur : ${snapshot.error}', style: theme.textTheme.bodyMedium));
             }
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Text('Aucun utilisateur trouvé.'));
+              return Center(child: Text('Aucun utilisateur trouvé.', style: theme.textTheme.bodyMedium));
             }
 
             final users = snapshot.data!;
@@ -74,11 +70,12 @@ class _UsersScreenState extends State<UsersScreen> {
           },
         ),
       ),
-      floatingActionButton: _buildFloatingActionButtons(),
+      floatingActionButton: _buildFloatingActionButtons(context),
     );
   }
 
-  Widget _buildFloatingActionButtons() {
+  Widget _buildFloatingActionButtons(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -88,8 +85,8 @@ class _UsersScreenState extends State<UsersScreen> {
           },
           heroTag: 'managePreAuthKeys',
           tooltip: 'Gérer les clés d\'accès',
-          backgroundColor: _accentColor,
-          child: const Icon(Icons.vpn_key, color: Colors.white),
+          backgroundColor: theme.colorScheme.primary,
+          child: Icon(Icons.vpn_key, color: theme.colorScheme.onPrimary),
         ),
         const SizedBox(height: 16),
         FloatingActionButton(
@@ -101,8 +98,8 @@ class _UsersScreenState extends State<UsersScreen> {
           },
           heroTag: 'createUser',
           tooltip: 'Créer un utilisateur',
-          backgroundColor: _accentColor,
-          child: const Icon(Icons.add, color: Colors.white),
+          backgroundColor: theme.colorScheme.primary,
+          child: Icon(Icons.add, color: theme.colorScheme.onPrimary),
         ),
       ],
     );
@@ -117,6 +114,7 @@ class _UserCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(MaterialPageRoute(
@@ -125,7 +123,7 @@ class _UserCard extends StatelessWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(12.0),
         ),
         child: Stack(
@@ -136,19 +134,19 @@ class _UserCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Icon(Icons.person, size: 48, color: _accentColor),
+                  Icon(Icons.person, size: 48, color: theme.colorScheme.primary),
                   const SizedBox(height: 12),
                   Text(
                     user.name,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _primaryTextColor),
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Créé le: ${user.createdAt?.toLocal().toString().substring(0, 10) ?? 'N/A'}',
-                    style: const TextStyle(fontSize: 12, color: _secondaryTextColor),
+                    style: theme.textTheme.bodySmall,
                   ),
                 ],
               ),
@@ -157,7 +155,7 @@ class _UserCard extends StatelessWidget {
               top: 0,
               right: 0,
               child: PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
+                icon: Icon(Icons.more_vert, color: theme.iconTheme.color),
                 onSelected: (value) {
                   if (value == 'delete') {
                     showDialog(
@@ -167,11 +165,11 @@ class _UserCard extends StatelessWidget {
                   }
                 },
                 itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                  const PopupMenuItem<String>(
+                  PopupMenuItem<String>(
                     value: 'delete',
                     child: ListTile(
-                      leading: Icon(Icons.delete, color: Colors.red),
-                      title: Text('Supprimer l\'utilisateur'),
+                      leading: Icon(Icons.delete, color: Colors.red, semanticLabel: 'Supprimer l\'utilisateur'),
+                      title: Text('Supprimer l\'utilisateur', style: theme.textTheme.bodyMedium),
                     ),
                   ),
                 ],
