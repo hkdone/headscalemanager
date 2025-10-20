@@ -240,7 +240,17 @@ La page ACL a deux fonctions principales :
     - La politique sera **automatiquement mise à jour et appliquée** sur le serveur pour autoriser cette communication spécifique.
     - Pour retirer l'autorisation, cliquez simplement sur la croix (x) de la règle active.
 
-### 3.4. Détails Utilisateur
+### 3.4. Testeur ACL (ACL Tester)
+
+Cette nouvelle page, accessible via un bouton dédié, vous permet de tester et de visualiser l'impact de différentes politiques ACL sans les appliquer directement à votre serveur Headscale. C'est un environnement sûr pour expérimenter.
+
+**Fonctionnalités :**
+- **Génération de Politique :** Similaire à la page ACL principale, vous pouvez générer une politique basée sur vos utilisateurs et nœuds existants.
+- **Règles Temporaires :** Ajoutez et supprimez des règles temporaires pour voir comment elles affectent la politique générée.
+- **Visualisation Instantanée :** La politique ACL résultante est affichée en temps réel dans un champ de texte, vous permettant de l'inspecter.
+- **Exportation Optionnelle :** Une fois satisfait du résultat, vous pouvez choisir d'exporter la politique vers votre serveur Headscale.
+
+### 3.5. Détails Utilisateur
 
 Cet écran affiche les informations détaillées d'un utilisateur et liste tous les appareils (nœuds) qui lui sont associés.
 

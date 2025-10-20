@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/screens/acl_screen.dart';
 import 'package:headscalemanager/screens/dashboard_screen.dart';
+import 'package:headscalemanager/screens/acl_tester_screen.dart';
 import 'package:headscalemanager/screens/network_overview_screen.dart';
 import 'package:headscalemanager/screens/settings_screen.dart';
 import 'package:headscalemanager/screens/users_screen.dart';
@@ -24,11 +25,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Liste des widgets (écrans) correspondant aux éléments de la barre de navigation.
   /// L'ordre doit correspondre à l'ordre des `BottomNavigationBarItem`.
-    static const List<Widget> _widgetOptions = <Widget>[
+  static const List<Widget> _widgetOptions = <Widget>[
     DashboardScreen(),
     UsersScreen(),
     AclScreen(),
     NetworkOverviewScreen(),
+    AclTesterScreen(),
   ];
 
   /// Gère le changement d'élément sélectionné dans la barre de navigation.
@@ -51,22 +53,26 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.help_outline),
             onPressed: () {
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HelpScreen()));
+              Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const HelpScreen()));
             },
           ),
           // Bouton des paramètres : navigue vers l'écran des paramètres.
           IconButton(
             icon: const Icon(EvaIcons.settings),
             onPressed: () {
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+              Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()));
             },
           ),
         ],
       ),
+
       /// Corps de l'écran, affichant le widget correspondant à l'élément sélectionné.
       body: Center(
         child: _widgetOptions.elementAt(_selectedIndex),
       ),
+
       /// Barre de navigation inférieure.
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
@@ -89,6 +95,11 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(EvaIcons.globe2Outline),
             label: 'Réseau',
+          ),
+          // Élément pour le Testeur d'ACL.
+          BottomNavigationBarItem(
+            icon: Icon(EvaIcons.colorPalette),
+            label: 'Test ACL',
           ),
         ],
         currentIndex: _selectedIndex, // Index de l'élément actuellement actif.

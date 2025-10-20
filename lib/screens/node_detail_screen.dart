@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/node.dart';
+import 'package:headscalemanager/providers/app_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:dart_ping/dart_ping.dart';
 import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
@@ -18,15 +20,27 @@ class NodeDetailScreen extends StatefulWidget {
 class _NodeDetailScreenState extends State<NodeDetailScreen> {
   bool _isPingingContinuously = false;
   StreamSubscription<PingData>? _pingSubscription;
+  // Variable d'état pour le nœud actuel, afin de pouvoir le mettre à jour.
+  late Node _currentNode;
+  // Utilisation d'un Set pour gérer efficacement les routes sélectionnées.
+  late Set<String> _selectedRoutes;
   final List<PingData> _pingResponses = [];
 
+  @override
+  void initState() {
+    super.initState();
+    // Initialise l'état local avec les données du nœud passées au widget.
+    _currentNode = widget.node;
+    _selectedRoutes = Set<String>.from(_currentNode.sharedRoutes);
+  }
+
   String get _ipv4 {
-    return widget.node.ipAddresses
+    return _currentNode.ipAddresses
         .firstWhere((ip) => !ip.contains(':'), orElse: () => '');
   }
 
   String get _ipv6 {
-    return widget.node.ipAddresses
+    return _currentNode.ipAddresses
         .firstWhere((ip) => ip.contains(':'), orElse: () => '');
   }
 
@@ -69,7 +83,8 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     final isDarkMode = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme
+          .scaffoldBackgroundColor, // Utilisation de la couleur de fond du thème
       appBar: AppBar(
         title: Text(widget.node.name, style: theme.appBarTheme.titleTextStyle),
         backgroundColor: theme.appBarTheme.backgroundColor,
@@ -85,6 +100,9 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
             _buildIpAddressesCard(context),
             const SizedBox(height: 16),
             _buildIdentifiersCard(context),
+            const SizedBox(height: 16),
+            _buildRoutesCard(
+                context), // Ajout de la nouvelle carte de gestion des routes
             const SizedBox(height: 16),
             _buildTagsAndRoutesCard(context),
             const SizedBox(height: 16),
@@ -103,14 +121,14 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.circle,
-                  color: widget.node.online ? Colors.green : Colors.grey,
-                  size: 16),
+              Icon(Icons.circle, // Utilise _currentNode pour le statut
+                  color: _currentNode.online ? Colors.green : Colors.grey,
+                  size: 16), // Taille de l'icône
               const SizedBox(width: 8),
-              Text(widget.node.online ? 'En ligne' : 'Hors ligne',
+              Text(_currentNode.online ? 'En ligne' : 'Hors ligne',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                      color: widget.node.online ? Colors.green : Colors.grey,
-                      fontWeight: FontWeight.bold)),
+                      color: _currentNode.online ? Colors.green : Colors.grey,
+                      fontWeight: FontWeight.bold)), // Style du texte
               const Spacer(),
               if (widget.node.isExitNode)
                 Chip(
@@ -120,15 +138,17 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                         ?.copyWith(color: theme.colorScheme.onPrimary)),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(widget.node.hostname,
+          const SizedBox(height: 16), // Espace vertical
+          Text(_currentNode.hostname, // Utilise _currentNode pour le nom d'hôte
               style: theme.textTheme.headlineSmall
                   ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text('Utilisateur: ${widget.node.user}',
+          Text(
+              'Utilisateur: ${_currentNode.user}', // Utilise _currentNode pour l'utilisateur
               style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          Text('Dernière connexion: ${widget.node.lastSeen.toLocal()}',
+          Text(
+              'Dernière connexion: ${_currentNode.lastSeen.toLocal()}', // Utilise _currentNode pour la dernière connexion
               style: theme.textTheme.bodySmall),
         ],
       ),
@@ -161,11 +181,82 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           Text('Identifiants',
               style: theme.textTheme.titleLarge
                   ?.copyWith(fontWeight: FontWeight.bold)),
-          const Divider(height: 20),
-          _DetailRowWithCopy(label: 'ID Nœud', value: widget.node.id),
+          const Divider(height: 20), // Séparateur visuel
+          _DetailRowWithCopy(label: 'ID Nœud', value: _currentNode.id),
           _DetailRowWithCopy(
-              label: 'Clé Machine', value: widget.node.machineKey),
-          _DetailRowWithCopy(label: 'FQDN', value: widget.node.fqdn),
+              label: 'Clé Machine', value: _currentNode.machineKey),
+          _DetailRowWithCopy(label: 'FQDN', value: _currentNode.fqdn),
+        ],
+      ),
+    );
+  }
+
+  /// Construit la carte de gestion des routes.
+  Widget _buildRoutesCard(BuildContext context) {
+    final theme = Theme.of(context);
+    // Fusionne les routes disponibles et approuvées pour tout afficher, en évitant les doublons.
+    final allPossibleRoutes = (Set<String>.from(_currentNode.availableRoutes)
+          ..addAll(_currentNode.sharedRoutes))
+        .toList();
+
+    // Si le nœud n'annonce aucune route, on n'affiche pas la carte.
+    if (allPossibleRoutes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return _SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Gestion des Routes',
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold)),
+          const Divider(height: 20),
+          Text(
+            'Cochez les routes que vous souhaitez approuver pour ce nœud.',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 10),
+          // Liste des routes avec des cases à cocher.
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: allPossibleRoutes.length,
+            itemBuilder: (context, index) {
+              final route = allPossibleRoutes[index];
+              return CheckboxListTile(
+                title: Text(route,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontFamily: 'monospace')),
+                value: _selectedRoutes.contains(route),
+                onChanged: (bool? value) {
+                  setState(() {
+                    if (value == true) {
+                      _selectedRoutes.add(route);
+                    } else {
+                      _selectedRoutes.remove(route);
+                    }
+                  });
+                },
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: ElevatedButton(
+              onPressed: _saveRoutes,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              ),
+              child: Text('Appliquer les changements',
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(color: theme.colorScheme.onPrimary)),
+            ),
+          ),
         ],
       ),
     );
@@ -177,7 +268,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Tags & Routes',
+          Text('Tags',
               style: theme.textTheme.titleLarge
                   ?.copyWith(fontWeight: FontWeight.bold)),
           const Divider(height: 20),
@@ -187,25 +278,42 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           const SizedBox(height: 8),
           Wrap(
             spacing: 8.0,
-            children: widget.node.tags.isEmpty
+            children: _currentNode.tags.isEmpty
                 ? [Text('Aucun tag', style: theme.textTheme.bodyMedium)]
-                : widget.node.tags
+                : _currentNode.tags
                     .map((tag) => Chip(
                         label: Text(tag, style: theme.textTheme.labelSmall)))
                     .toList(),
           ),
-          const SizedBox(height: 16),
-          Text('Routes partagées:',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          widget.node.sharedRoutes.isEmpty
-              ? Text('Aucune', style: theme.textTheme.bodyMedium)
-              : Text(widget.node.sharedRoutes.join(', '),
-                  style: theme.textTheme.bodyMedium),
         ],
       ),
     );
+  }
+
+  /// Sauvegarde les routes sélectionnées via l'API et met à jour l'état local.
+  Future<void> _saveRoutes() async {
+    final apiService = context.read<AppProvider>().apiService;
+    try {
+      // Envoie la liste des routes sélectionnées à l'API.
+      await apiService.setNodeRoutes(_currentNode.id, _selectedRoutes.toList());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Routes mises à jour avec succès.')),
+        );
+        // Recharge les détails du nœud pour refléter les changements immédiatement.
+        final updatedNode = await apiService.getNodeDetails(_currentNode.id);
+        setState(() {
+          _currentNode = updatedNode;
+          // Resynchronise également les routes sélectionnées au cas où.
+          _selectedRoutes = Set<String>.from(_currentNode.sharedRoutes);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erreur: $e')));
+      }
+    }
   }
 
   Widget _buildPingCard(BuildContext context) {

@@ -24,8 +24,14 @@ class Node {
   final DateTime lastSeen;
 
   /// Liste des routes réseau partagées par ce nœud (correspond à approvedRoutes de l'API).
-  final List<String> sharedRoutes;
+  final List<String>
+      sharedRoutes; // Vous souhaitez garder ce nom, il correspond à 'approvedRoutes' de l'API.
+
+  /// Liste des routes de sous-réseau disponibles (annoncées par le client mais pas encore approuvées).
+  final List<String> availableRoutes;
+
   /// Indique si ce nœud est un nœud de sortie (basé sur la présence de 0.0.0.0/0 ou ::/0 dans availableRoutes).
+  /// CORRECTION : Doit être basé sur les routes approuvées (sharedRoutes).
   final bool isExitNode;
 
   /// Liste des tags associés à ce nœud.
@@ -50,6 +56,7 @@ class Node {
     required this.online,
     required this.lastSeen,
     required this.sharedRoutes,
+    required this.availableRoutes,
     required this.isExitNode,
     required this.tags,
     required this.baseDomain,
@@ -73,8 +80,15 @@ class Node {
     // avec un fallback à 'Unknown Hostname' si non présent.
     final hostname = json['name'] as String? ?? 'Unknown Hostname';
 
-    final List<String> availableRoutes = List<String>.from(json['availableRoutes'] ?? []);
-    final bool isExitNode = availableRoutes.contains('0.0.0.0/0') || availableRoutes.contains('::/0');
+    // On récupère les deux listes de routes depuis l'API.
+    final List<String> approved =
+        List<String>.from(json['approvedRoutes'] ?? []);
+    final List<String> available =
+        List<String>.from(json['availableRoutes'] ?? []);
+
+    // CORRECTION LOGIQUE : Un nœud est un "exit node" si ses routes de sortie sont APPROUVÉES.
+    final bool isExitNode =
+        approved.contains('0.0.0.0/0') || approved.contains('::/0');
 
     return Node(
       id: json['id'] ?? '',
@@ -87,7 +101,9 @@ class Node {
       lastSeen: json['lastSeen'] != null
           ? DateTime.parse(json['lastSeen'])
           : DateTime.now(),
-      sharedRoutes: List<String>.from(json['approvedRoutes'] ?? []),
+      sharedRoutes: approved, // Mappé depuis 'approvedRoutes'
+      availableRoutes:
+          available, // Nouveau champ mappé depuis 'availableRoutes'
       isExitNode: isExitNode,
       tags: List<String>.from(
           json['forcedTags'] ?? json['validTags'] ?? json['tags'] ?? []),

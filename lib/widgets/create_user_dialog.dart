@@ -60,19 +60,22 @@ class _CreateUserDialogState extends State<CreateUserDialog> {
 
             if (name.isNotEmpty) {
               String finalName = name;
-              if (!name.contains('@')) { // Only append suffix if no @ is present
+              if (!name.contains('@')) {
+                // Only append suffix if no @ is present
                 finalName = '$name$suffix';
               }
 
               try {
                 await appProvider.apiService.createUser(finalName);
                 Navigator.of(context).pop(); // Close the dialog
-                widget.onUserCreated(); // Call the callback to refresh user list
+                widget
+                    .onUserCreated(); // Call the callback to refresh user list
               } catch (e) {
                 debugPrint('Erreur lors de la création de l\'utilisateur : $e');
                 if (!mounted) return;
                 Navigator.of(context).pop(); // Close the dialog even on error
-                showSafeSnackBar(context, 'Échec de la création de l\'utilisateur : $e');
+                showSafeSnackBar(
+                    context, 'Échec de la création de l\'utilisateur : $e');
               }
             }
           },

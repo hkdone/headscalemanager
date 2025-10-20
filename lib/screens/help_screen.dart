@@ -389,7 +389,24 @@ routes:
                   isSmall: true,
                 ),
                 const SizedBox(height: 16),
-                _buildSubTitle(context, '3.4. Vue d\'ensemble du réseau'),
+                _buildSubTitle(context, '3.4. Testeur ACL (ACL Tester)'),
+                const SizedBox(height: 8),
+                _buildBodyText(context,
+                    'Cette nouvelle page vous permet de tester et de visualiser l\'impact de différentes politiques ACL sans les appliquer directement à votre serveur Headscale. C\'est un environnement sûr pour expérimenter.'),
+                const SizedBox(height: 8),
+                _buildBodyText(context, '**Fonctionnalités :**',
+                    isBold: true),
+                const SizedBox(height: 4),
+                _buildBodyText(
+                  context,
+                  '- **Génération de Politique :** Similaire à la page ACL principale, vous pouvez générer une politique basée sur vos utilisateurs et nœuds existants.\n'
+                  '- **Règles Temporaires :** Ajoutez et supprimez des règles temporaires pour voir comment elles affectent la politique générée.\n'
+                  '- **Visualisation Instantanée :** La politique ACL résultante est affichée en temps réel dans un champ de texte, vous permettant de l\'inspecter.\n'
+                  '- **Exportation Optionnelle :** Une fois satisfait du résultat, vous pouvez choisir d\'exporter la politique vers votre serveur Headscale.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 16),
+                _buildSubTitle(context, '3.5. Vue d\'overview du réseau'),
                 const SizedBox(height: 8),
                 _buildBodyText(context,
                     'Cet écran, accessible depuis la barre de navigation, offre une vue dynamique et en temps réel de votre topologie réseau du point de vue de l\'appareil actuel. Il est particulièrement utile pour diagnostiquer les connexions et vérifier quel `exit node` est utilisé.'),

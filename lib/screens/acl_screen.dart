@@ -6,7 +6,7 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:headscalemanager/services/advanced_acl_generator_service.dart';
+import 'package:headscalemanager/services/new_acl_generator_service.dart';
 
 class AclScreen extends StatefulWidget {
   const AclScreen({super.key});
@@ -19,8 +19,8 @@ class _AclScreenState extends State<AclScreen> {
   final TextEditingController _aclController = TextEditingController();
   bool _isLoading = true;
   Map<String, dynamic> _currentAclPolicy = {};
-  final AdvancedAclGeneratorService _advancedAclGeneratorService =
-      AdvancedAclGeneratorService();
+  final NewAclGeneratorService _newAclGeneratorService =
+      NewAclGeneratorService();
 
   List<Node> _allNodes = [];
   List<String> _allTags = [];
@@ -42,7 +42,7 @@ class _AclScreenState extends State<AclScreen> {
     setState(() {
       _temporaryRules.addAll(loadedRules);
     });
-    await _generateAdvancedAclPolicy(showSnackbar: false);
+    await _generateNewAclPolicy(showSnackbar: false);
     setState(() => _isLoading = false);
   }
 
@@ -113,7 +113,7 @@ class _AclScreenState extends State<AclScreen> {
               ),
             ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _generateAdvancedAclPolicy(showSnackbar: true),
+        onPressed: () => _generateNewAclPolicy(showSnackbar: true),
         label: const Text('Générer la Politique'),
         icon: const Icon(Icons.settings_backup_restore),
         backgroundColor: Theme.of(context).colorScheme.primary,
@@ -163,7 +163,8 @@ class _AclScreenState extends State<AclScreen> {
           value: 'reset',
           child: ListTile(
             leading: Icon(Icons.lock_open, color: Colors.orange),
-            title: Text('Autoriser tout (Réinitialiser)', style: TextStyle(color: Colors.orange)),
+            title: Text('Autoriser tout (Réinitialiser)',
+                style: TextStyle(color: Colors.orange)),
           ),
         ),
       ],
@@ -238,7 +239,10 @@ class _AclScreenState extends State<AclScreen> {
                     style: Theme.of(context).textTheme.titleMedium),
                 IconButton(
                   icon: Icon(Icons.delete_sweep,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.6)),
                   tooltip: 'Effacer toutes les règles',
                   onPressed: _clearTemporaryRules,
                 )
@@ -341,7 +345,7 @@ class _AclScreenState extends State<AclScreen> {
         message: 'Règle ajoutée et politique appliquée avec succès.');
   }
 
-  Future<void> _generateAdvancedAclPolicy({bool showSnackbar = true}) async {
+  Future<void> _generateNewAclPolicy({bool showSnackbar = true}) async {
     setState(() => _isLoading = true);
     try {
       final appProvider = context.read<AppProvider>();
@@ -352,7 +356,7 @@ class _AclScreenState extends State<AclScreen> {
           _allNodes.isNotEmpty ? _allNodes : await apiService.getNodes();
       if (_allNodes.isEmpty) _allNodes = nodes;
 
-      _currentAclPolicy = _advancedAclGeneratorService.generatePolicy(
+      _currentAclPolicy = _newAclGeneratorService.generatePolicy(
         users: users,
         nodes: nodes,
         temporaryRules: _temporaryRules,
@@ -373,7 +377,9 @@ class _AclScreenState extends State<AclScreen> {
                 const SizedBox(height: 4),
                 Text('Utilisez le menu (⋮) pour l\'exporter.',
                     style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimary
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onPrimary
                             .withOpacity(0.7),
                         fontSize: 12)),
               ],
@@ -390,7 +396,8 @@ class _AclScreenState extends State<AclScreen> {
           SnackBar(
               content: Text(
                   'Échec de la génération de la politique ACL avancée : $e',
-                  style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onError)),
               backgroundColor: Theme.of(context).colorScheme.error),
         );
       }
@@ -464,7 +471,7 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Future<void> _generateAndExportPolicy({String? message}) async {
-    await _generateAdvancedAclPolicy(showSnackbar: false);
+    await _generateNewAclPolicy(showSnackbar: false);
     await _exportAclPolicyToServer(
         showConfirmation: false, successMessage: message);
   }
@@ -476,9 +483,11 @@ class _AclScreenState extends State<AclScreen> {
             context: context,
             builder: (BuildContext context) {
               return AlertDialog(
-                title: Text('Confirmer l\'exportation', style: Theme.of(context).textTheme.titleLarge),
+                title: Text('Confirmer l\'exportation',
+                    style: Theme.of(context).textTheme.titleLarge),
                 content: Text(
-                    'Vous allez appliquer la politique ACL définie dans le champ de texte sur votre serveur. Êtes-vous sûr ?', style: Theme.of(context).textTheme.bodyMedium),
+                    'Vous allez appliquer la politique ACL définie dans le champ de texte sur votre serveur. Êtes-vous sûr ?',
+                    style: Theme.of(context).textTheme.bodyMedium),
                 actions: <Widget>[
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(false),
@@ -487,7 +496,8 @@ class _AclScreenState extends State<AclScreen> {
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(true),
                     child: Text('Confirmer',
-                        style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error)),
                   ),
                 ],
               );
@@ -505,8 +515,9 @@ class _AclScreenState extends State<AclScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(successMessage ??
-                  'Politique ACL exportée avec succès vers le serveur.',
+              content: Text(
+                  successMessage ??
+                      'Politique ACL exportée avec succès vers le serveur.',
                   style: TextStyle(
                       color: Theme.of(context).colorScheme.onPrimary)),
               backgroundColor: Theme.of(context).colorScheme.primary),
@@ -518,9 +529,9 @@ class _AclScreenState extends State<AclScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  'Échec de l\'exportation de la politique ACL : $e',
-                  style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+              content: Text('Échec de l\'exportation de la politique ACL : $e',
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onError)),
               backgroundColor: Theme.of(context).colorScheme.error),
         );
       }
@@ -552,9 +563,9 @@ class _AclScreenState extends State<AclScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  'Échec de la récupération de la politique ACL : $e',
-                  style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+              content: Text('Échec de la récupération de la politique ACL : $e',
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onError)),
               backgroundColor: Theme.of(context).colorScheme.error),
         );
       }
@@ -562,7 +573,6 @@ class _AclScreenState extends State<AclScreen> {
       setState(() => _isLoading = false);
     }
   }
-
 
   Future<void> _shareAclFile() async {
     try {
@@ -574,7 +584,8 @@ class _AclScreenState extends State<AclScreen> {
           SnackBar(
               content: Text(
                   'Le contenu ACL est vide. Générez d\'abord une politique.',
-                  style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onError)),
               backgroundColor: Theme.of(context).colorScheme.error),
         );
         return;
@@ -590,8 +601,10 @@ class _AclScreenState extends State<AclScreen> {
       debugPrint('Erreur lors du partage du fichier ACL : $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Échec du partage du fichier ACL : $e',
-              style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+          SnackBar(
+              content: Text('Échec du partage du fichier ACL : $e',
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onError)),
               backgroundColor: Theme.of(context).colorScheme.error),
         );
       }
@@ -600,25 +613,30 @@ class _AclScreenState extends State<AclScreen> {
 
   Future<void> _resetAclPolicy() async {
     final bool confirm = await showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Confirmer la réinitialisation', style: Theme.of(context).textTheme.titleLarge),
-          content: Text(
-              'Vous allez remplacer la politique actuelle par une politique qui autorise TOUT le trafic entre TOUS les appareils. Êtes-vous sûr ?', style: Theme.of(context).textTheme.bodyMedium),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Annuler'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Confirmer', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Confirmer la réinitialisation',
+                  style: Theme.of(context).textTheme.titleLarge),
+              content: Text(
+                  'Vous allez remplacer la politique actuelle par une politique qui autorise TOUT le trafic entre TOUS les appareils. Êtes-vous sûr ?',
+                  style: Theme.of(context).textTheme.bodyMedium),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Annuler'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text('Confirmer',
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.error)),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
 
     if (!confirm || !mounted) return;
 
@@ -631,10 +649,10 @@ class _AclScreenState extends State<AclScreen> {
         }
       ]
     };
-    
+
     const JsonEncoder encoder = JsonEncoder.withIndent('  ');
     _aclController.text = encoder.convert(defaultPolicy);
-    
+
     // Also clear temporary rules as they are now irrelevant
     setState(() {
       _temporaryRules.clear();
@@ -642,6 +660,9 @@ class _AclScreenState extends State<AclScreen> {
     final storage = context.read<AppProvider>().storageService;
     await storage.saveTemporaryRules(_temporaryRules);
 
-    await _exportAclPolicyToServer(showConfirmation: false, successMessage: 'Politique réinitialisée : tout le trafic est maintenant autorisé.');
+    await _exportAclPolicyToServer(
+        showConfirmation: false,
+        successMessage:
+            'Politique réinitialisée : tout le trafic est maintenant autorisé.');
   }
 }

@@ -12,7 +12,8 @@ import 'package:provider/provider.dart';
 ///
 /// Cette fonction est la première étape du processus d'enregistrement d'un appareil.
 /// Elle présente des onglets pour différents systèmes d'exploitation.
-Future<void> showTailscaleUpCommandDialog(BuildContext context, User user) async {
+Future<void> showTailscaleUpCommandDialog(
+    BuildContext context, User user) async {
   final appProvider = context.read<AppProvider>();
   final serverUrl = await appProvider.storageService.getServerUrl();
   if (serverUrl == null) {
@@ -20,7 +21,9 @@ Future<void> showTailscaleUpCommandDialog(BuildContext context, User user) async
     return;
   }
 
-  final String loginServer = serverUrl.endsWith('/') ? serverUrl.substring(0, serverUrl.length - 1) : serverUrl;
+  final String loginServer = serverUrl.endsWith('/')
+      ? serverUrl.substring(0, serverUrl.length - 1)
+      : serverUrl;
   final String command = 'tailscale up --login-server=$loginServer';
 
   return showDialog(
@@ -56,14 +59,16 @@ Future<void> showTailscaleUpCommandDialog(BuildContext context, User user) async
                             const SizedBox(height: 16),
                             SelectableText(
                               command,
-                              style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+                              style: const TextStyle(
+                                  fontFamily: 'monospace', fontSize: 14),
                             ),
                             const SizedBox(height: 16),
                             ElevatedButton.icon(
                               icon: const Icon(Icons.copy),
                               label: const Text('Copier la commande'),
                               onPressed: () async {
-                                await Clipboard.setData(ClipboardData(text: command));
+                                await Clipboard.setData(
+                                    ClipboardData(text: command));
                                 showSafeSnackBar(context, 'Commande copiée !');
                               },
                             ),
@@ -82,14 +87,16 @@ Future<void> showTailscaleUpCommandDialog(BuildContext context, User user) async
                               const SizedBox(height: 16),
                               SelectableText(
                                 loginServer,
-                                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+                                style: const TextStyle(
+                                    fontFamily: 'monospace', fontSize: 14),
                               ),
                               const SizedBox(height: 16),
                               ElevatedButton.icon(
                                 icon: const Icon(Icons.copy),
                                 label: const Text('Copier l\'URL'),
                                 onPressed: () async {
-                                  await Clipboard.setData(ClipboardData(text: loginServer));
+                                  await Clipboard.setData(
+                                      ClipboardData(text: loginServer));
                                   showSafeSnackBar(context, 'URL copiée !');
                                 },
                               ),
@@ -126,7 +133,8 @@ Future<void> showTailscaleUpCommandDialog(BuildContext context, User user) async
 ///
 /// Guide l'utilisateur pour coller le lien web obtenu du client Tailscale
 /// et génère la commande `headscale nodes register` à exécuter sur le serveur.
-Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user) async {
+Future<void> showHeadscaleRegisterCommandDialog(
+    BuildContext context, User user) async {
   final TextEditingController urlController = TextEditingController();
   final ValueNotifier<String> machineKey = ValueNotifier<String>('');
 
@@ -154,7 +162,10 @@ Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user)
                   final Uri? uri = Uri.tryParse(trimmedValue);
 
                   // Essaye d'extraire la clé d'une URL complète
-                  if (uri != null && uri.hasScheme && uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'register') {
+                  if (uri != null &&
+                      uri.hasScheme &&
+                      uri.pathSegments.length >= 2 &&
+                      uri.pathSegments[0] == 'register') {
                     machineKey.value = uri.pathSegments[1];
                   } else {
                     // Sinon, suppose que l'entrée est la clé elle-même
@@ -165,8 +176,7 @@ Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user)
             ],
           ),
         ),
-
-              actions: [
+        actions: [
           TextButton(
             child: const Text('Fermer'),
             onPressed: () => Navigator.of(dialogContext).pop(),
@@ -181,13 +191,19 @@ Future<void> showHeadscaleRegisterCommandDialog(BuildContext context, User user)
                     ? null
                     : () async {
                         try {
-                          final newNode = await context.read<AppProvider>().apiService.registerMachine(key, user.name);
-                          Navigator.of(dialogContext).pop(); // Close registration dialog
-                          showSafeSnackBar(context, 'Appareil enregistré avec succès.');
+                          final newNode = await context
+                              .read<AppProvider>()
+                              .apiService
+                              .registerMachine(key, user.name);
+                          Navigator.of(dialogContext)
+                              .pop(); // Close registration dialog
+                          showSafeSnackBar(
+                              context, 'Appareil enregistré avec succès.');
                           // Show the new dialog to add ACL tags
                           _showAddTagsDialog(context, newNode);
                         } catch (e) {
-                          showSafeSnackBar(context, 'Erreur lors de l\'enregistrement: $e');
+                          showSafeSnackBar(
+                              context, 'Erreur lors de l\'enregistrement: $e');
                         }
                       },
               );
@@ -220,7 +236,8 @@ Future<void> _showAddTagsDialog(BuildContext context, Node node) async {
                 const SizedBox(height: 16),
                 CheckboxListTile(
                   title: const Text('Exit Node'),
-                  subtitle: const Text('Autoriser ce nœud à être une sortie internet.'),
+                  subtitle: const Text(
+                      'Autoriser ce nœud à être une sortie internet.'),
                   value: isExitNode,
                   onChanged: (value) {
                     setState(() {
@@ -230,7 +247,8 @@ Future<void> _showAddTagsDialog(BuildContext context, Node node) async {
                 ),
                 CheckboxListTile(
                   title: const Text('LAN Sharer'),
-                  subtitle: const Text('Autoriser ce nœud à partager son réseau local.'),
+                  subtitle: const Text(
+                      'Autoriser ce nœud à partager son réseau local.'),
                   value: isLanSharer,
                   onChanged: (value) {
                     setState(() {
@@ -262,7 +280,8 @@ Future<void> _showAddTagsDialog(BuildContext context, Node node) async {
                     Navigator.of(dialogContext).pop();
                     showSafeSnackBar(context, 'Tags appliqués avec succès.');
                   } catch (e) {
-                    showSafeSnackBar(context, 'Erreur lors de l\'application des tags: $e');
+                    showSafeSnackBar(
+                        context, 'Erreur lors de l\'application des tags: $e');
                   }
                 },
               ),
