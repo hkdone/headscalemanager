@@ -41,7 +41,8 @@ class _SplashScreenState extends State<SplashScreen> {
     if (mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (context) => hasCreds ? const HomeScreen() : const SettingsScreen(),
+          builder: (context) =>
+              hasCreds ? const HomeScreen() : const SettingsScreen(),
         ),
       );
     }
@@ -57,9 +58,13 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: theme.colorScheme.primary), // Indicateur visuel de chargement.
+            CircularProgressIndicator(
+                color: theme
+                    .colorScheme.primary), // Indicateur visuel de chargement.
             const SizedBox(height: 20),
-            Text('Chargement...', style: theme.textTheme.titleMedium), // Texte indiquant le chargement.
+            Text('Chargement...',
+                style: theme
+                    .textTheme.titleMedium), // Texte indiquant le chargement.
           ],
         ),
       ),

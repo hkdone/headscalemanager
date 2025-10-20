@@ -6,6 +6,7 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/widgets/create_pre_auth_key_dialog.dart';
+import 'package:qr_flutter/qr_flutter.dart'; // Importation pour le QR code
 
 class PreAuthKeysScreen extends StatefulWidget {
   const PreAuthKeysScreen({super.key});
@@ -71,7 +72,11 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
             itemCount: activeKeys.length,
             itemBuilder: (context, index) {
               final key = activeKeys[index];
-              return _PreAuthKeyCard(apiKey: key, onAction: _refreshData);
+              return _PreAuthKeyCard(
+                apiKey: key,
+                onAction: _refreshData,
+                onShowQrCode: _showQrCodeDialog, // Passer la fonction ici
+              );
             },
           );
         },
@@ -134,6 +139,15 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
             },
           ),
           ElevatedButton.icon(
+            icon: Icon(Icons.qr_code, color: theme.colorScheme.onPrimary),
+            label: Text('QR Code', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+            onPressed: () {
+              Navigator.of(context).pop(); // Ferme le dialogue actuel
+              _showQrCodeDialog(context, fullCommand); // Ouvre le dialogue QR Code
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.primary),
+          ),
+          ElevatedButton.icon(
             icon: Icon(Icons.copy, color: theme.colorScheme.onPrimary), 
             label: Text('Copier', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
             onPressed: () async {
@@ -146,13 +160,56 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
       ),
     );
   }
+
+  void _showQrCodeDialog(BuildContext context, String data) {
+    final theme = Theme.of(context);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('QR Code pour la commande', style: theme.textTheme.titleLarge),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            QrImageView(
+              data: data,
+              version: QrVersions.auto,
+              size: 200.0,
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              errorStateBuilder: (cxt, err) {
+                return Center(
+                  child: Text(
+                    'Uh oh! Something went wrong :($err)',
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            Text('Scannez ce QR code avec votre appareil mobile pour obtenir la commande.', style: theme.textTheme.bodyMedium),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Fermer', style: theme.textTheme.labelLarge),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _PreAuthKeyCard extends StatelessWidget {
   final PreAuthKey apiKey;
   final VoidCallback onAction;
+  final Function(BuildContext, String) onShowQrCode; // Nouveau callback
 
-  const _PreAuthKeyCard({required this.apiKey, required this.onAction});
+  const _PreAuthKeyCard({
+    required this.apiKey,
+    required this.onAction,
+    required this.onShowQrCode, // Requis
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -232,12 +289,23 @@ class _PreAuthKeyCard extends StatelessWidget {
         title: Text('Commande d\'enregistrement', style: theme.textTheme.titleLarge),
         content: SelectableText(fullCommand, style: theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace')),
         actions: [
-          TextButton(
+          ElevatedButton.icon(
+            icon: Icon(Icons.qr_code, color: theme.colorScheme.onPrimary),
+            label: Text('QR Code', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+            onPressed: () {
+              Navigator.of(context).pop(); // Ferme le dialogue actuel
+              onShowQrCode(context, fullCommand); // Utilise le callback
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.primary),
+          ),
+          ElevatedButton.icon(
+            icon: Icon(Icons.copy, color: theme.colorScheme.onPrimary), 
+            label: Text('Copier', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: fullCommand));
               showSafeSnackBar(context, 'Commande copiée !');
             },
-            child: Text('Copier', style: theme.textTheme.labelLarge),
+            style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.primary),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

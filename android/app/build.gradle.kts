@@ -41,6 +41,14 @@ android {
         versionName = flutter.versionName
     }
 
+    packagingOptions {
+        jniLibs {
+            // Ensure native libraries are 16KB page-aligned.
+            // This is important for Android 15 and devices with 16KB memory page sizes.
+            useLegacyPackaging = false
+        }
+    }
+
     signingConfigs {
         create("release") {
             storeFile = file(rootProject.projectDir.absolutePath + "/key.jks")

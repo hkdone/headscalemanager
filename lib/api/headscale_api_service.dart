@@ -320,14 +320,21 @@ class HeadscaleApiService {
     }
   }
 
-  /// Déplace un nœud vers un utilisateur différent.
-  Future<void> moveNode(String nodeId, String userId) async {
-    print('Déplacement du nœud $nodeId vers l\'utilisateur $userId');
+  /// Déplace un nœud vers un utilisateur différent et met à jour ses tags.
+  Future<void> moveNode(String nodeId, String newUserId) async {
+    print('Déplacement du nœud $nodeId vers l\'utilisateur $newUserId');
     final baseUrl = await _getBaseUrl();
+
+    // 1. Récupérer le nœud avant le déplacement pour obtenir ses tags actuels et son nom.
+    final oldNode = await getNodeDetails(nodeId);
+    final oldNodeName = oldNode.name;
+    final oldTags = List<String>.from(oldNode.tags); // Copie pour modification
+
+    // 2. Effectuer le déplacement du nœud.
     final response = await http.post(
       Uri.parse('${baseUrl}api/v1/node/$nodeId/user'),
       headers: await _getHeaders(),
-      body: jsonEncode(<String, String>{'user': userId}),
+      body: jsonEncode(<String, String>{'user': newUserId}),
     );
 
     if (response.statusCode != 200) {
@@ -335,25 +342,31 @@ class HeadscaleApiService {
       throw Exception(_handleError('déplacer le nœud', response));
     }
     print('Nœud déplacé avec succès.');
+
+    // 3. Récupérer le nœud après le déplacement pour obtenir son nouveau nom (si Headscale le change)
+    // et les tags potentiellement mis à jour par Headscale.
+    final newNode = await getNodeDetails(nodeId);
+    final newNodeName = newNode.name;
+    List<String> updatedTags = List<String>.from(newNode.tags);
+
+    // 4. Mettre à jour les tags :
+    // Supprimer l'ancien tag obligatoire et ajouter le nouveau.
+    final oldMandatoryTag = 'tag:$oldNodeName';
+    final newMandatoryTag = 'tag:$newNodeName';
+
+    // Supprimer l'ancien tag s'il existe
+    updatedTags.removeWhere((tag) => tag == oldMandatoryTag);
+
+    // Ajouter le nouveau tag s'il n'est pas déjà présent
+    if (!updatedTags.contains(newMandatoryTag)) {
+      updatedTags.add(newMandatoryTag);
+    }
+
+    // Appeler setTags pour mettre à jour les tags du nœud.
+    await setTags(nodeId, updatedTags);
+    print('Tags du nœud mis à jour avec succès après le déplacement.');
   }
 
-  /// Définit les tags pour une machine.
-  Future<void> setMachineTags(String machineId, List<String> tags) async {
-    // Récupère l'URL de base du serveur.
-    final baseUrl = await _getBaseUrl();
-    // Endpoint de l'API Headscale : POST /api/v1/machine/{machineId}/tags
-    // Le corps doit être un tableau JSON de chaînes : par exemple, ["tag:prod", "tag:db"]
-    final response = await http.post(
-      Uri.parse('${baseUrl}api/v1/machine/$machineId/tags'),
-      headers: await _getHeaders(),
-      body: jsonEncode(tags),
-    );
-    // Lève une exception si la requête n'a pas réussi.
-    if (response.statusCode != 200) {
-      throw Exception(_handleError('définir les tags de la machine', response));
-    }
-    // Aucune valeur de retour spécifique n'est nécessaire, juste la confirmation du succès ou de l'échec.
-  }
 
   /// Récupère toutes les clés de pré-authentification.
   Future<List<PreAuthKey>> getPreAuthKeys() async {
@@ -419,11 +432,18 @@ class HeadscaleApiService {
   }
 
   /// Crée une nouvelle clé d'API.
-  Future<String> createApiKey() async {
+  /// Permet de spécifier une date d'expiration pour la clé.
+  Future<String> createApiKey({DateTime? expiration}) async {
     final baseUrl = await _getBaseUrl();
+    final body = <String, dynamic>{};
+    if (expiration != null) {
+      body['expiration'] = expiration.toUtc().toIso8601String();
+    }
+
     final response = await http.post(
       Uri.parse('${baseUrl}api/v1/apikey'),
       headers: await _getHeaders(),
+      body: jsonEncode(body),
     );
 
     if (response.statusCode == 200) {

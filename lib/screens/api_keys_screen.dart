@@ -70,7 +70,10 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
   }
 
   Future<void> _createNewApiKey() async {
-    final newApiKey = await context.read<AppProvider>().apiService.createApiKey();
+    // Calculer la date d'expiration à 6 mois à partir de maintenant
+    final expirationDate = DateTime.now().add(const Duration(days: 182)); // Environ 6 mois
+
+    final newApiKey = await context.read<AppProvider>().apiService.createApiKey(expiration: expirationDate);
     _refreshApiKeys();
     if (mounted) {
       await showDialog(
@@ -136,7 +139,7 @@ class _ApiKeyCard extends StatelessWidget {
             ),
             PopupMenuItem(
               value: 'delete',
-              child: ListTile(leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error), title: Text('Supprimer')),
+              child: ListTile(leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error), title: const Text('Supprimer')),
             ),
           ],
         ),

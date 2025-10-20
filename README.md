@@ -263,6 +263,8 @@ Cet écran affiche toutes les informations détaillées d'un nœud spécifique, 
   - **Désactiver les routes de sous-réseau :** Désactive les routes de sous-réseau annoncées via l'API.
   - **Supprimer l'appareil :** Supprime le nœud du serveur Headscale après confirmation.
 
+**Note Importante sur les Modifications des Nœuds :**
+Toute modification apportée à un nœud (ajout, renommage, déplacement, modification des tags, activation/désactivation de routes) via cette application est enregistrée immédiatement dans la base de données de Headscale. Cependant, pour que ces changements soient réellement pris en compte par les autres nœuds du réseau et que la nouvelle configuration soit propagée, il est souvent nécessaire de redémarrer le service Headscale sur votre serveur. Headscale pousse les informations de sa base de données aux autres nœuds principalement au démarrage du service.
 
 ### 3.6. Vue d'ensemble du réseau
 

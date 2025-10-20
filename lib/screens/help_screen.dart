@@ -409,6 +409,16 @@ routes:
               ]),
               const SizedBox(height: 24),
 
+              _buildInfoCard(context, children: [
+                _buildBodyText(
+                  context,
+                  '**Note Importante sur les Modifications des Nœuds :**\n'
+                  'Toute modification apportée à un nœud (ajout, renommage, déplacement, modification des tags, activation/désactivation de routes) via cette application est enregistrée immédiatement dans la base de données de Headscale. Cependant, pour que ces changements soient réellement pris en compte par les autres nœuds du réseau et que la nouvelle configuration soit propagée, il est souvent nécessaire de redémarrer le service Headscale sur votre serveur. Headscale pousse les informations de sa base de données aux autres nœuds principalement au démarrage du service.',
+                  isBold: true,
+                ),
+              ]),
+              const SizedBox(height: 24),
+
               _buildBodyText(
                   context,
                   'Pour toute question ou problème, veuillez consulter la documentation officielle de Headscale ou les ressources de la communauté.'),

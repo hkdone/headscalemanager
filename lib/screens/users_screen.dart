@@ -168,7 +168,7 @@ class _UserCard extends StatelessWidget {
                   PopupMenuItem<String>(
                     value: 'delete',
                     child: ListTile(
-                      leading: Icon(Icons.delete, color: Colors.red, semanticLabel: 'Supprimer l\'utilisateur'),
+                      leading: const Icon(Icons.delete, color: Colors.red, semanticLabel: 'Supprimer l\'utilisateur'),
                       title: Text('Supprimer l\'utilisateur', style: theme.textTheme.bodyMedium),
                     ),
                   ),
