@@ -25,28 +25,40 @@ class DeleteUserDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.read<AppProvider>();
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
 
     return AlertDialog(
-      title: const Text('Supprimer l\'utilisateur ?'),
-      content: Text(
-          'Êtes-vous sûr de vouloir supprimer ${user.name} ?\n\nNote : La suppression échouera si l\'utilisateur possède encore des appareils.'),
+      title: Text(isFr ? 'Supprimer l\'utilisateur ?' : 'Delete user?'),
+      content: Text(isFr
+          ? 'Êtes-vous sûr de vouloir supprimer ${user.name} ?\n\nNote : La suppression échouera si l\'utilisateur possède encore des appareils.'
+          : 'Are you sure you want to delete ${user.name}?\n\nNote: Deletion will fail if the user still owns devices.'),
       actions: [
         TextButton(
-          child: const Text('Annuler'),
+          child: Text(isFr ? 'Annuler' : 'Cancel'),
           onPressed: () => Navigator.of(context).pop(),
         ),
         TextButton(
-          child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          child: Text(isFr ? 'Supprimer' : 'Delete',
+              style: const TextStyle(color: Colors.red)),
           onPressed: () async {
             try {
               await provider.apiService.deleteUser(user.id);
               Navigator.of(context).pop(); // Ferme le dialogue de confirmation
               onUserDeleted(); // Appelle le callback pour rafraîchir la liste
-              showSafeSnackBar(context, 'Utilisateur ${user.name} supprimé.');
+              showSafeSnackBar(
+                  context,
+                  isFr
+                      ? 'Utilisateur ${user.name} supprimé.'
+                      : 'User ${user.name} deleted.');
             } catch (e) {
               debugPrint('Erreur lors de la suppression de l\'utilisateur : $e');
               Navigator.of(context).pop();
-              showSafeSnackBar(context, 'Échec de la suppression de l\'utilisateur : $e');
+              showSafeSnackBar(
+                  context,
+                  isFr
+                      ? 'Échec de la suppression de l\'utilisateur : $e'
+                      : 'Failed to delete user: $e');
             }
           },
         ),

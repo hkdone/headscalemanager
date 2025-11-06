@@ -40,6 +40,8 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
   }
 
   Future<void> _refreshData() async {
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     // Incrémente la génération pour invalider les traceroutes précédents.
     _traceRouteGeneration++;
     final currentGeneration = _traceRouteGeneration;
@@ -62,7 +64,9 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors du rafraîchissement: $e')),
+          SnackBar(
+              content: Text(
+                  '${isFr ? 'Erreur lors du rafraîchissement' : 'Refresh error'}: $e')),
         );
       }
     } finally {
@@ -96,8 +100,12 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
       _startPinging();
     } catch (e) {
       if (!mounted) return;
+      final locale = context.read<AppProvider>().locale;
+      final isFr = locale.languageCode == 'fr';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de la récupération des nœuds: $e')),
+        SnackBar(
+            content: Text(
+                '${isFr ? 'Erreur lors de la récupération des nœuds' : 'Error fetching nodes'}: $e')),
       );
     }
   }
@@ -116,9 +124,12 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final locale = context.read<AppProvider>().locale;
+        final isFr = locale.languageCode == 'fr';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Erreur de récupération de l\'IP publique: $e')),
+              content: Text(
+                  '${isFr ? 'Erreur de récupération de l\'IP publique' : 'Error fetching public IP'}: $e')),
         );
       }
     }
@@ -264,9 +275,11 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Vue d\'ensemble du réseau'),
+        title: Text(isFr ? 'Vue d\'ensemble du réseau' : 'Network Overview'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -319,6 +332,8 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
   }
 
   Widget _buildNetworkVisualizer() {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     return Card(
       margin: const EdgeInsets.all(8.0),
       child: Padding(
@@ -326,34 +341,48 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
         child: Column(
           children: [
             Text(
-              'Visualisation du chemin réseau',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              isFr
+                  ? 'Visualisation du chemin réseau'
+                  : 'Network Path Visualization',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildVisualizerNode(context, 'Mon Appareil', Icons.phone_iphone,
-                    _selectedNode?.name ?? 'N/A'),
+                _buildVisualizerNode(
+                    context,
+                    isFr ? 'Mon Appareil' : 'My Device',
+                    Icons.phone_iphone,
+                    _selectedNode?.name ?? (isFr ? 'N/A' : 'N/A')),
                 if (_exitNodeInUse != null) ...[
-                  Icon(Icons.arrow_forward, color: Theme.of(context).textTheme.bodyMedium?.color),
-                  _buildVisualizerNode(
-                      context, 'Exit Node', Icons.router, _exitNodeInUse!.name),
+                  Icon(Icons.arrow_forward,
+                      color: Theme.of(context).textTheme.bodyMedium?.color),
+                  _buildVisualizerNode(context, 'Exit Node', Icons.router,
+                      _exitNodeInUse!.name),
                 ],
-                Icon(Icons.arrow_forward, color: Theme.of(context).textTheme.bodyMedium?.color),
+                Icon(Icons.arrow_forward,
+                    color: Theme.of(context).textTheme.bodyMedium?.color),
                 _buildVisualizerNode(
                     context, 'Internet', Icons.cloud, _publicIp ?? '...'),
               ],
             ),
             if (_isTracingRoute) ...[
               const SizedBox(height: 10),
-              CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
-              Text('Traceroute en cours...', style: Theme.of(context).textTheme.bodyMedium),
+              CircularProgressIndicator(
+                  color: Theme.of(context).colorScheme.primary),
+              Text(isFr ? 'Traceroute en cours...' : 'Traceroute in progress...',
+                  style: Theme.of(context).textTheme.bodyMedium),
             ],
             if (_traceRouteHops.isNotEmpty) ...[
               const SizedBox(height: 16),
               ExpansionTile(
-                title: Text('Détails du traceroute', style: Theme.of(context).textTheme.titleMedium),
+                title: Text(
+                    isFr ? 'Détails du traceroute' : 'Traceroute Details',
+                    style: Theme.of(context).textTheme.titleMedium),
                 children: _traceRouteHops.map((hop) {
                   String nodeName = '';
                   try {
@@ -389,11 +418,14 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
   }
 
   Widget _buildNodeSelector() {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: DropdownButton<Node>(
         value: _selectedNode,
-        hint: Text('Sélectionnez un nœud', style: Theme.of(context).textTheme.bodyMedium),
+        hint: Text(isFr ? 'Sélectionnez un nœud' : 'Select a node',
+            style: Theme.of(context).textTheme.bodyMedium),
         isExpanded: true,
         onChanged: (Node? newValue) {
           setState(() {

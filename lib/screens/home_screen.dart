@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/acl_screen.dart';
 import 'package:headscalemanager/screens/dashboard_screen.dart';
 import 'package:headscalemanager/screens/acl_tester_screen.dart';
@@ -6,7 +7,8 @@ import 'package:headscalemanager/screens/network_overview_screen.dart';
 import 'package:headscalemanager/screens/settings_screen.dart';
 import 'package:headscalemanager/screens/users_screen.dart';
 import 'package:eva_icons_flutter/eva_icons_flutter.dart';
-import 'package:headscalemanager/screens/help_screen.dart'; // Import pour l'écran d'aide
+import 'package:headscalemanager/screens/help_screen.dart';
+import 'package:provider/provider.dart'; // Import pour l'écran d'aide
 
 /// Écran d'accueil principal de l'application.
 ///
@@ -44,10 +46,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     return Scaffold(
       /// Barre d'application en haut de l'écran.
       appBar: AppBar(
-        title: const Text('Gestionnaire Headscale'), // Titre de l'application
+        title: Text(isFr ? 'Gestionnaire Headscale' : 'Headscale Manager'),
         actions: [
           // Bouton d'aide : navigue vers l'écran d'aide.
           IconButton(
@@ -75,31 +80,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
       /// Barre de navigation inférieure.
       bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
+        items: <BottomNavigationBarItem>[
           // Élément pour le Tableau de Bord.
           BottomNavigationBarItem(
-            icon: Icon(EvaIcons.layout),
-            label: 'Tableau de bord',
+            icon: const Icon(EvaIcons.layout),
+            label: isFr ? 'Tableau de bord' : 'Dashboard',
           ),
           // Élément pour les Utilisateurs.
           BottomNavigationBarItem(
-            icon: Icon(EvaIcons.people),
-            label: 'Utilisateurs',
+            icon: const Icon(EvaIcons.people),
+            label: isFr ? 'Utilisateurs' : 'Users',
           ),
           // Élément pour les ACLs.
           BottomNavigationBarItem(
-            icon: Icon(EvaIcons.shield),
+            icon: const Icon(EvaIcons.shield),
             label: 'ACLs',
           ),
           // Élément pour la vue d'ensemble du réseau.
           BottomNavigationBarItem(
-            icon: Icon(EvaIcons.globe2Outline),
-            label: 'Réseau',
+            icon: const Icon(EvaIcons.globe2Outline),
+            label: isFr ? 'Réseau' : 'Network',
           ),
           // Élément pour le Testeur d'ACL.
           BottomNavigationBarItem(
-            icon: Icon(EvaIcons.colorPalette),
-            label: 'Test ACL',
+            icon: const Icon(EvaIcons.colorPalette),
+            label: isFr ? 'Test ACL' : 'ACL Test',
           ),
         ],
         currentIndex: _selectedIndex, // Index de l'élément actuellement actif.

@@ -27,10 +27,14 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('Clés API', style: Theme.of(context).appBarTheme.titleTextStyle),
+        title: Text(isFr ? 'Clés API' : 'API Keys',
+            style: Theme.of(context).appBarTheme.titleTextStyle),
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
         iconTheme: Theme.of(context).appBarTheme.iconTheme,
@@ -42,10 +46,13 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Erreur : ${snapshot.error}'));
+            return Center(
+                child: Text(
+                    '${isFr ? 'Erreur' : 'Error'}: ${snapshot.error}'));
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Aucune clé API trouvée.'));
+            return Center(
+                child: Text(isFr ? 'Aucune clé API trouvée.' : 'No API key found.'));
           }
 
           final apiKeys = snapshot.data!;
@@ -62,7 +69,7 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _createNewApiKey,
-        tooltip: 'Créer une clé API',
+        tooltip: isFr ? 'Créer une clé API' : 'Create API Key',
         backgroundColor: Theme.of(context).colorScheme.primary,
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -70,29 +77,38 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
   }
 
   Future<void> _createNewApiKey() async {
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     // Calculer la date d'expiration à 6 mois à partir de maintenant
-    final expirationDate = DateTime.now().add(const Duration(days: 182)); // Environ 6 mois
+    final expirationDate =
+        DateTime.now().add(const Duration(days: 182)); // Environ 6 mois
 
-    final newApiKey = await context.read<AppProvider>().apiService.createApiKey(expiration: expirationDate);
+    final newApiKey = await context
+        .read<AppProvider>()
+        .apiService
+        .createApiKey(expiration: expirationDate);
     _refreshApiKeys();
     if (mounted) {
       await showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Nouvelle clé API créée'),
+          title: Text(isFr ? 'Nouvelle clé API créée' : 'New API Key Created'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Veuillez copier cette clé maintenant. Vous ne pourrez pas la voir à nouveau.'),
+              Text(isFr
+                  ? 'Veuillez copier cette clé maintenant. Vous ne pourrez pas la voir à nouveau.'
+                  : 'Please copy this key now. You will not be able to see it again.'),
               const SizedBox(height: 16),
-              SelectableText(newApiKey, style: const TextStyle(fontFamily: 'monospace')),
+              SelectableText(newApiKey,
+                  style: const TextStyle(fontFamily: 'monospace')),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
+              child: Text(isFr ? 'OK' : 'OK'),
             ),
           ],
         ),
@@ -109,13 +125,17 @@ class _ApiKeyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     return Card(
       elevation: 0,
       color: Theme.of(context).cardColor,
       margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         title: Text('Prefix: ${apiKey.prefix}',
             style: Theme.of(context).textTheme.titleMedium),
         subtitle: Column(
@@ -124,22 +144,29 @@ class _ApiKeyCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text('ID: ${apiKey.id}',
                 style: Theme.of(context).textTheme.bodySmall),
-            Text('Expiration: ${apiKey.expiration?.toLocal() ?? 'Jamais'}',
+            Text(
+                '${isFr ? 'Expiration' : 'Expiration'}: ${apiKey.expiration?.toLocal() ?? (isFr ? 'Jamais' : 'Never')}',
                 style: Theme.of(context).textTheme.bodySmall),
-            Text('Dernière utilisation: ${apiKey.lastSeen?.toLocal() ?? 'Jamais'}',
+            Text(
+                '${isFr ? 'Dernière utilisation' : 'Last Seen'}: ${apiKey.lastSeen?.toLocal() ?? (isFr ? 'Jamais' : 'Never')}',
                 style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
         trailing: PopupMenuButton<String>(
           onSelected: (value) => _handleMenuSelection(context, value),
           itemBuilder: (context) => [
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'expire',
-              child: ListTile(leading: Icon(Icons.hourglass_bottom), title: Text('Faire expirer')),
+              child: ListTile(
+                  leading: const Icon(Icons.hourglass_bottom),
+                  title: Text(isFr ? 'Faire expirer' : 'Expire')),
             ),
             PopupMenuItem(
               value: 'delete',
-              child: ListTile(leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error), title: const Text('Supprimer')),
+              child: ListTile(
+                  leading: Icon(Icons.delete,
+                      color: Theme.of(context).colorScheme.error),
+                  title: Text(isFr ? 'Supprimer' : 'Delete')),
             ),
           ],
         ),
@@ -148,41 +175,68 @@ class _ApiKeyCard extends StatelessWidget {
   }
 
   void _handleMenuSelection(BuildContext context, String value) async {
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     switch (value) {
       case 'expire':
-        final confirm = await _showConfirmationDialog(context, 'Faire expirer la clé API ?', 'Voulez-vous vraiment faire expirer la clé API avec le préfixe ${apiKey.prefix} ?');
+        final confirm = await _showConfirmationDialog(
+            context,
+            isFr ? 'Faire expirer la clé API ?' : 'Expire API Key?',
+            isFr
+                ? 'Voulez-vous vraiment faire expirer la clé API avec le préfixe ${apiKey.prefix} ?'
+                : 'Do you really want to expire the API key with prefix ${apiKey.prefix}?');
         if (confirm) {
-          await context.read<AppProvider>().apiService.expireApiKey(apiKey.prefix);
+          await context
+              .read<AppProvider>()
+              .apiService
+              .expireApiKey(apiKey.prefix);
           onAction();
         }
         break;
       case 'delete':
-        final confirm = await _showConfirmationDialog(context, 'Supprimer la clé API ?', 'Voulez-vous vraiment supprimer la clé API avec le préfixe ${apiKey.prefix} ?');
+        final confirm = await _showConfirmationDialog(
+            context,
+            isFr ? 'Supprimer la clé API ?' : 'Delete API Key?',
+            isFr
+                ? 'Voulez-vous vraiment supprimer la clé API avec le préfixe ${apiKey.prefix} ?'
+                : 'Do you really want to delete the API key with prefix ${apiKey.prefix}?');
         if (confirm) {
-          await context.read<AppProvider>().apiService.deleteApiKey(apiKey.prefix);
+          await context
+              .read<AppProvider>()
+              .apiService
+              .deleteApiKey(apiKey.prefix);
           onAction();
         }
         break;
     }
   }
 
-  Future<bool> _showConfirmationDialog(BuildContext context, String title, String content) async {
+  Future<bool> _showConfirmationDialog(
+      BuildContext context, String title, String content) async {
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title, style: Theme.of(context).textTheme.titleLarge),
-        content: Text(content, style: Theme.of(context).textTheme.bodyMedium),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler'),
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(title, style: Theme.of(context).textTheme.titleLarge),
+            content:
+                Text(content, style: Theme.of(context).textTheme.bodyMedium),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(isFr ? 'Annuler' : 'Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(isFr ? 'Confirmer' : 'Confirm',
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Confirmer', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 }

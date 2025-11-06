@@ -43,19 +43,26 @@ class _RenameNodeDialogState extends State<RenameNodeDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     return AlertDialog(
-      title: const Text('Renommer l\'appareil'),
+      title: Text(isFr ? 'Renommer l\'appareil' : 'Rename Device'),
       content: Form(
         key: _formKey,
         child: TextFormField(
           controller: _nameController,
-          decoration: const InputDecoration(
-            labelText: 'Nouveau nom',
-            hintText: 'Entrez le nouveau nom de l\'appareil',
+          decoration: InputDecoration(
+            labelText: isFr ? 'Nouveau nom' : 'New name',
+            hintText: isFr
+                ? 'Entrez le nouveau nom de l\'appareil'
+                : 'Enter the new device name',
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return 'Le nom ne peut pas être vide.';
+              return isFr
+                  ? 'Le nom ne peut pas être vide.'
+                  : 'Name cannot be empty.';
             }
             return null;
           },
@@ -64,21 +71,32 @@ class _RenameNodeDialogState extends State<RenameNodeDialog> {
       ),
       actions: [
         TextButton(
-          child: const Text('Annuler'),
+          child: Text(isFr ? 'Annuler' : 'Cancel'),
           onPressed: () => Navigator.of(context).pop(),
         ),
         TextButton(
-          child: const Text('Renommer'),
+          child: Text(isFr ? 'Renommer' : 'Rename'),
           onPressed: () async {
             if (_formKey.currentState!.validate()) {
               final newName = _nameController.text.trim();
               try {
-                await context.read<AppProvider>().apiService.renameNode(widget.node.id, newName);
+                await context
+                    .read<AppProvider>()
+                    .apiService
+                    .renameNode(widget.node.id, newName);
                 widget.onNodeRenamed();
                 Navigator.of(context).pop();
-                showSafeSnackBar(context, 'Appareil renommé avec succès.');
+                showSafeSnackBar(
+                    context,
+                    isFr
+                        ? 'Appareil renommé avec succès.'
+                        : 'Device renamed successfully.');
               } catch (e) {
-                showSafeSnackBar(context, 'Erreur lors du renommage: $e');
+                showSafeSnackBar(
+                    context,
+                    isFr
+                        ? 'Erreur lors du renommage: $e'
+                        : 'Error while renaming: $e');
               }
             }
           },

@@ -73,10 +73,13 @@ class _AclScreenState extends State<AclScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('Gestion des ACLs',
+        title: Text(isFr ? 'Gestion des ACLs' : 'ACL Management',
             style: Theme.of(context).appBarTheme.titleTextStyle),
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
@@ -114,7 +117,7 @@ class _AclScreenState extends State<AclScreen> {
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _generateNewAclPolicy(showSnackbar: true),
-        label: const Text('Générer la Politique'),
+        label: Text(isFr ? 'Générer la Politique' : 'Generate Policy'),
         icon: const Icon(Icons.settings_backup_restore),
         backgroundColor: Theme.of(context).colorScheme.primary,
         heroTag: 'generate_policy_fab',
@@ -123,6 +126,9 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   PopupMenuButton<String> _buildActionsMenu() {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     return PopupMenuButton<String>(
       onSelected: (value) {
         switch (value) {
@@ -141,30 +147,33 @@ class _AclScreenState extends State<AclScreen> {
         }
       },
       itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'export',
           child: ListTile(
-              leading: Icon(Icons.cloud_upload),
-              title: Text('Exporter vers le serveur')),
+              leading: const Icon(Icons.cloud_upload),
+              title:
+                  Text(isFr ? 'Exporter vers le serveur' : 'Export to Server')),
         ),
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'fetch',
           child: ListTile(
-              leading: Icon(Icons.cloud_download),
-              title: Text('Récupérer du serveur')),
+              leading: const Icon(Icons.cloud_download),
+              title: Text(isFr ? 'Récupérer du serveur' : 'Fetch from Server')),
         ),
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'share',
           child: ListTile(
-              leading: Icon(Icons.share), title: Text('Partager en fichier')),
+              leading: const Icon(Icons.share),
+              title: Text(isFr ? 'Partager en fichier' : 'Share as File')),
         ),
         const PopupMenuDivider(),
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'reset',
           child: ListTile(
-            leading: Icon(Icons.lock_open, color: Colors.orange),
-            title: Text('Autoriser tout (Réinitialiser)',
-                style: TextStyle(color: Colors.orange)),
+            leading: const Icon(Icons.lock_open, color: Colors.orange),
+            title: Text(
+                isFr ? 'Autoriser tout (Réinitialiser)' : 'Allow All (Reset)',
+                style: const TextStyle(color: Colors.orange)),
           ),
         ),
       ],
@@ -172,6 +181,9 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Widget _buildTemporaryRulesSection() {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     return Card(
       elevation: 0,
       color: Theme.of(context).cardColor,
@@ -181,14 +193,16 @@ class _AclScreenState extends State<AclScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Autorisations Spécifiques',
+            Text(isFr ? 'Autorisations Spécifiques' : 'Specific Permissions',
                 style: Theme.of(context)
                     .textTheme
                     .titleLarge
                     ?.copyWith(fontSize: 20)),
             const SizedBox(height: 8),
             Text(
-              'Créez ici des exceptions pour autoriser la communication entre les appareils de différents utilisateurs.',
+              isFr
+                  ? 'Créez ici des exceptions pour autoriser la communication entre les appareils de différents utilisateurs.'
+                  : 'Create exceptions here to allow communication between devices of different users.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
@@ -222,8 +236,8 @@ class _AclScreenState extends State<AclScreen> {
               child: ElevatedButton.icon(
                 onPressed: _addTemporaryRule,
                 icon: const Icon(Icons.add_link, color: Colors.white),
-                label: const Text('Ajouter et Appliquer',
-                    style: TextStyle(color: Colors.white)),
+                label: Text(isFr ? 'Ajouter et Appliquer' : 'Add and Apply',
+                    style: const TextStyle(color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   shape: RoundedRectangleBorder(
@@ -235,7 +249,7 @@ class _AclScreenState extends State<AclScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Règles actives:',
+                Text(isFr ? 'Règles actives:' : 'Active Rules:',
                     style: Theme.of(context).textTheme.titleMedium),
                 IconButton(
                   icon: Icon(Icons.delete_sweep,
@@ -243,7 +257,8 @@ class _AclScreenState extends State<AclScreen> {
                           .colorScheme
                           .onSurface
                           .withOpacity(0.6)),
-                  tooltip: 'Effacer toutes les règles',
+                  tooltip:
+                      isFr ? 'Effacer toutes les règles' : 'Clear All Rules',
                   onPressed: _clearTemporaryRules,
                 )
               ],
@@ -272,9 +287,13 @@ class _AclScreenState extends State<AclScreen> {
 
   DropdownButtonFormField<String> _buildTagDropdown(String label,
       String? selectedTag, List<String> tags, ValueChanged<String?> onChanged) {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     return DropdownButtonFormField<String>(
       value: selectedTag,
-      decoration: _buildInputDecoration(label, 'Choisir un tag'),
+      decoration: _buildInputDecoration(
+          label, isFr ? 'Choisir un tag' : 'Choose a tag'),
       items: tags.map((String tag) {
         return DropdownMenuItem<String>(
           value: tag,
@@ -301,10 +320,15 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Future<void> _addTemporaryRule() async {
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     if (_selectedSourceTag == null || _selectedDestinationTag == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
-              'Veuillez sélectionner un tag source et un tag destination.',
+              isFr
+                  ? 'Veuillez sélectionner un tag source et un tag destination.'
+                  : 'Please select a source and a destination tag.',
               style: TextStyle(color: Theme.of(context).colorScheme.onError)),
           backgroundColor: Theme.of(context).colorScheme.error));
       return;
@@ -312,7 +336,9 @@ class _AclScreenState extends State<AclScreen> {
     if (_selectedSourceTag == _selectedDestinationTag) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
-              'Le tag source et le tag destination ne peuvent pas être identiques.',
+              isFr
+                  ? 'Le tag source et le tag destination ne peuvent pas être identiques.'
+                  : 'Source and destination tags cannot be the same.',
               style: TextStyle(color: Theme.of(context).colorScheme.onError)),
           backgroundColor: Theme.of(context).colorScheme.error));
       return;
@@ -329,7 +355,8 @@ class _AclScreenState extends State<AclScreen> {
 
     if (ruleExists) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Cette règle existe déjà.',
+          content: Text(
+              isFr ? 'Cette règle existe déjà.' : 'This rule already exists.',
               style: TextStyle(color: Theme.of(context).colorScheme.onError)),
           backgroundColor: Theme.of(context).colorScheme.error));
       return;
@@ -342,7 +369,9 @@ class _AclScreenState extends State<AclScreen> {
     final storage = context.read<AppProvider>().storageService;
     await storage.saveTemporaryRules(_temporaryRules);
     await _generateAndExportPolicy(
-        message: 'Règle ajoutée et politique appliquée avec succès.');
+        message: isFr
+            ? 'Règle ajoutée et politique appliquée avec succès.'
+            : 'Rule added and policy applied successfully.');
   }
 
   Future<void> _generateNewAclPolicy({bool showSnackbar = true}) async {
@@ -364,6 +393,9 @@ class _AclScreenState extends State<AclScreen> {
 
       _updateAclControllerText();
 
+      final locale = context.read<AppProvider>().locale;
+      final isFr = locale.languageCode == 'fr';
+
       if (showSnackbar && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -371,11 +403,17 @@ class _AclScreenState extends State<AclScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Politique ACL avancée générée dans le champ de texte.',
+                Text(
+                    isFr
+                        ? 'Politique ACL avancée générée dans le champ de texte.'
+                        : 'Advanced ACL policy generated in the text field.',
                     style: TextStyle(
                         color: Theme.of(context).colorScheme.onPrimary)),
                 const SizedBox(height: 4),
-                Text('Utilisez le menu (⋮) pour l\'exporter.',
+                Text(
+                    isFr
+                        ? 'Utilisez le menu (⋮) pour l\'exporter.'
+                        : 'Use the menu (⋮) to export it.',
                     style: TextStyle(
                         color: Theme.of(context)
                             .colorScheme
@@ -392,34 +430,42 @@ class _AclScreenState extends State<AclScreen> {
       debugPrint(
           'Erreur lors de la génération de la politique ACL avancée : $e');
       if (mounted) {
+        final locale = context.read<AppProvider>().locale;
+        final isFr = locale.languageCode == 'fr';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
-                  'Échec de la génération de la politique ACL avancée : $e',
+                  '${isFr ? 'Échec de la génération de la politique ACL avancée' : 'Failed to generate advanced ACL policy'}: $e',
                   style:
                       TextStyle(color: Theme.of(context).colorScheme.onError)),
               backgroundColor: Theme.of(context).colorScheme.error),
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _removeTemporaryRule(int index) async {
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     final bool confirm = await showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Confirmer la suppression'),
-            content: const Text(
-                'Cela va supprimer la règle et appliquer immédiatement la nouvelle politique au serveur. Continuer ?'),
+            title: Text(isFr ? 'Confirmer la suppression' : 'Confirm Deletion'),
+            content: Text(isFr
+                ? 'Cela va supprimer la règle et appliquer immédiatement la nouvelle politique au serveur. Continuer ?'
+                : 'This will delete the rule and immediately apply the new policy to the server. Continue?'),
             actions: [
               TextButton(
-                  child: const Text('Annuler'),
+                  child: Text(isFr ? 'Annuler' : 'Cancel'),
                   onPressed: () => Navigator.of(ctx).pop(false)),
               TextButton(
-                  child: const Text('Confirmer',
-                      style: TextStyle(color: Colors.red)),
+                  child: Text(isFr ? 'Confirmer' : 'Confirm',
+                      style: const TextStyle(color: Colors.red)),
                   onPressed: () => Navigator.of(ctx).pop(true)),
             ],
           ),
@@ -435,23 +481,29 @@ class _AclScreenState extends State<AclScreen> {
     final storage = context.read<AppProvider>().storageService;
     await storage.saveTemporaryRules(_temporaryRules);
     await _generateAndExportPolicy(
-        message: 'Règle supprimée et politique mise à jour.');
+        message: isFr
+            ? 'Règle supprimée et politique mise à jour.'
+            : 'Rule deleted and policy updated.');
   }
 
   Future<void> _clearTemporaryRules() async {
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     final bool confirm = await showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Confirmer la suppression'),
-            content: const Text(
-                'Cela va supprimer TOUTES les règles et appliquer la nouvelle politique au serveur. Continuer ?'),
+            title: Text(isFr ? 'Confirmer la suppression' : 'Confirm Deletion'),
+            content: Text(isFr
+                ? 'Cela va supprimer TOUTES les règles et appliquer la nouvelle politique au serveur. Continuer ?'
+                : 'This will delete ALL rules and apply the new policy to the server. Continue?'),
             actions: [
               TextButton(
-                  child: const Text('Annuler'),
+                  child: Text(isFr ? 'Annuler' : 'Cancel'),
                   onPressed: () => Navigator.of(ctx).pop(false)),
               TextButton(
-                  child: const Text('Confirmer',
-                      style: TextStyle(color: Colors.red)),
+                  child: Text(isFr ? 'Confirmer' : 'Confirm',
+                      style: const TextStyle(color: Colors.red)),
                   onPressed: () => Navigator.of(ctx).pop(true)),
             ],
           ),
@@ -466,8 +518,9 @@ class _AclScreenState extends State<AclScreen> {
     final storage = context.read<AppProvider>().storageService;
     await storage.saveTemporaryRules(_temporaryRules);
     await _generateAndExportPolicy(
-        message:
-            'Toutes les règles ont été supprimées et la politique a été mise à jour.');
+        message: isFr
+            ? 'Toutes les règles ont été supprimées et la politique a été mise à jour.'
+            : 'All rules have been deleted and the policy has been updated.');
   }
 
   Future<void> _generateAndExportPolicy({String? message}) async {
@@ -478,24 +531,30 @@ class _AclScreenState extends State<AclScreen> {
 
   Future<void> _exportAclPolicyToServer(
       {bool showConfirmation = true, String? successMessage}) async {
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     if (showConfirmation) {
       final bool confirm = await showDialog(
             context: context,
             builder: (BuildContext context) {
               return AlertDialog(
-                title: Text('Confirmer l\'exportation',
+                title: Text(
+                    isFr ? 'Confirmer l\'exportation' : 'Confirm Export',
                     style: Theme.of(context).textTheme.titleLarge),
                 content: Text(
-                    'Vous allez appliquer la politique ACL définie dans le champ de texte sur votre serveur. Êtes-vous sûr ?',
+                    isFr
+                        ? 'Vous allez appliquer la politique ACL définie dans le champ de texte sur votre serveur. Êtes-vous sûr ?'
+                        : 'You are about to apply the ACL policy defined in the text field to your server. Are you sure?',
                     style: Theme.of(context).textTheme.bodyMedium),
                 actions: <Widget>[
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Annuler'),
+                    child: Text(isFr ? 'Annuler' : 'Cancel'),
                   ),
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(true),
-                    child: Text('Confirmer',
+                    child: Text(isFr ? 'Confirmer' : 'Confirm',
                         style: TextStyle(
                             color: Theme.of(context).colorScheme.error)),
                   ),
@@ -517,7 +576,9 @@ class _AclScreenState extends State<AclScreen> {
           SnackBar(
               content: Text(
                   successMessage ??
-                      'Politique ACL exportée avec succès vers le serveur.',
+                      (isFr
+                          ? 'Politique ACL exportée avec succès vers le serveur.'
+                          : 'ACL policy successfully exported to the server.'),
                   style: TextStyle(
                       color: Theme.of(context).colorScheme.onPrimary)),
               backgroundColor: Theme.of(context).colorScheme.primary),
@@ -527,16 +588,21 @@ class _AclScreenState extends State<AclScreen> {
       debugPrint(
           'Erreur lors de l\'exportation de la politique ACL vers le serveur : $e');
       if (mounted) {
+        final locale = context.read<AppProvider>().locale;
+        final isFr = locale.languageCode == 'fr';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Échec de l\'exportation de la politique ACL : $e',
+              content: Text(
+                  '${isFr ? 'Échec de l\'exportation de la politique ACL' : 'Failed to export ACL policy'}: $e',
                   style:
                       TextStyle(color: Theme.of(context).colorScheme.onError)),
               backgroundColor: Theme.of(context).colorScheme.error),
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -548,10 +614,15 @@ class _AclScreenState extends State<AclScreen> {
       _currentAclPolicy = json.decode(aclJsonString);
       // On ne vide plus les règles temporaires, on les garde
       _updateAclControllerText();
+      final locale = context.read<AppProvider>().locale;
+      final isFr = locale.languageCode == 'fr';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Politique ACL récupérée du serveur.',
+              content: Text(
+                  isFr
+                      ? 'Politique ACL récupérée du serveur.'
+                      : 'ACL policy fetched from the server.',
                   style: TextStyle(
                       color: Theme.of(context).colorScheme.onPrimary)),
               backgroundColor: Theme.of(context).colorScheme.primary),
@@ -561,16 +632,21 @@ class _AclScreenState extends State<AclScreen> {
       debugPrint(
           'Erreur lors de la récupération de la politique ACL du serveur : $e');
       if (mounted) {
+        final locale = context.read<AppProvider>().locale;
+        final isFr = locale.languageCode == 'fr';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Échec de la récupération de la politique ACL : $e',
+              content: Text(
+                  '${isFr ? 'Échec de la récupération de la politique ACL' : 'Failed to fetch ACL policy'}: $e',
                   style:
                       TextStyle(color: Theme.of(context).colorScheme.onError)),
               backgroundColor: Theme.of(context).colorScheme.error),
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -579,11 +655,15 @@ class _AclScreenState extends State<AclScreen> {
       const JsonEncoder encoder = JsonEncoder.withIndent('  ');
       final String aclJsonString = encoder.convert(_currentAclPolicy);
 
+      final locale = context.read<AppProvider>().locale;
+      final isFr = locale.languageCode == 'fr';
       if (aclJsonString.isEmpty || aclJsonString == encoder.convert({})) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
-                  'Le contenu ACL est vide. Générez d\'abord une politique.',
+                  isFr
+                      ? 'Le contenu ACL est vide. Générez d\'abord une politique.'
+                      : 'ACL content is empty. Generate a policy first.',
                   style:
                       TextStyle(color: Theme.of(context).colorScheme.onError)),
               backgroundColor: Theme.of(context).colorScheme.error),
@@ -600,9 +680,12 @@ class _AclScreenState extends State<AclScreen> {
     } catch (e) {
       debugPrint('Erreur lors du partage du fichier ACL : $e');
       if (mounted) {
+        final locale = context.read<AppProvider>().locale;
+        final isFr = locale.languageCode == 'fr';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Échec du partage du fichier ACL : $e',
+              content: Text(
+                  '${isFr ? 'Échec du partage du fichier ACL' : 'Failed to share ACL file'}: $e',
                   style:
                       TextStyle(color: Theme.of(context).colorScheme.onError)),
               backgroundColor: Theme.of(context).colorScheme.error),
@@ -612,23 +695,29 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Future<void> _resetAclPolicy() async {
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     final bool confirm = await showDialog(
           context: context,
           builder: (BuildContext context) {
             return AlertDialog(
-              title: Text('Confirmer la réinitialisation',
+              title: Text(
+                  isFr ? 'Confirmer la réinitialisation' : 'Confirm Reset',
                   style: Theme.of(context).textTheme.titleLarge),
               content: Text(
-                  'Vous allez remplacer la politique actuelle par une politique qui autorise TOUT le trafic entre TOUS les appareils. Êtes-vous sûr ?',
+                  isFr
+                      ? 'Vous allez remplacer la politique actuelle par une politique qui autorise TOUT le trafic entre TOUS les appareils. Êtes-vous sûr ?'
+                      : 'You are about to replace the current policy with one that allows ALL traffic between ALL devices. Are you sure?',
                   style: Theme.of(context).textTheme.bodyMedium),
               actions: <Widget>[
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Annuler'),
+                  child: Text(isFr ? 'Annuler' : 'Cancel'),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: Text('Confirmer',
+                  child: Text(isFr ? 'Confirmer' : 'Confirm',
                       style: TextStyle(
                           color: Theme.of(context).colorScheme.error)),
                 ),
@@ -662,7 +751,8 @@ class _AclScreenState extends State<AclScreen> {
 
     await _exportAclPolicyToServer(
         showConfirmation: false,
-        successMessage:
-            'Politique réinitialisée : tout le trafic est maintenant autorisé.');
+        successMessage: isFr
+            ? 'Politique réinitialisée : tout le trafic est maintenant autorisé.'
+            : 'Policy reset: all traffic is now allowed.');
   }
 }

@@ -17,10 +17,15 @@ class AppProvider extends ChangeNotifier {
   /// État indiquant si une opération de chargement est en cours.
   bool _isLoading = false;
 
+  /// Locale (langue) actuelle de l'application.
+  Locale _locale = const Locale('fr');
+
   /// Constructeur par défaut de [AppProvider].
   ///
-  /// Initialise les services API et de stockage directement.
-  AppProvider();
+  /// Initialise les services API et de stockage directement et charge la locale.
+  AppProvider() {
+    _loadLocale();
+  }
 
   /// Getter pour accéder à l'instance de [HeadscaleApiService].
   HeadscaleApiService get apiService => _apiService;
@@ -30,6 +35,27 @@ class AppProvider extends ChangeNotifier {
 
   /// Getter pour obtenir l'état actuel de chargement.
   bool get isLoading => _isLoading;
+
+  /// Getter pour la locale actuelle.
+  Locale get locale => _locale;
+
+  /// Charge la locale depuis le stockage.
+  Future<void> _loadLocale() async {
+    final languageCode = await _storageService.getLanguage();
+    if (languageCode != null) {
+      _locale = Locale(languageCode);
+      notifyListeners();
+    }
+  }
+
+  /// Définit la nouvelle locale et la sauvegarde.
+  Future<void> setLocale(Locale newLocale) async {
+    if (_locale != newLocale) {
+      _locale = newLocale;
+      await _storageService.saveLanguage(newLocale.languageCode);
+      notifyListeners();
+    }
+  }
 
   /// Définit l'état de chargement et notifie les auditeurs des changements.
   ///

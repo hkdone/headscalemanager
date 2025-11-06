@@ -30,6 +30,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -40,10 +43,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return Center(child: Text('Erreur : ${snapshot.error}'));
+              return Center(
+                  child: Text(
+                      '${isFr ? 'Erreur' : 'Error'}: ${snapshot.error}'));
             }
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Text('Aucun nœud trouvé.'));
+              return Center(
+                  child: Text(isFr ? 'Aucun nœud trouvé.' : 'No node found.'));
             }
 
             final nodes = snapshot.data!;
@@ -58,7 +64,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             return Column(
               children: [
-                _buildSummarySection(users.length, connectedNodes, disconnectedNodes),
+                _buildSummarySection(
+                    users.length, connectedNodes, disconnectedNodes, isFr),
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -75,11 +82,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           },
         ),
       ),
-      floatingActionButton: _buildFloatingActionButtons(),
+      floatingActionButton: _buildFloatingActionButtons(isFr),
     );
   }
 
-  Widget _buildSummarySection(int userCount, int connectedCount, int disconnectedCount) {
+  Widget _buildSummarySection(
+      int userCount, int connectedCount, int disconnectedCount, bool isFr) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Card(
@@ -91,11 +99,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _StatItem(title: 'Utilisateurs', value: userCount.toString(), color: Theme.of(context).textTheme.bodyMedium!.color!, icon: Icons.people),
-              SizedBox(height: 40, child: VerticalDivider(thickness: 1, color: Theme.of(context).dividerColor)),
-              _StatItem(title: 'Connectés', value: connectedCount.toString(), color: Colors.green, icon: Icons.lan),
-              SizedBox(height: 40, child: VerticalDivider(thickness: 1, color: Theme.of(context).dividerColor)),
-              _StatItem(title: 'Déconnectés', value: disconnectedCount.toString(), color: Colors.red, icon: Icons.phonelink_off),
+              _StatItem(
+                  title: isFr ? 'Utilisateurs' : 'Users',
+                  value: userCount.toString(),
+                  color: Theme.of(context).textTheme.bodyMedium!.color!,
+                  icon: Icons.people),
+              SizedBox(
+                  height: 40,
+                  child: VerticalDivider(
+                      thickness: 1, color: Theme.of(context).dividerColor)),
+              _StatItem(
+                  title: isFr ? 'Connectés' : 'Connected',
+                  value: connectedCount.toString(),
+                  color: Colors.green,
+                  icon: Icons.lan),
+              SizedBox(
+                  height: 40,
+                  child: VerticalDivider(
+                      thickness: 1, color: Theme.of(context).dividerColor)),
+              _StatItem(
+                  title: isFr ? 'Déconnectés' : 'Disconnected',
+                  value: disconnectedCount.toString(),
+                  color: Colors.red,
+                  icon: Icons.phonelink_off),
             ],
           ),
         ),
@@ -103,22 +129,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildFloatingActionButtons() {
+  Widget _buildFloatingActionButtons(bool isFr) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         FloatingActionButton(
           onPressed: _refreshNodes,
           heroTag: 'refreshNodes',
-          tooltip: 'Rafraîchir les nœuds',
+          tooltip: isFr ? 'Rafraîchir les nœuds' : 'Refresh nodes',
           backgroundColor: Theme.of(context).colorScheme.primary,
           child: const Icon(Icons.refresh, color: Colors.white),
         ),
         const SizedBox(height: 16),
         FloatingActionButton(
-          onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ApiKeysScreen())),
+          onPressed: () => Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const ApiKeysScreen())),
           heroTag: 'apiKeys',
-          tooltip: 'Gérer les clés API',
+          tooltip: isFr ? 'Gérer les clés API' : 'Manage API keys',
           backgroundColor: Theme.of(context).colorScheme.primary,
           child: const Icon(Icons.api, color: Colors.white),
         ),
@@ -185,9 +212,15 @@ class _UserNodeCard extends StatelessWidget {
   }
 
   Widget _buildNodeTile(BuildContext context, Node node) {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     return ListTile(
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => NodeDetailScreen(node: node))),
-      leading: Icon(Icons.circle, color: node.online ? Colors.green : Theme.of(context).disabledColor, size: 12),
+      onTap: () => Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => NodeDetailScreen(node: node))),
+      leading: Icon(Icons.circle,
+          color: node.online ? Colors.green : Theme.of(context).disabledColor,
+          size: 12),
       title: Row(
         children: [
           Text(node.name, style: Theme.of(context).textTheme.titleSmall),
@@ -202,13 +235,19 @@ class _UserNodeCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(node.hostname, style: Theme.of(context).textTheme.bodySmall),
-          Text(node.ipAddresses.join(', '), style: Theme.of(context).textTheme.bodySmall),
+          Text(node.ipAddresses.join(', '),
+              style: Theme.of(context).textTheme.bodySmall),
           if (node.sharedRoutes.isNotEmpty)
             Text(
-              'Routes: ${node.sharedRoutes.join(', ')}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.secondary),
+              '${isFr ? 'Routes' : 'Routes'}: ${node.sharedRoutes.join(', ')}',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.secondary),
             ),
-          Text('Dernière connexion : ${node.lastSeen.toLocal()}', style: Theme.of(context).textTheme.bodySmall),
+          Text(
+              '${isFr ? 'Dernière connexion' : 'Last seen'}: ${node.lastSeen.toLocal()}',
+              style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );

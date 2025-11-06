@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/home_screen.dart';
 import 'package:headscalemanager/screens/settings_screen.dart';
 import 'package:headscalemanager/services/storage_service.dart';
+import 'package:provider/provider.dart';
 
 /// Écran de démarrage (Splash Screen) de l'application.
 ///
@@ -51,6 +53,8 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     // Affiche un indicateur de chargement pendant la vérification des identifiants.
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -62,7 +66,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 color: theme
                     .colorScheme.primary), // Indicateur visuel de chargement.
             const SizedBox(height: 20),
-            Text('Chargement...',
+            Text(isFr ? 'Chargement...' : 'Loading...',
                 style: theme
                     .textTheme.titleMedium), // Texte indiquant le chargement.
           ],

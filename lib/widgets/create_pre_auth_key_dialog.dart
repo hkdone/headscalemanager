@@ -32,9 +32,12 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
   @override
   Widget build(BuildContext context) {
     final provider = context.read<AppProvider>();
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
 
     return AlertDialog(
-      title: const Text('Créer une clé de pré-authentification'),
+      title: Text(
+          isFr ? 'Créer une clé de pré-authentification' : 'Create Pre-Auth Key'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -48,7 +51,8 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
                 }
                 final users = snapshot.data!;
                 if (_selectedUser == null && users.isNotEmpty) {
-                  _selectedUser = users.first; // Sélectionne le premier utilisateur par défaut
+                  _selectedUser =
+                      users.first; // Sélectionne le premier utilisateur par défaut
                 }
                 return DropdownButtonFormField<User>(
                   isExpanded: true,
@@ -64,16 +68,16 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
                       _selectedUser = user;
                     });
                   },
-                  decoration: const InputDecoration(
-                    labelText: 'Sélectionner un utilisateur',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: isFr ? 'Sélectionner un utilisateur' : 'Select a user',
+                    border: const OutlineInputBorder(),
                   ),
                 );
               },
             ),
             // Option pour rendre la clé réutilisable.
             CheckboxListTile(
-              title: const Text('Réutilisable'),
+              title: Text(isFr ? 'Réutilisable' : 'Reusable'),
               value: _isReusable,
               onChanged: (value) {
                 setState(() {
@@ -83,7 +87,7 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
             ),
             // Option pour rendre la clé éphémère.
             CheckboxListTile(
-              title: const Text('Éphémère'),
+              title: Text(isFr ? 'Éphémère' : 'Ephemeral'),
               value: _isEphemeral,
               onChanged: (value) {
                 setState(() {
@@ -94,16 +98,20 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
             // Champ pour la durée d'expiration en jours.
             TextFormField(
               controller: _expirationController,
-              decoration: const InputDecoration(
-                labelText: 'Expiration en jours (facultatif)',
+              decoration: InputDecoration(
+                labelText:
+                    isFr ? 'Expiration en jours (facultatif)' : 'Expiration in days (optional)',
               ),
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 16),
-            const Text('Tags ACL (Nouveau)', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(isFr ? 'Tags ACL (Nouveau)' : 'ACL Tags (New)',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
             CheckboxListTile(
               title: const Text('Exit Node'),
-              subtitle: const Text('Autoriser ce nœud à être une sortie internet.'),
+              subtitle: Text(isFr
+                  ? 'Autoriser ce nœud à être une sortie internet.'
+                  : 'Allow this node to be an internet exit.'),
               value: _isExitNode,
               onChanged: (value) {
                 setState(() {
@@ -113,7 +121,9 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
             ),
             CheckboxListTile(
               title: const Text('LAN Sharer'),
-              subtitle: const Text('Autoriser ce nœud à partager son réseau local.'),
+              subtitle: Text(isFr
+                  ? 'Autoriser ce nœud à partager son réseau local.'
+                  : 'Allow this node to share its local network.'),
               value: _isLanSharer,
               onChanged: (value) {
                 setState(() {
@@ -126,11 +136,11 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
       ),
       actions: [
         TextButton(
-          child: const Text('Annuler'),
+          child: Text(isFr ? 'Annuler' : 'Cancel'),
           onPressed: () => Navigator.of(context).pop(),
         ),
         TextButton(
-          child: const Text('Créer'),
+          child: Text(isFr ? 'Créer' : 'Create'),
           onPressed: () async {
             if (_selectedUser != null) {
               final expirationText = _expirationController.text.trim();
@@ -143,12 +153,14 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
                   expirationDays = parsedDays;
                 }
               }
-              final expiration = DateTime.now().add(Duration(days: expirationDays));
+              final expiration =
+                  DateTime.now().add(Duration(days: expirationDays));
 
               // Construction des tags ACL
               final List<String> aclTags = [];
               if (_selectedUser != null) {
-                String baseTag = 'tag:${normalizeUserName(_selectedUser!.name)}-client';
+                String baseTag =
+                    'tag:${normalizeUserName(_selectedUser!.name)}-client';
                 if (_isExitNode) {
                   baseTag += ';exit-node';
                 }
@@ -169,7 +181,11 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
                 Navigator.of(context).pop(key); // Return the created key
               } catch (e) {
                 debugPrint('Erreur lors de la création de la clé : $e');
-                showSafeSnackBar(context, 'Échec de la création de la clé : $e');
+                showSafeSnackBar(
+                    context,
+                    isFr
+                        ? 'Échec de la création de la clé : $e'
+                        : 'Failed to create key: $e');
                 Navigator.of(context).pop(); // Pop the dialog on error
               }
             }

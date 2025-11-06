@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For Clipboard
+import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart'; // For showSafeSnackBar
+import 'package:provider/provider.dart';
 
 /// Dialogue pour afficher une commande Tailscale et des instructions spécifiques à la plateforme.
 ///
@@ -34,6 +36,9 @@ class SubnetCommandDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
     return DefaultTabController(
       length: 3, // Linux, Windows, Mobile
       child: AlertDialog(
@@ -63,7 +68,8 @@ class SubnetCommandDialog extends StatelessWidget {
                           const SizedBox(height: 8),
                           SelectableText(
                             tailscaleCommand,
-                            style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+                            style: const TextStyle(
+                                fontFamily: 'monospace', fontSize: 14),
                           ),
                         ],
                       ),
@@ -77,7 +83,8 @@ class SubnetCommandDialog extends StatelessWidget {
                           const SizedBox(height: 8),
                           SelectableText(
                             tailscaleCommand,
-                            style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+                            style: const TextStyle(
+                                fontFamily: 'monospace', fontSize: 14),
                           ),
                         ],
                       ),
@@ -91,7 +98,8 @@ class SubnetCommandDialog extends StatelessWidget {
                           const SizedBox(height: 8),
                           SelectableText(
                             tailscaleCommand,
-                            style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+                            style: const TextStyle(
+                                fontFamily: 'monospace', fontSize: 14),
                           ),
                         ],
                       ),
@@ -104,14 +112,20 @@ class SubnetCommandDialog extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            child: const Text('Fermer'),
+            child: Text(isFr ? 'Fermer' : 'Close'),
             onPressed: () => Navigator.of(context).pop(),
           ),
           TextButton(
-            child: const Text('Copier la commande Tailscale'),
+            child: Text(isFr
+                ? 'Copier la commande Tailscale'
+                : 'Copy Tailscale Command'),
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: tailscaleCommand));
-              showSafeSnackBar(context, 'Commande Tailscale copiée dans le presse-papiers !');
+              showSafeSnackBar(
+                  context,
+                  isFr
+                      ? 'Commande Tailscale copiée dans le presse-papiers !'
+                      : 'Tailscale command copied to clipboard!');
             },
           ),
         ],

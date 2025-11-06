@@ -41,14 +41,18 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
   @override
   Widget build(BuildContext context) {
     final apiProvider = Provider.of<AppProvider>(context, listen: false);
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     return AlertDialog(
-      title: const Text('Modifier les tags'),
+      title: Text(isFr ? 'Modifier les tags' : 'Edit tags'),
       content: Form(
         key: _formKey,
         child: TextFormField(
           controller: _tagsController,
-          decoration: const InputDecoration(
-            hintText: 'Tags (minuscules, sans chiffres/espaces/spéciaux, séparés par des virgules)',
+          decoration: InputDecoration(
+            hintText: isFr
+                ? 'Tags (minuscules, sans chiffres/espaces/spéciaux, séparés par des virgules)'
+                : 'Tags (lowercase, no numbers/spaces/specials, comma separated)',
             labelText: 'Tags',
           ),
           validator: (value) {
@@ -74,7 +78,9 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
             }
 
             if (!allTagsValid) {
-              return 'Tags invalides : ${invalidTagsExamples.join(", ")}. Caractères autorisés : lettres minuscules, chiffres, tirets (-) et points-virgules (;).';
+              return isFr
+                  ? 'Tags invalides : ${invalidTagsExamples.join(", ")}. Caractères autorisés : lettres minuscules, chiffres, tirets (-) et points-virgules (;).'
+                  : 'Invalid tags: ${invalidTagsExamples.join(", ")}. Allowed characters: lowercase letters, numbers, hyphens (-), and semicolons (;).';
             }
             return null;
           },
@@ -83,24 +89,37 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
       ),
       actions: [
         TextButton(
-          child: const Text('Annuler'),
+          child: Text(isFr ? 'Annuler' : 'Cancel'),
           onPressed: () => Navigator.of(context).pop(), // Pop with null
         ),
         TextButton(
-          child: const Text('Sauvegarder'),
+          child: Text(isFr ? 'Sauvegarder' : 'Save'),
           onPressed: () async {
             if (_formKey.currentState!.validate()) {
               final tagsString = _tagsController.text.trim();
               final newTagsList = tagsString.isNotEmpty
-                  ? tagsString.split(',').map((t) => 'tag:${t.trim()}').where((t) => t.length > 4).toList()
+                  ? tagsString
+                      .split(',')
+                      .map((t) => 'tag:${t.trim()}')
+                      .where((t) => t.length > 4)
+                      .toList()
                   : <String>[];
 
               try {
-                await apiProvider.apiService.setTags(widget.node.id, newTagsList);
+                await apiProvider.apiService
+                    .setTags(widget.node.id, newTagsList);
                 Navigator.of(context).pop();
-                showSafeSnackBar(context, 'Tags mis à jour avec succès.');
+                showSafeSnackBar(
+                    context,
+                    isFr
+                        ? 'Tags mis à jour avec succès.'
+                        : 'Tags updated successfully.');
               } catch (e) {
-                showSafeSnackBar(context, 'Erreur lors de la mise à jour des tags: $e');
+                showSafeSnackBar(
+                    context,
+                    isFr
+                        ? 'Erreur lors de la mise à jour des tags: $e'
+                        : 'Error updating tags: $e');
               }
             }
           },

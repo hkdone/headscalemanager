@@ -31,20 +31,23 @@ class _CreateUserDialogState extends State<CreateUserDialog> {
   @override
   Widget build(BuildContext context) {
     final appProvider = context.read<AppProvider>();
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
 
     return AlertDialog(
-      title: const Text('Créer un utilisateur'),
+      title: Text(isFr ? 'Créer un utilisateur' : 'Create user'),
       content: TextField(
         controller: _nameController,
-        decoration: const InputDecoration(hintText: "Nom de l'utilisateur"),
+        decoration: InputDecoration(
+            hintText: isFr ? 'Nom de l\'utilisateur' : 'Username'),
       ),
       actions: [
         TextButton(
-          child: const Text('Annuler'),
+          child: Text(isFr ? 'Annuler' : 'Cancel'),
           onPressed: () => Navigator.of(context).pop(),
         ),
         TextButton(
-          child: const Text('Créer'),
+          child: Text(isFr ? 'Créer' : 'Create'),
           onPressed: () async {
             final String name = _nameController.text.trim();
             final serverUrl = await appProvider.storageService.getServerUrl();
@@ -75,7 +78,10 @@ class _CreateUserDialogState extends State<CreateUserDialog> {
                 if (!mounted) return;
                 Navigator.of(context).pop(); // Close the dialog even on error
                 showSafeSnackBar(
-                    context, 'Échec de la création de l\'utilisateur : $e');
+                    context,
+                    isFr
+                        ? 'Échec de la création de l\'utilisateur : $e'
+                        : 'Failed to create user: $e');
               }
             }
           },

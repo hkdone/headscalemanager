@@ -8,6 +8,17 @@ class StorageService {
   static const _apiKey = 'HEADSCALE_API_KEY';
   static const _serverUrl = 'HEADSCALE_SERVER_URL';
   static const _temporaryAclRules = 'TEMPORARY_ACL_RULES';
+  static const _languageKey = 'APP_LANGUAGE';
+
+  /// Sauvegarde la langue sélectionnée.
+  Future<void> saveLanguage(String languageCode) async {
+    await _storage.write(key: _languageKey, value: languageCode);
+  }
+
+  /// Récupère la langue sélectionnée.
+  Future<String?> getLanguage() async {
+    return await _storage.read(key: _languageKey);
+  }
 
   /// Sauvegarde les identifiants de connexion.
   Future<void> saveCredentials({required String apiKey, required String serverUrl}) async {

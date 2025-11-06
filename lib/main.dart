@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/splash_screen.dart';
 import 'package:provider/provider.dart';
@@ -27,11 +28,25 @@ class MyApp extends StatelessWidget {
     /// une injection de dépendances plus explicite pourrait être envisagée pour ces services.
     return ChangeNotifierProvider(
       create: (context) => AppProvider(),
-      child: MaterialApp(
-        /// Titre de l'application, affiché dans la barre des tâches ou le sélecteur d'applications.
-        title: 'Gestionnaire Headscale',
+      child: Consumer<AppProvider>(
+        builder: (context, appProvider, child) {
+          return MaterialApp(
+            /// Titre de l'application, affiché dans la barre des tâches ou le sélecteur d'applications.
+            title: 'Gestionnaire Headscale',
 
-        /// Désactive la bannière "DEBUG" en mode développement.
+            /// Configuration de la localisation
+            locale: appProvider.locale,
+            supportedLocales: const [
+              Locale('en', ''),
+              Locale('fr', ''),
+            ],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+
+            /// Désactive la bannière "DEBUG" en mode développement.
         debugShowCheckedModeBanner: false,
 
         /// Thème visuel de l'application pour le mode clair.
@@ -75,6 +90,8 @@ class MyApp extends StatelessWidget {
 
         /// Le premier écran affiché au lancement de l'application.
         home: const SplashScreen(),
+          );
+        },
       ),
     );
   }

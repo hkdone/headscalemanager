@@ -41,6 +41,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -56,8 +58,11 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           children: [
             _buildUserInfoCard(context),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-              child: Text('Appareils', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              child: Text(isFr ? 'Appareils' : 'Devices',
+                  style: theme.textTheme.headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.bold)),
             ),
             Expanded(child: _buildNodesGrid(context)),
           ],
@@ -65,8 +70,11 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showTailscaleUpCommandDialog(context, widget.user),
-        label: Text('Nouvel Appareil', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-        icon: Icon(Icons.add_to_queue_sharp, color: theme.colorScheme.onPrimary),
+        label: Text(isFr ? 'Nouvel Appareil' : 'New Device',
+            style: theme.textTheme.labelLarge
+                ?.copyWith(color: theme.colorScheme.onPrimary)),
+        icon: Icon(Icons.add_to_queue_sharp,
+            color: theme.colorScheme.onPrimary),
         backgroundColor: theme.colorScheme.primary,
       ),
     );
@@ -74,6 +82,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
   Widget _buildUserInfoCard(BuildContext context) {
     final theme = Theme.of(context);
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -87,7 +97,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         children: [
           Text('ID: ${widget.user.id}', style: theme.textTheme.bodySmall),
           const SizedBox(height: 8),
-          Text('Créé le: ${widget.user.createdAt?.toLocal() ?? 'N/A'}', style: theme.textTheme.bodySmall),
+          Text(
+              '${isFr ? 'Créé le' : 'Created on'}: ${widget.user.createdAt?.toLocal() ?? 'N/A'}',
+              style: theme.textTheme.bodySmall),
         ],
       ),
     );
@@ -95,6 +107,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
   Widget _buildNodesGrid(BuildContext context) {
     final theme = Theme.of(context);
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     return ValueListenableBuilder<Future<List<Node>>>(
       valueListenable: _nodesFutureNotifier,
       builder: (context, nodesFuture, child) {
@@ -102,20 +116,35 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           future: nodesFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
+              return Center(
+                  child: CircularProgressIndicator(
+                      color: theme.colorScheme.primary));
             }
             if (snapshot.hasError) {
-              debugPrint('Erreur lors du chargement des nœuds : ${snapshot.error}');
-              return Center(child: Text('Erreur : ${snapshot.error}', style: theme.textTheme.bodyMedium));
+              debugPrint(
+                  'Erreur lors du chargement des nœuds : ${snapshot.error}');
+              return Center(
+                  child: Text(
+                      '${isFr ? 'Erreur' : 'Error'}: ${snapshot.error}',
+                      style: theme.textTheme.bodyMedium));
             }
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return Center(child: Text('Aucun appareil trouvé.', style: theme.textTheme.bodyMedium));
+              return Center(
+                  child: Text(isFr ? 'Aucun appareil trouvé.' : 'No devices found.',
+                      style: theme.textTheme.bodyMedium));
             }
 
-            final userNodes = snapshot.data!.where((node) => node.user == widget.user.name).toList();
+            final userNodes = snapshot.data!
+                .where((node) => node.user == widget.user.name)
+                .toList();
 
             if (userNodes.isEmpty) {
-              return Center(child: Text('Aucun appareil trouvé pour cet utilisateur.', style: theme.textTheme.bodyMedium));
+              return Center(
+                  child: Text(
+                      isFr
+                          ? 'Aucun appareil trouvé pour cet utilisateur.'
+                          : 'No devices found for this user.',
+                      style: theme.textTheme.bodyMedium));
             }
 
             return GridView.builder(
@@ -145,14 +174,17 @@ class _NodeCard extends StatelessWidget {
 
   const _NodeCard({required this.node, required this.onNodeUpdate});
 
-  Future<void> _runAction(BuildContext context, Future<void> Function() action, String successMessage) async {
+  Future<void> _runAction(BuildContext context, Future<void> Function() action,
+      String successMessage) async {
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     try {
       await action();
       showSafeSnackBar(context, successMessage);
       onNodeUpdate();
     } catch (e) {
       debugPrint('Action échouée : $e');
-      showSafeSnackBar(context, 'Erreur : $e');
+      showSafeSnackBar(context, '${isFr ? 'Erreur' : 'Error'}: $e');
     }
   }
 
@@ -164,15 +196,26 @@ class _NodeCard extends StatelessWidget {
       ),
     );
 
-    if (generatedCommand != null && generatedCommand.isNotEmpty && context.mounted) {
+    if (generatedCommand != null &&
+        generatedCommand.isNotEmpty &&
+        context.mounted) {
+      final locale = context.read<AppProvider>().locale;
+      final isFr = locale.languageCode == 'fr';
       showDialog(
         context: context,
-        builder: (dialogContext) => CliCommandDisplayDialog(command: generatedCommand),
+        builder: (dialogContext) =>
+            CliCommandDisplayDialog(command: generatedCommand),
       );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              'Commande CLI générée. Exécutez-la et actualisez la page pour voir les changements.', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white)),
+              isFr
+                  ? 'Commande CLI générée. Exécutez-la et actualisez la page pour voir les changements.'
+                  : 'CLI command generated. Run it and refresh the page to see the changes.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: Colors.white)),
           backgroundColor: Colors.orange,
         ),
       );
@@ -181,22 +224,34 @@ class _NodeCard extends StatelessWidget {
 
   void _showExitNodeWarningAndProceed(BuildContext context) async {
     final theme = Theme.of(context);
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: Text('Avertissement sur les Nœuds de Sortie', style: theme.textTheme.titleLarge),
+          title: Text(
+              isFr
+                  ? 'Avertissement sur les Nœuds de Sortie'
+                  : 'Exit Node Warning',
+              style: theme.textTheme.titleLarge),
           content: Text(
-              'Dans la configuration ACL actuelle, si plusieurs nœuds de sortie appartiennent à différents utilisateurs, ils ne peuvent pas être rendus exclusifs. Tout utilisateur autorisé pourra voir et utiliser tous les nœuds de sortie disponibles sur le réseau.', style: theme.textTheme.bodyMedium),
+              isFr
+                  ? 'Dans la configuration ACL actuelle, si plusieurs nœuds de sortie appartiennent à différents utilisateurs, ils ne peuvent pas être rendus exclusifs. Tout utilisateur autorisé pourra voir et utiliser tous les nœuds de sortie disponibles sur le réseau.'
+                  : 'In the current ACL configuration, if multiple exit nodes belong to different users, they cannot be made exclusive. Any authorized user will be able to see and use all available exit nodes on the network.',
+              style: theme.textTheme.bodyMedium),
           actions: <Widget>[
             TextButton(
-              child: Text('Annuler', style: theme.textTheme.labelLarge),
+              child: Text(isFr ? 'Annuler' : 'Cancel',
+                  style: theme.textTheme.labelLarge),
               onPressed: () {
                 Navigator.of(dialogContext).pop(false);
               },
             ),
             TextButton(
-              child: Text('Continuer', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
+              child: Text(isFr ? 'Continuer' : 'Continue',
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.bold)),
               onPressed: () {
                 Navigator.of(dialogContext).pop(true);
               },
@@ -219,6 +274,8 @@ class _NodeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final provider = context.read<AppProvider>();
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     final onlineColor = node.online ? Colors.green : Colors.grey.shade400;
     final isExitNode = node.isExitNode;
     final hasSharedRoutes = node.sharedRoutes.isNotEmpty;
@@ -249,9 +306,13 @@ class _NodeCard extends StatelessWidget {
             if (isExitNode)
               Row(
                 children: [
-                  Icon(Icons.exit_to_app, size: 14, color: theme.colorScheme.primary),
+                  Icon(Icons.exit_to_app,
+                      size: 14, color: theme.colorScheme.primary),
                   const SizedBox(width: 4),
-                  Text('Exit Node', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                  Text('Exit Node',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold)),
                 ],
               ),
             if (hasSharedRoutes)
@@ -272,8 +333,10 @@ class _NodeCard extends StatelessWidget {
                 ),
               ),
             const Spacer(),
-            Text('Dernière connexion:', style: theme.textTheme.bodySmall),
-            Text(node.lastSeen.toLocal().toString(), style: theme.textTheme.bodySmall),
+            Text(isFr ? 'Dernière connexion:' : 'Last seen:',
+                style: theme.textTheme.bodySmall),
+            Text(node.lastSeen.toLocal().toString(),
+                style: theme.textTheme.bodySmall),
           ],
         ),
       ),
@@ -282,15 +345,23 @@ class _NodeCard extends StatelessWidget {
 
   Widget _buildPopupMenu(BuildContext context, AppProvider provider) {
     final theme = Theme.of(context);
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     return PopupMenuButton<String>(
       icon: Icon(Icons.more_vert, color: theme.iconTheme.color),
       onSelected: (String value) {
         switch (value) {
           case 'rename':
-            showDialog(context: context, builder: (dialogContext) => RenameNodeDialog(node: node, onNodeRenamed: onNodeUpdate));
+            showDialog(
+                context: context,
+                builder: (dialogContext) => RenameNodeDialog(
+                    node: node, onNodeRenamed: onNodeUpdate));
             break;
           case 'move':
-            showDialog(context: context, builder: (dialogContext) => MoveNodeDialog(node: node, onNodeMoved: onNodeUpdate));
+            showDialog(
+                context: context,
+                builder: (dialogContext) =>
+                    MoveNodeDialog(node: node, onNodeMoved: onNodeUpdate));
             break;
           case 'edit_tags':
             _showEditTagsFlow(context);
@@ -299,27 +370,54 @@ class _NodeCard extends StatelessWidget {
             _showExitNodeWarningAndProceed(context);
             break;
           case 'disable_exit_node':
-            _runAction(context, () => provider.apiService.setNodeRoutes(node.id, []), 'Nœud de sortie désactivé.');
+            _runAction(
+                context,
+                () => provider.apiService.setNodeRoutes(node.id, []),
+                isFr
+                    ? 'Nœud de sortie désactivé.'
+                    : 'Exit node disabled.');
             break;
           case 'share_subnet':
-            showDialog(context: context, builder: (dialogContext) => ShareSubnetDialog(node: node, onSubnetShared: onNodeUpdate));
+            showDialog(
+                context: context,
+                builder: (dialogContext) => ShareSubnetDialog(
+                    node: node, onSubnetShared: onNodeUpdate));
             break;
           case 'disable_subnet':
-            _runAction(context, () => provider.apiService.setNodeRoutes(node.id, []), 'Routes de sous-réseau désactivées.');
+            _runAction(
+                context,
+                () => provider.apiService.setNodeRoutes(node.id, []),
+                isFr
+                    ? 'Routes de sous-réseau désactivées.'
+                    : 'Subnet routes disabled.');
             break;
           case 'delete_device':
             showDialog(
               context: context,
               builder: (dialogContext) => AlertDialog(
-                title: Text('Supprimer l\'appareil ?', style: theme.textTheme.titleLarge),
-                content: Text('Êtes-vous sûr de vouloir supprimer ${node.name} ?', style: theme.textTheme.bodyMedium),
+                title: Text(
+                    isFr ? 'Supprimer l\'appareil ?' : 'Delete device?',
+                    style: theme.textTheme.titleLarge),
+                content: Text(
+                    isFr
+                        ? 'Êtes-vous sûr de vouloir supprimer ${node.name} ?'
+                        : 'Are you sure you want to delete ${node.name}?',
+                    style: theme.textTheme.bodyMedium),
                 actions: <Widget>[
-                  TextButton(child: Text('Annuler', style: theme.textTheme.labelLarge), onPressed: () => Navigator.of(dialogContext).pop()),
                   TextButton(
-                    child: Text('Confirmer', style: theme.textTheme.labelLarge?.copyWith(color: Colors.red)),
+                      child: Text(isFr ? 'Annuler' : 'Cancel',
+                          style: theme.textTheme.labelLarge),
+                      onPressed: () => Navigator.of(dialogContext).pop()),
+                  TextButton(
+                    child: Text(isFr ? 'Confirmer' : 'Confirm',
+                        style: theme.textTheme.labelLarge
+                            ?.copyWith(color: Colors.red)),
                     onPressed: () {
                       Navigator.of(dialogContext).pop();
-                      _runAction(context, () => provider.apiService.deleteNode(node.id), 'Appareil supprimé.');
+                      _runAction(
+                          context,
+                          () => provider.apiService.deleteNode(node.id),
+                          isFr ? 'Appareil supprimé.' : 'Device deleted.');
                     },
                   ),
                 ],
@@ -329,16 +427,40 @@ class _NodeCard extends StatelessWidget {
         }
       },
       itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-        PopupMenuItem<String>(value: 'rename', child: Text('Renommer', style: theme.textTheme.bodyMedium)),
-        PopupMenuItem<String>(value: 'move', child: Text('Changer d\'utilisateur', style: theme.textTheme.bodyMedium)),
-        PopupMenuItem<String>(value: 'edit_tags', child: Text('Modifier les tags', style: theme.textTheme.bodyMedium)),
+        PopupMenuItem<String>(
+            value: 'rename',
+            child: Text(isFr ? 'Renommer' : 'Rename',
+                style: theme.textTheme.bodyMedium)),
+        PopupMenuItem<String>(
+            value: 'move',
+            child: Text(isFr ? 'Changer d\'utilisateur' : 'Change user',
+                style: theme.textTheme.bodyMedium)),
+        PopupMenuItem<String>(
+            value: 'edit_tags',
+            child: Text(isFr ? 'Modifier les tags' : 'Edit tags',
+                style: theme.textTheme.bodyMedium)),
         const PopupMenuDivider(),
-        PopupMenuItem<String>(value: 'enable_exit_node', child: Text('Activer nœud de sortie', style: theme.textTheme.bodyMedium)),
-        PopupMenuItem<String>(value: 'disable_exit_node', child: Text('Désactiver nœud de sortie', style: theme.textTheme.bodyMedium)),
-        PopupMenuItem<String>(value: 'share_subnet', child: Text('Partager sous-réseau', style: theme.textTheme.bodyMedium)),
-        PopupMenuItem<String>(value: 'disable_subnet', child: Text('Désactiver sous-réseau', style: theme.textTheme.bodyMedium)),
+        PopupMenuItem<String>(
+            value: 'enable_exit_node',
+            child: Text(isFr ? 'Activer nœud de sortie' : 'Enable exit node',
+                style: theme.textTheme.bodyMedium)),
+        PopupMenuItem<String>(
+            value: 'disable_exit_node',
+            child:
+                Text(isFr ? 'Désactiver nœud de sortie' : 'Disable exit node', style: theme.textTheme.bodyMedium)),
+        PopupMenuItem<String>(
+            value: 'share_subnet',
+            child: Text(isFr ? 'Partager sous-réseau' : 'Share subnet',
+                style: theme.textTheme.bodyMedium)),
+        PopupMenuItem<String>(
+            value: 'disable_subnet',
+            child: Text(isFr ? 'Désactiver sous-réseau' : 'Disable subnet',
+                style: theme.textTheme.bodyMedium)),
         const PopupMenuDivider(),
-        PopupMenuItem<String>(value: 'delete_device', child: Text('Supprimer', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.red))),
+        PopupMenuItem<String>(
+            value: 'delete_device',
+            child: Text(isFr ? 'Supprimer' : 'Delete',
+                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.red))),
       ],
     );
   }

@@ -49,18 +49,20 @@ class NodeManagementTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.read<AppProvider>();
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: ListTile(
         // Navigue vers l'écran de détails du nœud au tap.
         onTap: () {
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => NodeDetailScreen(node: node)));
+          Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => NodeDetailScreen(node: node)));
         },
         // Icône indiquant le statut en ligne/hors ligne du nœud.
-        leading: Icon(
-            Icons.circle, color: node.online ? Colors.green : Colors.grey,
-            size: 18),
+        leading: Icon(Icons.circle,
+            color: node.online ? Colors.green : Colors.grey, size: 18),
         title: Row(
           children: [
             Text(node.name),
@@ -68,7 +70,8 @@ class NodeManagementTile extends StatelessWidget {
             if (_isExitNode)
               const Padding(
                 padding: EdgeInsets.only(left: 8.0),
-                child: Icon(Icons.exit_to_app, size: 18, color: Colors.blueGrey),
+                child:
+                    Icon(Icons.exit_to_app, size: 18, color: Colors.blueGrey),
               ),
           ],
         ),
@@ -76,7 +79,9 @@ class NodeManagementTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(node.ipAddresses.join(', ')),
-            Text('Dernière connexion : ${node.lastSeen.toLocal()}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(
+                '${isFr ? 'Dernière connexion' : 'Last seen'}: ${node.lastSeen.toLocal()}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
         // Menu contextuel pour les actions de gestion du nœud.
@@ -88,125 +93,135 @@ class NodeManagementTile extends StatelessWidget {
                 // Affiche le dialogue pour renommer le nœud.
                 showDialog(
                   context: context,
-                  builder: (ctx) => RenameNodeDialog(node: node, onNodeRenamed: onNodeUpdate),
+                  builder: (ctx) =>
+                      RenameNodeDialog(node: node, onNodeRenamed: onNodeUpdate),
                 );
                 break;
               case 'move':
                 // Affiche le dialogue pour déplacer le nœud.
                 showDialog(
                   context: context,
-                  builder: (ctx) => MoveNodeDialog(node: node, onNodeMoved: onNodeUpdate),
+                  builder: (ctx) =>
+                      MoveNodeDialog(node: node, onNodeMoved: onNodeUpdate),
                 );
                 break;
               case 'enable_exit_node':
                 // Affiche le dialogue pour activer le nœud de sortie.
                 showDialog(
                   context: context,
-                  builder: (ctx) => ExitNodeCommandDialog(node: node, onExitNodeEnabled: onNodeUpdate),
+                  builder: (ctx) => ExitNodeCommandDialog(
+                      node: node, onExitNodeEnabled: onNodeUpdate),
                 );
                 break;
               case 'disable_exit_node':
                 // Désactive le nœud de sortie via l'API.
-                _runAction(context,
-                        () => provider.apiService.setNodeRoutes(node.id, []),
-                    'Nœud de sortie désactivé.'
-                );
+                _runAction(
+                    context,
+                    () => provider.apiService.setNodeRoutes(node.id, []),
+                    isFr
+                        ? 'Nœud de sortie désactivé.'
+                        : 'Exit node disabled.');
                 break;
               case 'share_subnet':
                 // Affiche le dialogue pour partager un sous-réseau.
                 showDialog(
                   context: context,
-                  builder: (ctx) => ShareSubnetDialog(node: node, onSubnetShared: onNodeUpdate),
+                  builder: (ctx) => ShareSubnetDialog(
+                      node: node, onSubnetShared: onNodeUpdate),
                 );
                 break;
               case 'disable_subnet':
                 // Désactive les routes de sous-réseau via l'API.
                 _runAction(
-                  context,
-                  () => provider.apiService.setNodeRoutes(node.id, []),
-                  'Routes de sous-réseau désactivées.'
-                );
+                    context,
+                    () => provider.apiService.setNodeRoutes(node.id, []),
+                    isFr
+                        ? 'Routes de sous-réseau désactivées.'
+                        : 'Subnet routes disabled.');
                 break;
               case 'delete_device':
                 // Affiche le dialogue de confirmation de suppression.
                 showDialog(
                   context: context,
-                  builder: (dialogCtx) =>
-                      AlertDialog(
-                        title: const Text('Supprimer l\'appareil ?'),
-                        content: Text(
-                            'Êtes-vous sûr de vouloir supprimer ${node.name} ?'),
-                        actions: <Widget>[
-                          TextButton(child: const Text('Annuler'),
-                              onPressed: () => Navigator.of(dialogCtx).pop()),
-                          TextButton(
-                            child: const Text(
-                                'Confirmer', style: TextStyle(color: Colors.red)),
-                            onPressed: () {
-                              Navigator.of(dialogCtx).pop();
-                              _runAction(context,
-                                      () =>
-                                      provider.apiService.deleteNode(node.id),
-                                  'Appareil supprimé.'
-                              );
-                            },
-                          ),
-                        ],
+                  builder: (dialogCtx) => AlertDialog(
+                    title: Text(
+                        isFr ? 'Supprimer l\'appareil ?' : 'Delete device?'),
+                    content: Text(isFr
+                        ? 'Êtes-vous sûr de vouloir supprimer ${node.name} ?'
+                        : 'Are you sure you want to delete ${node.name}?'),
+                    actions: <Widget>[
+                      TextButton(
+                          child: Text(isFr ? 'Annuler' : 'Cancel'),
+                          onPressed: () => Navigator.of(dialogCtx).pop()),
+                      TextButton(
+                        child: Text(isFr ? 'Confirmer' : 'Confirm',
+                            style: const TextStyle(color: Colors.red)),
+                        onPressed: () {
+                          Navigator.of(dialogCtx).pop();
+                          _runAction(
+                              context,
+                              () => provider.apiService.deleteNode(node.id),
+                              isFr
+                                  ? 'Appareil supprimé.'
+                                  : 'Device deleted.');
+                        },
                       ),
+                    ],
+                  ),
                 );
                 break;
             }
           },
-          itemBuilder: (BuildContext context) =>
-          <PopupMenuEntry<String>>[
-            const PopupMenuItem<String>(
+          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+            PopupMenuItem<String>(
               value: 'rename',
               child: ListTile(
-                leading: Icon(Icons.edit),
-                title: Text('Renommer l\'appareil'),
+                leading: const Icon(Icons.edit),
+                title: Text(isFr ? 'Renommer l\'appareil' : 'Rename Device'),
               ),
             ),
-            const PopupMenuItem<String>(
+            PopupMenuItem<String>(
               value: 'move',
               child: ListTile(
-                leading: Icon(Icons.move_up),
-                title: Text('Déplacer l\'appareil'),
+                leading: const Icon(Icons.move_up),
+                title: Text(isFr ? 'Déplacer l\'appareil' : 'Move Device'),
               ),
             ),
-            const PopupMenuItem<String>(
+            PopupMenuItem<String>(
               value: 'enable_exit_node',
               child: ListTile(
-                leading: Icon(Icons.exit_to_app),
-                title: Text('Activer le nœud de sortie'),
+                leading: const Icon(Icons.exit_to_app),
+                title: Text(isFr ? 'Activer le nœud de sortie' : 'Enable Exit Node'),
               ),
             ),
-            const PopupMenuItem<String>(
+            PopupMenuItem<String>(
               value: 'disable_exit_node',
               child: ListTile(
-                leading: Icon(Icons.remove_circle_outline),
-                title: Text('Désactiver le nœud de sortie'),
+                leading: const Icon(Icons.remove_circle_outline),
+                title: Text(isFr ? 'Désactiver le nœud de sortie' : 'Disable Exit Node'),
               ),
             ),
-            const PopupMenuItem<String>(
+            PopupMenuItem<String>(
               value: 'share_subnet',
               child: ListTile(
-                leading: Icon(Icons.router_outlined),
-                title: Text('Partager le sous-réseau local'),
+                leading: const Icon(Icons.router_outlined),
+                title: Text(isFr ? 'Partager le sous-réseau local' : 'Share Local Subnet'),
               ),
             ),
-            const PopupMenuItem<String>(
+            PopupMenuItem<String>(
               value: 'disable_subnet',
               child: ListTile(
-                leading: Icon(Icons.router_outlined), // Réutilisation de l'icône pour l'instant
-                title: Text('Désactiver les routes de sous-réseau'),
+                leading: const Icon(Icons
+                    .router_outlined), // Réutilisation de l'icône pour l'instant
+                title: Text(isFr ? 'Désactiver les routes de sous-réseau' : 'Disable Subnet Routes'),
               ),
             ),
             const PopupMenuDivider(),
-            const PopupMenuItem<String>(
+            PopupMenuItem<String>(
               value: 'delete_device',
               child: ListTile(
-                leading: Icon(Icons.delete, color: Colors.red),
-                title: Text('Supprimer l\'appareil'),
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: Text(isFr ? 'Supprimer l\'appareil' : 'Delete Device'),
               ),
             ),
           ],

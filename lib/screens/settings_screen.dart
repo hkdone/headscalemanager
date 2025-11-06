@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/home_screen.dart';
 import 'package:headscalemanager/screens/help_screen.dart';
+import 'package:headscalemanager/screens/help_screen_en.dart';
 import 'package:provider/provider.dart';
 
 /// Écran des paramètres de l'application.
@@ -46,11 +48,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('Paramètres', style: theme.appBarTheme.titleTextStyle),
+        title: Text(isFr ? 'Paramètres' : 'Settings',
+            style: theme.appBarTheme.titleTextStyle),
         backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
         iconTheme: theme.appBarTheme.iconTheme,
@@ -66,11 +71,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _serverUrlController,
-                  decoration: _buildInputDecoration(context, 'URL du serveur', 'https://headscale.example.com'),
+                  decoration: _buildInputDecoration(
+                      context,
+                      isFr ? 'URL du serveur' : 'Server URL',
+                      'https://headscale.example.com'),
                   style: theme.textTheme.bodyMedium,
                   validator: (value) {
-                    if (value == null || value.isEmpty || !Uri.parse(value).isAbsolute) {
-                      return 'Veuillez entrer une URL valide';
+                    if (value == null ||
+                        value.isEmpty ||
+                        !Uri.parse(value).isAbsolute) {
+                      return isFr
+                          ? 'Veuillez entrer une URL valide'
+                          : 'Please enter a valid URL';
                     }
                     return null;
                   },
@@ -80,9 +92,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   controller: _apiKeyController,
                   obscureText: _obscureApiKey,
                   style: theme.textTheme.bodyMedium,
-                  decoration: _buildInputDecoration(context, 'Clé API', 'Votre clé secrète').copyWith(
+                  decoration: _buildInputDecoration(
+                          context,
+                          isFr ? 'Clé API' : 'API Key',
+                          isFr ? 'Votre clé secrète' : 'Your secret key')
+                      .copyWith(
                     suffixIcon: IconButton(
-                      icon: Icon(_obscureApiKey ? Icons.visibility_off : Icons.visibility, color: theme.iconTheme.color),
+                      icon: Icon(
+                          _obscureApiKey
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: theme.iconTheme.color),
                       onPressed: () {
                         setState(() {
                           _obscureApiKey = !_obscureApiKey;
@@ -92,19 +112,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Veuillez entrer une clé API';
+                      return isFr
+                          ? 'Veuillez entrer une clé API'
+                          : 'Please enter an API key';
                     }
                     return null;
                   },
                 ),
-                const SizedBox(height: 24), // Added space for help button
+                const SizedBox(height: 24),
+                Text(isFr ? 'Langue' : 'Language',
+                    style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildLanguageButton(context, 'fr'),
+                    const SizedBox(width: 16),
+                    _buildLanguageButton(context, 'en'),
+                  ],
+                ),
+                const SizedBox(height: 24),
                 TextButton(
                   onPressed: () {
+                    final locale = context.read<AppProvider>().locale;
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => const HelpScreen()),
+                      MaterialPageRoute(
+                        builder: (context) => locale.languageCode == 'fr'
+                            ? const HelpScreen()
+                            : const HelpScreenEn(),
+                      ),
                     );
                   },
-                  child: Text('Besoin d\'aide ?', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
+                  child: Text(isFr ? 'Besoin d\'aide ?' : 'Need help?',
+                      style: theme.textTheme.labelLarge
+                          ?.copyWith(color: theme.colorScheme.primary)),
                 ),
                 const Spacer(),
                 ElevatedButton(
@@ -116,7 +157,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       borderRadius: BorderRadius.circular(12.0),
                     ),
                   ),
-                  child: Text('Enregistrer', style: theme.textTheme.labelLarge?.copyWith(fontSize: 16, color: theme.colorScheme.onPrimary)),
+                  child: Text(isFr ? 'Enregistrer' : 'Save',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                          fontSize: 16, color: theme.colorScheme.onPrimary)),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -151,7 +194,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildLanguageButton(BuildContext context, String languageCode) {
+    final appProvider = Provider.of<AppProvider>(context);
+    final isSelected = appProvider.locale.languageCode == languageCode;
+
+    return GestureDetector(
+      onTap: () {
+        appProvider.setLocale(Locale(languageCode));
+      },
+      child: Opacity(
+        opacity: isSelected ? 1.0 : 0.5,
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: isSelected
+                ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
+                : null,
+          ),
+          child: Text(
+            languageCode.toUpperCase(),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _saveSettings() async {
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     if (_formKey.currentState!.validate()) {
       await context.read<AppProvider>().storageService.saveCredentials(
             serverUrl: _serverUrlController.text.trim(),
@@ -159,7 +231,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Paramètres enregistrés')),
+          SnackBar(
+              content:
+                  Text(isFr ? 'Paramètres enregistrés' : 'Settings saved')),
         );
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomeScreen()),

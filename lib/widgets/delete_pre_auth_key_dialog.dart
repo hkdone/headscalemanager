@@ -25,27 +25,38 @@ class DeletePreAuthKeyDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.read<AppProvider>();
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
 
     return AlertDialog(
-      title: const Text('Supprimer la clé ?'),
-      content: Text('Êtes-vous sûr de vouloir supprimer la clé ${preAuthKey.key} ?'),
+      title: Text(isFr ? 'Supprimer la clé ?' : 'Delete key?'),
+      content: Text(isFr
+          ? 'Êtes-vous sûr de vouloir supprimer la clé ${preAuthKey.key} ?'
+          : 'Are you sure you want to delete the key ${preAuthKey.key}?'),
       actions: [
         TextButton(
-          child: const Text('Annuler'),
+          child: Text(isFr ? 'Annuler' : 'Cancel'),
           onPressed: () => Navigator.of(context).pop(),
         ),
         TextButton(
-          child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          child: Text(isFr ? 'Supprimer' : 'Delete',
+              style: const TextStyle(color: Colors.red)),
           onPressed: () async {
             try {
-              await provider.apiService.expirePreAuthKey(preAuthKey.user!.id,preAuthKey.key);
+              await provider.apiService
+                  .expirePreAuthKey(preAuthKey.user!.id, preAuthKey.key);
               Navigator.of(context).pop(); // Ferme le dialogue de confirmation
               onKeyDeleted(); // Appelle le callback pour rafraîchir la liste
-              showSafeSnackBar(context, 'Clé expirée avec succès.');
+              showSafeSnackBar(context,
+                  isFr ? 'Clé expirée avec succès.' : 'Key expired successfully.');
             } catch (e) {
               debugPrint('Erreur lors de l\'expiration de la clé : $e');
               Navigator.of(context).pop();
-              showSafeSnackBar(context, 'Échec de l\'expiration de la clé : $e');
+              showSafeSnackBar(
+                  context,
+                  isFr
+                      ? 'Échec de l\'expiration de la clé : $e'
+                      : 'Failed to expire key: $e');
             }
           },
         ),

@@ -36,9 +36,11 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
   @override
   Widget build(BuildContext context) {
     final provider = context.read<AppProvider>();
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
 
     return AlertDialog(
-      title: const Text('Déplacer l\'appareil'),
+      title: Text(isFr ? 'Déplacer l\'appareil' : 'Move Device'),
       content: FutureBuilder<List<User>>(
         future: _usersFuture,
         builder: (context, snapshot) {
@@ -49,19 +51,27 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
             );
           }
           if (snapshot.hasError) {
-            debugPrint('Erreur lors du chargement des utilisateurs pour déplacer le nœud : ${snapshot.error}');
-            return Text('Échec du chargement des utilisateurs : ${snapshot.error}');
+            debugPrint(
+                'Erreur lors du chargement des utilisateurs pour déplacer le nœud : ${snapshot.error}');
+            return Text(isFr
+                ? 'Échec du chargement des utilisateurs : ${snapshot.error}'
+                : 'Failed to load users: ${snapshot.error}');
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Text('Aucun autre utilisateur disponible pour déplacer l\'appareil.');
+            return Text(isFr
+                ? 'Aucun autre utilisateur disponible pour déplacer l\'appareil.'
+                : 'No other user available to move the device.');
           }
 
           final users = snapshot.data!;
           // Filtre l'utilisateur actuel du nœud pour ne pas le proposer comme destination.
-          final otherUsers = users.where((u) => u.name != widget.node.user).toList();
+          final otherUsers =
+              users.where((u) => u.name != widget.node.user).toList();
 
           if (otherUsers.isEmpty) {
-            return const Text('Aucun autre utilisateur disponible pour déplacer l\'appareil.');
+            return Text(isFr
+                ? 'Aucun autre utilisateur disponible pour déplacer l\'appareil.'
+                : 'No other user available to move the device.');
           }
 
           // Sélectionne le premier utilisateur différent par défaut si aucun n'est sélectionné.
@@ -81,32 +91,41 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
                 _selectedUser = user;
               });
             },
-            decoration: const InputDecoration(
-              labelText: 'Sélectionner un utilisateur',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: isFr ? 'Sélectionner un utilisateur' : 'Select a user',
+              border: const OutlineInputBorder(),
             ),
           );
         },
       ),
       actions: <Widget>[
         TextButton(
-          child: const Text('Annuler'),
+          child: Text(isFr ? 'Annuler' : 'Cancel'),
           onPressed: () => Navigator.of(context).pop(),
         ),
         TextButton(
-          child: const Text('Déplacer'),
+          child: Text(isFr ? 'Déplacer' : 'Move'),
           onPressed: () async {
             if (_selectedUser != null) {
               try {
-                await provider.apiService.moveNode(widget.node.id, _selectedUser!.id);
+                await provider.apiService
+                    .moveNode(widget.node.id, _selectedUser!.id);
                 Navigator.of(context).pop(); // Ferme le dialogue
                 widget.onNodeMoved(); // Appelle le callback pour rafraîchir la liste
-                showSafeSnackBar(context, 'Appareil déplacé avec succès.');
+                showSafeSnackBar(
+                    context,
+                    isFr
+                        ? 'Appareil déplacé avec succès.'
+                        : 'Device moved successfully.');
               } catch (e) {
                 debugPrint('Erreur lors du déplacement de l\'appareil : $e');
                 if (!mounted) return;
                 Navigator.of(context).pop();
-                showSafeSnackBar(context, 'Échec du déplacement de l\'appareil : $e');
+                showSafeSnackBar(
+                    context,
+                    isFr
+                        ? 'Échec du déplacement de l\'appareil : $e'
+                        : 'Failed to move device: $e');
               }
             }
           },

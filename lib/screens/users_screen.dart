@@ -33,6 +33,8 @@ class _UsersScreenState extends State<UsersScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -41,14 +43,22 @@ class _UsersScreenState extends State<UsersScreen> {
           future: _usersFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
+              return Center(
+                  child: CircularProgressIndicator(
+                      color: theme.colorScheme.primary));
             }
             if (snapshot.hasError) {
-              debugPrint('Erreur lors du chargement des utilisateurs : ${snapshot.error}');
-              return Center(child: Text('Erreur : ${snapshot.error}', style: theme.textTheme.bodyMedium));
+              debugPrint(
+                  'Erreur lors du chargement des utilisateurs : ${snapshot.error}');
+              return Center(
+                  child: Text(
+                      '${isFr ? 'Erreur' : 'Error'}: ${snapshot.error}',
+                      style: theme.textTheme.bodyMedium));
             }
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return Center(child: Text('Aucun utilisateur trouvé.', style: theme.textTheme.bodyMedium));
+              return Center(
+                  child: Text(isFr ? 'Aucun utilisateur trouvé.' : 'No users found.',
+                      style: theme.textTheme.bodyMedium));
             }
 
             final users = snapshot.data!;
@@ -76,15 +86,18 @@ class _UsersScreenState extends State<UsersScreen> {
 
   Widget _buildFloatingActionButtons(BuildContext context) {
     final theme = Theme.of(context);
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         FloatingActionButton(
           onPressed: () {
-            Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PreAuthKeysScreen()));
+            Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PreAuthKeysScreen()));
           },
           heroTag: 'managePreAuthKeys',
-          tooltip: 'Gérer les clés d\'accès',
+          tooltip: isFr ? 'Gérer les clés d\'accès' : 'Manage pre-auth keys',
           backgroundColor: theme.colorScheme.primary,
           child: Icon(Icons.vpn_key, color: theme.colorScheme.onPrimary),
         ),
@@ -97,7 +110,7 @@ class _UsersScreenState extends State<UsersScreen> {
             );
           },
           heroTag: 'createUser',
-          tooltip: 'Créer un utilisateur',
+          tooltip: isFr ? 'Créer un utilisateur' : 'Create user',
           backgroundColor: theme.colorScheme.primary,
           child: Icon(Icons.add, color: theme.colorScheme.onPrimary),
         ),
@@ -115,11 +128,15 @@ class _UserCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => UserDetailScreen(user: user),
-        )).then((_) => onUserAction());
+        Navigator.of(context)
+            .push(MaterialPageRoute(
+              builder: (_) => UserDetailScreen(user: user),
+            ))
+            .then((_) => onUserAction());
       },
       child: Container(
         decoration: BoxDecoration(
@@ -145,7 +162,7 @@ class _UserCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Créé le: ${user.createdAt?.toLocal().toString().substring(0, 10) ?? 'N/A'}',
+                    '${isFr ? 'Créé le' : 'Created on'}: ${user.createdAt?.toLocal().toString().substring(0, 10) ?? 'N/A'}',
                     style: theme.textTheme.bodySmall,
                   ),
                 ],
@@ -160,7 +177,8 @@ class _UserCard extends StatelessWidget {
                   if (value == 'delete') {
                     showDialog(
                       context: context,
-                      builder: (ctx) => DeleteUserDialog(user: user, onUserDeleted: onUserAction),
+                      builder: (ctx) => DeleteUserDialog(
+                          user: user, onUserDeleted: onUserAction),
                     );
                   }
                 },
@@ -168,8 +186,12 @@ class _UserCard extends StatelessWidget {
                   PopupMenuItem<String>(
                     value: 'delete',
                     child: ListTile(
-                      leading: const Icon(Icons.delete, color: Colors.red, semanticLabel: 'Supprimer l\'utilisateur'),
-                      title: Text('Supprimer l\'utilisateur', style: theme.textTheme.bodyMedium),
+                      leading: Icon(Icons.delete,
+                          color: Colors.red,
+                          semanticLabel:
+                              isFr ? 'Supprimer l\'utilisateur' : 'Delete user'),
+                      title: Text(isFr ? 'Supprimer l\'utilisateur' : 'Delete user',
+                          style: theme.textTheme.bodyMedium),
                     ),
                   ),
                 ],

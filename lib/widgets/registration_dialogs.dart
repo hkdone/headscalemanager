@@ -29,10 +29,12 @@ Future<void> showTailscaleUpCommandDialog(
   return showDialog(
     context: context,
     builder: (dialogContext) {
+      final locale = context.watch<AppProvider>().locale;
+      final isFr = locale.languageCode == 'fr';
       return DefaultTabController(
         length: 2,
         child: AlertDialog(
-          title: const Text('Étape 1 : Connecter l\'appareil'),
+          title: Text(isFr ? 'Étape 1 : Connecter l\'appareil' : 'Step 1: Connect Device'),
           content: SizedBox(
             width: double.maxFinite,
             child: Column(
@@ -54,8 +56,9 @@ Future<void> showTailscaleUpCommandDialog(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                                'Exécutez la commande suivante dans le terminal de votre appareil:'),
+                            Text(isFr
+                                ? 'Exécutez la commande suivante dans le terminal de votre appareil:'
+                                : 'Run the following command in your device\'s terminal:'),
                             const SizedBox(height: 16),
                             SelectableText(
                               command,
@@ -65,11 +68,12 @@ Future<void> showTailscaleUpCommandDialog(
                             const SizedBox(height: 16),
                             ElevatedButton.icon(
                               icon: const Icon(Icons.copy),
-                              label: const Text('Copier la commande'),
+                              label: Text(isFr ? 'Copier la commande' : 'Copy Command'),
                               onPressed: () async {
                                 await Clipboard.setData(
                                     ClipboardData(text: command));
-                                showSafeSnackBar(context, 'Commande copiée !');
+                                showSafeSnackBar(
+                                    context, isFr ? 'Commande copiée !' : 'Command copied!');
                               },
                             ),
                           ],
@@ -82,8 +86,9 @@ Future<void> showTailscaleUpCommandDialog(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                  'Sur votre appareil, allez dans les paramètres du client Tailscale, sélectionnez "Use alternate server" et entrez l\'URL suivante:'),
+                              Text(isFr
+                                  ? 'Sur votre appareil, allez dans les paramètres du client Tailscale, sélectionnez "Use alternate server" et entrez l\'URL suivante:'
+                                  : 'On your device, go to the Tailscale client settings, select "Use alternate server" and enter the following URL:'),
                               const SizedBox(height: 16),
                               SelectableText(
                                 loginServer,
@@ -93,11 +98,11 @@ Future<void> showTailscaleUpCommandDialog(
                               const SizedBox(height: 16),
                               ElevatedButton.icon(
                                 icon: const Icon(Icons.copy),
-                                label: const Text('Copier l\'URL'),
+                                label: Text(isFr ? 'Copier l\'URL' : 'Copy URL'),
                                 onPressed: () async {
                                   await Clipboard.setData(
                                       ClipboardData(text: loginServer));
-                                  showSafeSnackBar(context, 'URL copiée !');
+                                  showSafeSnackBar(context, isFr ? 'URL copiée !' : 'URL copied!');
                                 },
                               ),
                             ],
@@ -112,11 +117,11 @@ Future<void> showTailscaleUpCommandDialog(
           ),
           actions: [
             TextButton(
-              child: const Text('Fermer'),
+              child: Text(isFr ? 'Fermer' : 'Close'),
               onPressed: () => Navigator.of(dialogContext).pop(),
             ),
             ElevatedButton(
-              child: const Text('Étape suivante'),
+              child: Text(isFr ? 'Étape suivante' : 'Next Step'),
               onPressed: () {
                 Navigator.of(dialogContext).pop();
                 showHeadscaleRegisterCommandDialog(context, user);
@@ -141,21 +146,24 @@ Future<void> showHeadscaleRegisterCommandDialog(
   return showDialog(
     context: context,
     builder: (dialogContext) {
+      final locale = context.watch<AppProvider>().locale;
+      final isFr = locale.languageCode == 'fr';
       return AlertDialog(
-        title: const Text('Étape 2 : Enregistrer l\'appareil'),
+        title: Text(isFr ? 'Étape 2 : Enregistrer l\'appareil' : 'Step 2: Register Device'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                  'Après avoir suivi l\'étape 1 sur votre appareil, le client Tailscale vous fournira une URL d\'enregistrement unique contenant une clé d\'identification unique. Collez cette URL compléte ou la clé d\'identification seule dans le champ ci-dessous pour enregistrer l\'appareil.'),
+              Text(isFr
+                  ? 'Après avoir suivi l\'étape 1 sur votre appareil, le client Tailscale vous fournira une URL d\'enregistrement unique contenant une clé d\'identification unique. Collez cette URL compléte ou la clé d\'identification seule dans le champ ci-dessous pour enregistrer l\'appareil.'
+                  : 'After following step 1 on your device, the Tailscale client will provide you with a unique registration URL containing a unique identification key. Paste this full URL or the identification key alone in the field below to register the device.'),
               const SizedBox(height: 16),
               TextField(
                 controller: urlController,
-                decoration: const InputDecoration(
-                  labelText: 'Coller l\'URL du client ici',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: isFr ? 'Coller l\'URL du client ici' : 'Paste client URL here',
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (value) {
                   final trimmedValue = value.trim();
@@ -178,7 +186,7 @@ Future<void> showHeadscaleRegisterCommandDialog(
         ),
         actions: [
           TextButton(
-            child: const Text('Fermer'),
+            child: Text(isFr ? 'Fermer' : 'Close'),
             onPressed: () => Navigator.of(dialogContext).pop(),
           ),
           ValueListenableBuilder<String>(
@@ -186,7 +194,7 @@ Future<void> showHeadscaleRegisterCommandDialog(
             builder: (ctx, key, child) {
               return ElevatedButton.icon(
                 icon: const Icon(Icons.save),
-                label: const Text('Enregistrer sur le serveur'),
+                label: Text(isFr ? 'Enregistrer sur le serveur' : 'Register on Server'),
                 onPressed: key.isEmpty
                     ? null
                     : () async {
@@ -198,12 +206,18 @@ Future<void> showHeadscaleRegisterCommandDialog(
                           Navigator.of(dialogContext)
                               .pop(); // Close registration dialog
                           showSafeSnackBar(
-                              context, 'Appareil enregistré avec succès.');
+                              context,
+                              isFr
+                                  ? 'Appareil enregistré avec succès.'
+                                  : 'Device registered successfully.');
                           // Show the new dialog to add ACL tags
                           _showAddTagsDialog(context, newNode);
                         } catch (e) {
                           showSafeSnackBar(
-                              context, 'Erreur lors de l\'enregistrement: $e');
+                              context,
+                              isFr
+                                  ? 'Erreur lors de l\'enregistrement: $e'
+                                  : 'Error during registration: $e');
                         }
                       },
               );
@@ -224,20 +238,23 @@ Future<void> _showAddTagsDialog(BuildContext context, Node node) async {
     context: context,
     barrierDismissible: false, // User must make a choice
     builder: (dialogContext) {
+      final locale = context.watch<AppProvider>().locale;
+      final isFr = locale.languageCode == 'fr';
       return StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            title: const Text('Étape 3 : Ajouter des Tags ACL'),
+            title: Text(isFr ? 'Étape 3 : Ajouter des Tags ACL' : 'Step 3: Add ACL Tags'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Configurez les capacités de "${node.name}".'),
+                Text('${isFr ? 'Configurez les capacités de' : 'Configure capabilities for'} "${node.name}".'),
                 const SizedBox(height: 16),
                 CheckboxListTile(
                   title: const Text('Exit Node'),
-                  subtitle: const Text(
-                      'Autoriser ce nœud à être une sortie internet.'),
+                  subtitle: Text(isFr
+                      ? 'Autoriser ce nœud à être une sortie internet.'
+                      : 'Allow this node to be an internet exit.'),
                   value: isExitNode,
                   onChanged: (value) {
                     setState(() {
@@ -247,8 +264,9 @@ Future<void> _showAddTagsDialog(BuildContext context, Node node) async {
                 ),
                 CheckboxListTile(
                   title: const Text('LAN Sharer'),
-                  subtitle: const Text(
-                      'Autoriser ce nœud à partager son réseau local.'),
+                  subtitle: Text(isFr
+                      ? 'Autoriser ce nœud à partager son réseau local.'
+                      : 'Allow this node to share its local network.'),
                   value: isLanSharer,
                   onChanged: (value) {
                     setState(() {
@@ -260,11 +278,11 @@ Future<void> _showAddTagsDialog(BuildContext context, Node node) async {
             ),
             actions: [
               TextButton(
-                child: const Text('Ignorer'),
+                child: Text(isFr ? 'Ignorer' : 'Skip'),
                 onPressed: () => Navigator.of(dialogContext).pop(),
               ),
               ElevatedButton(
-                child: const Text('Appliquer les Tags'),
+                child: Text(isFr ? 'Appliquer les Tags' : 'Apply Tags'),
                 onPressed: () async {
                   final provider = context.read<AppProvider>();
                   String baseTag = 'tag:${normalizeUserName(node.user)}-client';
@@ -278,10 +296,17 @@ Future<void> _showAddTagsDialog(BuildContext context, Node node) async {
                   try {
                     await provider.apiService.setTags(node.id, [baseTag]);
                     Navigator.of(dialogContext).pop();
-                    showSafeSnackBar(context, 'Tags appliqués avec succès.');
+                    showSafeSnackBar(
+                        context,
+                        isFr
+                            ? 'Tags appliqués avec succès.'
+                            : 'Tags applied successfully.');
                   } catch (e) {
                     showSafeSnackBar(
-                        context, 'Erreur lors de l\'application des tags: $e');
+                        context,
+                        isFr
+                            ? 'Erreur lors de l\'application des tags: $e'
+                            : 'Error applying tags: $e');
                   }
                 },
               ),
