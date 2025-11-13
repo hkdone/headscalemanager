@@ -1,20 +1,19 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
+import 'package:headscalemanager/services/new_acl_generator_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
 
-/// Dialogue pour modifier les tags d'un nœud.
-///
-/// Permet à l'utilisateur de saisir des tags sous forme de liste séparée par des virgules.
-/// Valide le format des tags et met à jour les tags via l'API.
 class EditTagsDialog extends StatefulWidget {
-  /// Le nœud dont les tags doivent être modifiés.
   final Node node;
+  final VoidCallback onTagsUpdated;
 
   const EditTagsDialog({
     super.key,
     required this.node,
+    required this.onTagsUpdated,
   });
 
   @override
@@ -22,107 +21,182 @@ class EditTagsDialog extends StatefulWidget {
 }
 
 class _EditTagsDialogState extends State<EditTagsDialog> {
-  final TextEditingController _tagsController = TextEditingController();
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  late List<String> _currentTags;
 
   @override
   void initState() {
     super.initState();
-    // remove "tag:" prefix before displaying
-    _tagsController.text = widget.node.tags.map((t) => t.startsWith('tag:') ? t.substring(4) : t).join(', ');
+    _currentTags = List.from(widget.node.tags);
   }
 
-  @override
-  void dispose() {
-    _tagsController.dispose();
-    super.dispose();
+  String get baseTag {
+    return _currentTags
+        .firstWhere((t) => t.endsWith('-client'), orElse: () => '')
+        .replaceFirst('tag:', '');
+  }
+
+  bool hasCapabilityTag(String capability) {
+    return baseTag.contains(';$capability');
+  }
+
+  void _addCapability(String capability) {
+    final base = baseTag;
+    if (base.isNotEmpty && !base.contains(';$capability')) {
+      setState(() {
+        final oldTag = 'tag:$base';
+        final newTag = 'tag:$base;$capability';
+        _currentTags.remove(oldTag);
+        _currentTags.add(newTag);
+      });
+    }
+  }
+
+  void _removeCapability(String capability) {
+    final base = baseTag;
+    if (base.isNotEmpty && base.contains(';$capability')) {
+      setState(() {
+        final oldTag = 'tag:$base';
+        final newTag = 'tag:${base.replaceAll(';$capability', '')}';
+        _currentTags.remove(oldTag);
+        _currentTags.add(newTag);
+      });
+    }
+  }
+
+  Future<void> _handleSave() async {
+    final apiService = context.read<AppProvider>().apiService;
+    final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
+
+    try {
+      // Save tags first
+      await apiService.setTags(widget.node.id, _currentTags);
+      showSuccessSnackBar(context, isFr ? 'Tags mis à jour.' : 'Tags updated.');
+
+      // Check for ACL mode
+      bool aclMode = true;
+      try {
+        await apiService.getAclPolicy();
+      } catch (e) {
+        aclMode = false;
+      }
+
+      if (aclMode && mounted) {
+        // Ask for ACL update
+        final bool? updateAcls = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(isFr ? 'Mettre à jour les ACLs ?' : 'Update ACLs?'),
+            content: Text(isFr
+                ? 'Voulez-vous régénérer et appliquer la politique ACL pour que ces changements prennent effet ?'
+                : 'Do you want to regenerate and apply the ACL policy for these changes to take effect?'),
+            actions: [
+              TextButton(
+                child: Text(isFr ? 'Non' : 'No'),
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+              ),
+              TextButton(
+                child: Text(isFr ? 'Oui' : 'Yes'),
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+              ),
+            ],
+          ),
+        );
+
+        if (updateAcls == true && mounted) {
+          showSnackBar(context, isFr ? 'Mise à jour des ACLs...' : 'Updating ACLs...');
+          final allUsers = await apiService.getUsers();
+          final allNodes = await apiService.getNodes();
+          final tempRules = await context.read<AppProvider>().storageService.getTemporaryRules();
+          final aclGenerator = NewAclGeneratorService();
+          final newPolicyMap = aclGenerator.generatePolicy(
+              users: allUsers, nodes: allNodes, temporaryRules: tempRules);
+          final newPolicyJson = jsonEncode(newPolicyMap);
+          await apiService.setAclPolicy(newPolicyJson);
+
+          showSuccessSnackBar(context, isFr ? 'ACLs mises à jour !' : 'ACLs updated!');
+        }
+      }
+
+      // Final actions
+      widget.onTagsUpdated();
+      Navigator.of(context).pop();
+
+    } catch (e) {
+      showErrorSnackBar(context, isFr ? 'Échec: $e' : 'Failed: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final apiProvider = Provider.of<AppProvider>(context, listen: false);
-    final locale = context.watch<AppProvider>().locale;
-    final isFr = locale.languageCode == 'fr';
+    final isFr = context.watch<AppProvider>().locale.languageCode == 'fr';
+
+    final clientTag = baseTag;
+    final hasExitNode = hasCapabilityTag('exit-node');
+    final hasLanSharer = hasCapabilityTag('lan-sharer');
+
     return AlertDialog(
       title: Text(isFr ? 'Modifier les tags' : 'Edit tags'),
-      content: Form(
-        key: _formKey,
-        child: TextFormField(
-          controller: _tagsController,
-          decoration: InputDecoration(
-            hintText: isFr
-                ? 'Tags (minuscules, sans chiffres/espaces/spéciaux, séparés par des virgules)'
-                : 'Tags (lowercase, no numbers/spaces/specials, comma separated)',
-            labelText: 'Tags',
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return null; // Empty is valid (clears tags)
-            }
-            final rawTags = value.split(',').map((t) => t.trim()).toList();
-            // Updated regex to allow lowercase letters, numbers, hyphens, and semicolons, to support tags like 'user-1-client;exit-node'
-            final RegExp validTagPattern = RegExp(r'^[a-z0-9-;]+$');
-
-            List<String> invalidTagsExamples = [];
-            bool allTagsValid = true;
-
-            for (String tag in rawTags) {
-              if (tag.isNotEmpty) {
-                if (!validTagPattern.hasMatch(tag)) {
-                  allTagsValid = false;
-                  if (invalidTagsExamples.length < 3) {
-                    invalidTagsExamples.add(tag);
-                  }
-                }
-              }
-            }
-
-            if (!allTagsValid) {
-              return isFr
-                  ? 'Tags invalides : ${invalidTagsExamples.join(", ")}. Caractères autorisés : lettres minuscules, chiffres, tirets (-) et points-virgules (;).'
-                  : 'Invalid tags: ${invalidTagsExamples.join(", ")}. Allowed characters: lowercase letters, numbers, hyphens (-), and semicolons (;).';
-            }
-            return null;
-          },
-          autofocus: true,
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(isFr ? 'Tags Actuels' : 'Current Tags',
+                style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 4.0,
+              children: _currentTags.map((tag) => Chip(label: Text(tag))).toList(),
+            ),
+            const SizedBox(height: 24),
+            Text(isFr ? 'Suggestions' : 'Suggestions',
+                style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            if (clientTag.isNotEmpty) ...[
+              if (!hasExitNode)
+                ElevatedButton.icon(
+                  onPressed: () => _addCapability('exit-node'),
+                  icon: const Icon(Icons.add),
+                  label: Text(isFr ? 'Ajouter ;exit-node' : 'Add ;exit-node'),
+                ),
+              if (hasExitNode)
+                ElevatedButton.icon(
+                  onPressed: () => _removeCapability('exit-node'),
+                  icon: const Icon(Icons.remove),
+                  label: Text(isFr ? 'Retirer ;exit-node' : 'Remove ;exit-node'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                ),
+              const SizedBox(height: 8),
+              if (!hasLanSharer)
+                ElevatedButton.icon(
+                  onPressed: () => _addCapability('lan-sharer'),
+                  icon: const Icon(Icons.add),
+                  label: Text(isFr ? 'Ajouter ;lan-sharer' : 'Add ;lan-sharer'),
+                ),
+              if (hasLanSharer)
+                ElevatedButton.icon(
+                  onPressed: () => _removeCapability('lan-sharer'),
+                  icon: const Icon(Icons.remove),
+                  label: Text(isFr ? 'Retirer ;lan-sharer' : 'Remove ;lan-sharer'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                ),
+            ] else ...[
+              Text(isFr
+                  ? 'Aucun tag de base de type "-client" trouvé. La modification guidée n\'est pas disponible.'
+                  : 'No base "-client" tag found. Guided editing is not available.')
+            ]
+          ],
         ),
       ),
       actions: [
         TextButton(
           child: Text(isFr ? 'Annuler' : 'Cancel'),
-          onPressed: () => Navigator.of(context).pop(), // Pop with null
+          onPressed: () => Navigator.of(context).pop(),
         ),
         TextButton(
           child: Text(isFr ? 'Sauvegarder' : 'Save'),
-          onPressed: () async {
-            if (_formKey.currentState!.validate()) {
-              final tagsString = _tagsController.text.trim();
-              final newTagsList = tagsString.isNotEmpty
-                  ? tagsString
-                      .split(',')
-                      .map((t) => 'tag:${t.trim()}')
-                      .where((t) => t.length > 4)
-                      .toList()
-                  : <String>[];
-
-              try {
-                await apiProvider.apiService
-                    .setTags(widget.node.id, newTagsList);
-                Navigator.of(context).pop();
-                showSafeSnackBar(
-                    context,
-                    isFr
-                        ? 'Tags mis à jour avec succès.'
-                        : 'Tags updated successfully.');
-              } catch (e) {
-                showSafeSnackBar(
-                    context,
-                    isFr
-                        ? 'Erreur lors de la mise à jour des tags: $e'
-                        : 'Error updating tags: $e');
-              }
-            }
-          },
+          onPressed: _handleSave,
         ),
       ],
     );

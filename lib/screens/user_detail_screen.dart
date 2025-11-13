@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
-import 'package:headscalemanager/widgets/cli_command_display_dialog.dart';
 import 'package:headscalemanager/widgets/edit_tags_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/widgets/registration_dialogs.dart';
@@ -11,8 +10,6 @@ import 'package:headscalemanager/widgets/registration_dialogs.dart';
 // Dialogs for node actions
 import 'package:headscalemanager/widgets/rename_node_dialog.dart';
 import 'package:headscalemanager/widgets/move_node_dialog.dart';
-import 'package:headscalemanager/widgets/exit_node_command_dialog.dart';
-import 'package:headscalemanager/widgets/share_subnet_dialog.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 
 /// Écran affichant les détails d'un utilisateur spécifique et ses nœuds associés.
@@ -188,86 +185,14 @@ class _NodeCard extends StatelessWidget {
     }
   }
 
-  void _showEditTagsFlow(BuildContext context) async {
-    final String? generatedCommand = await showDialog<String>(
+  void _showEditTagsDialog(BuildContext context) {
+    showDialog(
       context: context,
       builder: (dialogContext) => EditTagsDialog(
         node: node,
+        onTagsUpdated: onNodeUpdate, // Passer la fonction de rafraîchissement
       ),
     );
-
-    if (generatedCommand != null &&
-        generatedCommand.isNotEmpty &&
-        context.mounted) {
-      final locale = context.read<AppProvider>().locale;
-      final isFr = locale.languageCode == 'fr';
-      showDialog(
-        context: context,
-        builder: (dialogContext) =>
-            CliCommandDisplayDialog(command: generatedCommand),
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              isFr
-                  ? 'Commande CLI générée. Exécutez-la et actualisez la page pour voir les changements.'
-                  : 'CLI command generated. Run it and refresh the page to see the changes.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: Colors.white)),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-  }
-
-  void _showExitNodeWarningAndProceed(BuildContext context) async {
-    final theme = Theme.of(context);
-    final locale = context.read<AppProvider>().locale;
-    final isFr = locale.languageCode == 'fr';
-    bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(
-              isFr
-                  ? 'Avertissement sur les Nœuds de Sortie'
-                  : 'Exit Node Warning',
-              style: theme.textTheme.titleLarge),
-          content: Text(
-              isFr
-                  ? 'Dans la configuration ACL actuelle, si plusieurs nœuds de sortie appartiennent à différents utilisateurs, ils ne peuvent pas être rendus exclusifs. Tout utilisateur autorisé pourra voir et utiliser tous les nœuds de sortie disponibles sur le réseau.'
-                  : 'In the current ACL configuration, if multiple exit nodes belong to different users, they cannot be made exclusive. Any authorized user will be able to see and use all available exit nodes on the network.',
-              style: theme.textTheme.bodyMedium),
-          actions: <Widget>[
-            TextButton(
-              child: Text(isFr ? 'Annuler' : 'Cancel',
-                  style: theme.textTheme.labelLarge),
-              onPressed: () {
-                Navigator.of(dialogContext).pop(false);
-              },
-            ),
-            TextButton(
-              child: Text(isFr ? 'Continuer' : 'Continue',
-                  style: theme.textTheme.labelLarge
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-              onPressed: () {
-                Navigator.of(dialogContext).pop(true);
-              },
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed == true && context.mounted) {
-      showDialog(
-        context: context,
-        builder: (dialogContext) =>
-            ExitNodeCommandDialog(node: node, onExitNodeEnabled: onNodeUpdate),
-      );
-    }
   }
 
   @override
@@ -364,32 +289,7 @@ class _NodeCard extends StatelessWidget {
                     MoveNodeDialog(node: node, onNodeMoved: onNodeUpdate));
             break;
           case 'edit_tags':
-            _showEditTagsFlow(context);
-            break;
-          case 'enable_exit_node':
-            _showExitNodeWarningAndProceed(context);
-            break;
-          case 'disable_exit_node':
-            _runAction(
-                context,
-                () => provider.apiService.setNodeRoutes(node.id, []),
-                isFr
-                    ? 'Nœud de sortie désactivé.'
-                    : 'Exit node disabled.');
-            break;
-          case 'share_subnet':
-            showDialog(
-                context: context,
-                builder: (dialogContext) => ShareSubnetDialog(
-                    node: node, onSubnetShared: onNodeUpdate));
-            break;
-          case 'disable_subnet':
-            _runAction(
-                context,
-                () => provider.apiService.setNodeRoutes(node.id, []),
-                isFr
-                    ? 'Routes de sous-réseau désactivées.'
-                    : 'Subnet routes disabled.');
+            _showEditTagsDialog(context);
             break;
           case 'delete_device':
             showDialog(
@@ -438,23 +338,6 @@ class _NodeCard extends StatelessWidget {
         PopupMenuItem<String>(
             value: 'edit_tags',
             child: Text(isFr ? 'Modifier les tags' : 'Edit tags',
-                style: theme.textTheme.bodyMedium)),
-        const PopupMenuDivider(),
-        PopupMenuItem<String>(
-            value: 'enable_exit_node',
-            child: Text(isFr ? 'Activer nœud de sortie' : 'Enable exit node',
-                style: theme.textTheme.bodyMedium)),
-        PopupMenuItem<String>(
-            value: 'disable_exit_node',
-            child:
-                Text(isFr ? 'Désactiver nœud de sortie' : 'Disable exit node', style: theme.textTheme.bodyMedium)),
-        PopupMenuItem<String>(
-            value: 'share_subnet',
-            child: Text(isFr ? 'Partager sous-réseau' : 'Share subnet',
-                style: theme.textTheme.bodyMedium)),
-        PopupMenuItem<String>(
-            value: 'disable_subnet',
-            child: Text(isFr ? 'Désactiver sous-réseau' : 'Disable subnet',
                 style: theme.textTheme.bodyMedium)),
         const PopupMenuDivider(),
         PopupMenuItem<String>(

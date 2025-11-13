@@ -1,20 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
+import 'package:headscalemanager/services/new_acl_generator_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
-// For debugPrint
 
-/// Dialogue pour déplacer un nœud vers un autre utilisateur.
-///
-/// Permet à l'utilisateur de sélectionner un utilisateur cible parmi la liste
-/// des utilisateurs existants et de déplacer le nœud vers cet utilisateur.
 class MoveNodeDialog extends StatefulWidget {
-  /// Le nœud à déplacer.
   final Node node;
-
-  /// Fonction de rappel appelée après le déplacement réussi du nœud.
   final VoidCallback onNodeMoved;
 
   const MoveNodeDialog({super.key, required this.node, required this.onNodeMoved});
@@ -33,11 +27,77 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
     _usersFuture = context.read<AppProvider>().apiService.getUsers();
   }
 
+  Future<void> _handleMove() async {
+    if (_selectedUser == null) return;
+
+    final provider = context.read<AppProvider>();
+    final isFr = provider.locale.languageCode == 'fr';
+
+    // Close the dialog first, as operations will take time
+    Navigator.of(context).pop();
+    showSafeSnackBar(context, isFr ? 'Déplacement en cours...' : 'Moving device...');
+
+    try {
+      await provider.apiService.moveNode(widget.node.id, _selectedUser!);
+
+      bool aclMode = true;
+      try {
+        await provider.apiService.getAclPolicy();
+      } catch (e) {
+        aclMode = false;
+      }
+
+      if (aclMode) {
+        final bool? updateAcls = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(isFr ? 'Mettre à jour les ACLs ?' : 'Update ACLs?'),
+            content: Text(isFr
+                ? 'Voulez-vous régénérer et appliquer la politique ACL pour refléter ce changement de propriétaire ?'
+                : 'Do you want to regenerate and apply the ACL policy to reflect this change of ownership?'),
+            actions: [
+              TextButton(
+                child: Text(isFr ? 'Non' : 'No'),
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+              ),
+              TextButton(
+                child: Text(isFr ? 'Oui' : 'Yes'),
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+              ),
+            ],
+          ),
+        );
+
+        if (updateAcls == true) {
+          showSafeSnackBar(context, isFr ? 'Mise à jour des ACLs...' : 'Updating ACLs...');
+
+          final allUsers = await provider.apiService.getUsers();
+          final allNodes = await provider.apiService.getNodes();
+          final tempRules = await provider.storageService.getTemporaryRules();
+          final aclGenerator = NewAclGeneratorService();
+          final newPolicyMap = aclGenerator.generatePolicy(
+              users: allUsers, nodes: allNodes, temporaryRules: tempRules);
+          final newPolicyJson = jsonEncode(newPolicyMap);
+          await provider.apiService.setAclPolicy(newPolicyJson);
+
+          showSafeSnackBar(context, isFr ? 'Appareil déplacé et ACLs mises à jour !' : 'Device moved and ACLs updated!');
+        } else {
+          showSafeSnackBar(context, isFr ? 'Appareil déplacé.' : 'Device moved.');
+        }
+      } else {
+        showSafeSnackBar(context, isFr ? 'Appareil déplacé (ACLs non gérées).' : 'Device moved (ACLs not managed).');
+      }
+
+      widget.onNodeMoved();
+
+    } catch (e) {
+        showSafeSnackBar(context, isFr ? 'Échec du déplacement: $e' : 'Failed to move: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final provider = context.read<AppProvider>();
-    final locale = context.watch<AppProvider>().locale;
-    final isFr = locale.languageCode == 'fr';
+    final isFr = context.watch<AppProvider>().locale.languageCode == 'fr';
 
     return AlertDialog(
       title: Text(isFr ? 'Déplacer l\'appareil' : 'Move Device'),
@@ -46,35 +106,25 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const SizedBox(
-              height: 100, // Hauteur fixe pour éviter le redimensionnement
+              height: 100,
               child: Center(child: CircularProgressIndicator()),
             );
           }
           if (snapshot.hasError) {
-            debugPrint(
-                'Erreur lors du chargement des utilisateurs pour déplacer le nœud : ${snapshot.error}');
             return Text(isFr
                 ? 'Échec du chargement des utilisateurs : ${snapshot.error}'
                 : 'Failed to load users: ${snapshot.error}');
           }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Text(isFr
-                ? 'Aucun autre utilisateur disponible pour déplacer l\'appareil.'
-                : 'No other user available to move the device.');
-          }
-
-          final users = snapshot.data!;
-          // Filtre l'utilisateur actuel du nœud pour ne pas le proposer comme destination.
+          final users = snapshot.data ?? [];
           final otherUsers =
               users.where((u) => u.name != widget.node.user).toList();
 
           if (otherUsers.isEmpty) {
             return Text(isFr
-                ? 'Aucun autre utilisateur disponible pour déplacer l\'appareil.'
-                : 'No other user available to move the device.');
+                ? 'Aucun autre utilisateur disponible.'
+                : 'No other users available.');
           }
 
-          // Sélectionne le premier utilisateur différent par défaut si aucun n'est sélectionné.
           _selectedUser ??= otherUsers.first;
 
           return DropdownButtonFormField<User>(
@@ -105,30 +155,7 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
         ),
         TextButton(
           child: Text(isFr ? 'Déplacer' : 'Move'),
-          onPressed: () async {
-            if (_selectedUser != null) {
-              try {
-                await provider.apiService
-                    .moveNode(widget.node.id, _selectedUser!.id);
-                Navigator.of(context).pop(); // Ferme le dialogue
-                widget.onNodeMoved(); // Appelle le callback pour rafraîchir la liste
-                showSafeSnackBar(
-                    context,
-                    isFr
-                        ? 'Appareil déplacé avec succès.'
-                        : 'Device moved successfully.');
-              } catch (e) {
-                debugPrint('Erreur lors du déplacement de l\'appareil : $e');
-                if (!mounted) return;
-                Navigator.of(context).pop();
-                showSafeSnackBar(
-                    context,
-                    isFr
-                        ? 'Échec du déplacement de l\'appareil : $e'
-                        : 'Failed to move device: $e');
-              }
-            }
-          },
+          onPressed: _handleMove,
         ),
       ],
     );
