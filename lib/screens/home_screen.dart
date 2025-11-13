@@ -92,8 +92,8 @@ class _HomeScreenState extends State<HomeScreen> {
             label: isFr ? 'Utilisateurs' : 'Users',
           ),
           // Élément pour les ACLs.
-          BottomNavigationBarItem(
-            icon: const Icon(EvaIcons.shield),
+          const BottomNavigationBarItem(
+            icon: Icon(EvaIcons.shield),
             label: 'ACLs',
           ),
           // Élément pour la vue d'ensemble du réseau.
