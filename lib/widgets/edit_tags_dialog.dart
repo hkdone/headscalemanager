@@ -70,7 +70,7 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
     try {
       // Save tags first
       await apiService.setTags(widget.node.id, _currentTags);
-      showSuccessSnackBar(context, isFr ? 'Tags mis à jour.' : 'Tags updated.');
+      showSafeSnackBar(context, isFr ? 'Tags mis à jour.' : 'Tags updated.');
 
       // Check for ACL mode
       bool aclMode = true;
@@ -103,7 +103,7 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
         );
 
         if (updateAcls == true && mounted) {
-          showSnackBar(context, isFr ? 'Mise à jour des ACLs...' : 'Updating ACLs...');
+          showSafeSnackBar(context, isFr ? 'Mise à jour des ACLs...' : 'Updating ACLs...');
           final allUsers = await apiService.getUsers();
           final allNodes = await apiService.getNodes();
           final tempRules = await context.read<AppProvider>().storageService.getTemporaryRules();
@@ -113,7 +113,7 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
           final newPolicyJson = jsonEncode(newPolicyMap);
           await apiService.setAclPolicy(newPolicyJson);
 
-          showSuccessSnackBar(context, isFr ? 'ACLs mises à jour !' : 'ACLs updated!');
+          showSafeSnackBar(context, isFr ? 'ACLs mises à jour !' : 'ACLs updated!');
         }
       }
 
@@ -122,7 +122,7 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
       Navigator.of(context).pop();
 
     } catch (e) {
-      showErrorSnackBar(context, isFr ? 'Échec: $e' : 'Failed: $e');
+      showSafeSnackBar(context, isFr ? 'Échec: $e' : 'Failed: $e');
     }
   }
 

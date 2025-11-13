@@ -340,7 +340,7 @@ class _UserNodeCard extends StatelessWidget {
               child: Text(isFr ? 'Oui' : 'Yes'),
               onPressed: () async {
                 Navigator.of(context).pop(); // Close dialog first
-                showSnackBar(context,
+                showSafeSnackBar(context,
                     isFr ? 'Traitement en cours...' : 'Processing...');
 
                 bool aclMode = true;
@@ -388,7 +388,7 @@ class _UserNodeCard extends StatelessWidget {
                     final newPolicyJson = jsonEncode(newPolicyMap);
                     await appProvider.apiService.setAclPolicy(newPolicyJson);
 
-                    showSuccessSnackBar(
+                    showSafeSnackBar(
                         context,
                         isFr
                             ? 'Nœud approuvé et ACLs mises à jour !'
@@ -396,14 +396,14 @@ class _UserNodeCard extends StatelessWidget {
                   } else {
                     // Simplified logic: Routes only
                     await appProvider.apiService.setNodeRoutes(node.id, pendingRoutes);
-                    showSuccessSnackBar(
+                    showSafeSnackBar(
                         context,
                         isFr
                             ? 'Routes approuvées (ACLs non gérées).'
                             : 'Routes approved (ACLs not managed).');
                   }
                 } catch (e) {
-                  showErrorSnackBar(context, isFr ? 'Échec : $e' : 'Failed: $e');
+                  showSafeSnackBar(context, isFr ? 'Échec : $e' : 'Failed: $e');
                 } finally {
                   refreshNodes();
                 }
@@ -461,7 +461,7 @@ class _UserNodeCard extends StatelessWidget {
               child: Text(isFr ? 'Oui, Nettoyer' : 'Yes, Clean Up'),
               onPressed: () async {
                 Navigator.of(context).pop();
-                showSnackBar(context, isFr ? 'Nettoyage en cours...' : 'Cleaning up...');
+                showSafeSnackBar(context, isFr ? 'Nettoyage en cours...' : 'Cleaning up...');
 
                 bool aclMode = true;
                 try {
@@ -505,7 +505,7 @@ class _UserNodeCard extends StatelessWidget {
                     final newPolicyJson = jsonEncode(newPolicyMap);
                     await appProvider.apiService.setAclPolicy(newPolicyJson);
 
-                    showSuccessSnackBar(
+                    showSafeSnackBar(
                         context,
                         isFr
                             ? 'Configuration nettoyée et ACLs mises à jour !'
@@ -514,14 +514,14 @@ class _UserNodeCard extends StatelessWidget {
                   } else {
                     // Simplified logic: Routes only
                     await appProvider.apiService.setNodeRoutes(node.id, remainingRoutes);
-                     showSuccessSnackBar(
+                     showSafeSnackBar(
                         context,
                         isFr
                             ? 'Configuration des routes nettoyée (ACLs non gérées).'
                             : 'Route configuration cleaned up (ACLs not managed).');
                   }
                 } catch (e) {
-                  showErrorSnackBar(context, isFr ? 'Échec : $e' : 'Failed: $e');
+                  showSafeSnackBar(context, isFr ? 'Échec : $e' : 'Failed: $e');
                 } finally {
                   refreshNodes();
                 }
