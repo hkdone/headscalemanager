@@ -3,9 +3,9 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/home_screen.dart';
 import 'package:headscalemanager/screens/help_screen.dart';
 import 'package:headscalemanager/screens/help_screen_en.dart';
+import 'package:headscalemanager/screens/api_keys_screen.dart'; // Import the ApiKeysScreen
 import 'package:provider/provider.dart';
 
-/// Écran des paramètres de l'application.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -131,6 +131,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ApiKeysScreen()),
+                    );
+                  },
+                  child: Text(isFr ? 'Gérer les clés API' : 'Manage API Keys',
+                      style: theme.textTheme.labelLarge
+                          ?.copyWith(color: theme.colorScheme.primary)),
+                ),
+                const SizedBox(height: 8),
                 TextButton(
                   onPressed: () {
                     final locale = context.read<AppProvider>().locale;

@@ -5,7 +5,6 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/new_acl_generator_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
-import 'package:headscalemanager/screens/api_keys_screen.dart';
 import 'package:headscalemanager/screens/node_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -24,12 +23,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _refreshNodes();
   }
 
-  void _refreshNodes() {
+  Future<void> _refreshNodes() async {
     if (mounted) {
       setState(() {
         _nodesFuture = context.read<AppProvider>().apiService.getNodes();
       });
     }
+    // Return a completed future to satisfy RefreshIndicator
+    return Future.value();
   }
 
   @override
@@ -43,7 +44,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: FutureBuilder<List<Node>>(
           future: _nodesFuture,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
@@ -52,8 +54,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       '${isFr ? 'Erreur' : 'Error'}: ${snapshot.error}'));
             }
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return Center(
-                  child: Text(isFr ? 'Aucun nœud trouvé.' : 'No node found.'));
+              return RefreshIndicator(
+                onRefresh: _refreshNodes,
+                child: ListView(
+                  children: [
+                    Center(
+                        child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child:
+                          Text(isFr ? 'Aucun nœud trouvé.' : 'No node found.'),
+                    ))
+                  ],
+                ),
+              );
             }
 
             final nodes = snapshot.data!;
@@ -66,31 +79,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final connectedNodes = nodes.where((node) => node.online).length;
             final disconnectedNodes = nodes.length - connectedNodes;
 
-            return Column(
-              children: [
-                _buildSummarySection(
-                    users.length, connectedNodes, disconnectedNodes, isFr),
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    itemCount: users.length,
-                    itemBuilder: (context, index) {
-                      final user = users[index];
-                      final userNodes = nodesByUser[user]!;
-                      return _UserNodeCard(
-                        user: user,
-                        nodes: userNodes,
-                        refreshNodes: _refreshNodes,
-                      );
-                    },
+            return RefreshIndicator(
+              onRefresh: _refreshNodes,
+              child: Column(
+                children: [
+                  _buildSummarySection(
+                      users.length, connectedNodes, disconnectedNodes, isFr),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      itemCount: users.length,
+                      itemBuilder: (context, index) {
+                        final user = users[index];
+                        final userNodes = nodesByUser[user]!;
+                        return _UserNodeCard(
+                          user: user,
+                          nodes: userNodes,
+                          refreshNodes: _refreshNodes,
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             );
           },
         ),
       ),
-      floatingActionButton: _buildFloatingActionButtons(isFr),
     );
   }
 
@@ -134,30 +149,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildFloatingActionButtons(bool isFr) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        FloatingActionButton(
-          onPressed: _refreshNodes,
-          heroTag: 'refreshNodes',
-          tooltip: isFr ? 'Rafraîchir les nœuds' : 'Refresh nodes',
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          child: const Icon(Icons.refresh, color: Colors.white),
-        ),
-        const SizedBox(height: 16),
-        FloatingActionButton(
-          onPressed: () => Navigator.of(context)
-              .push(MaterialPageRoute(builder: (_) => const ApiKeysScreen())),
-          heroTag: 'apiKeys',
-          tooltip: isFr ? 'Gérer les clés API' : 'Manage API keys',
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          child: const Icon(Icons.api, color: Colors.white),
-        ),
-      ],
     );
   }
 }
