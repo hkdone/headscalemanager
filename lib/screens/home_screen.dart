@@ -80,6 +80,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
       /// Barre de navigation inférieure.
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed, // Force le style fixe
+        backgroundColor: Theme.of(context).bottomAppBarTheme.color,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Colors.grey,
         items: <BottomNavigationBarItem>[
           // Élément pour le Tableau de Bord.
           BottomNavigationBarItem(

@@ -26,7 +26,7 @@ class _AclTesterScreenState extends State<AclTesterScreen> {
   List<String> _allTags = [];
   String? _selectedSourceTag;
   String? _selectedDestinationTag;
-  final List<Map<String, String>> _temporaryRules = [];
+  final List<Map<String, dynamic>> _temporaryRules = [];
 
   @override
   void initState() {
@@ -265,9 +265,11 @@ class _AclTesterScreenState extends State<AclTesterScreen> {
               spacing: 8.0,
               children: _temporaryRules.asMap().entries.map((entry) {
                 int idx = entry.key;
-                Map<String, String> rule = entry.value;
+                Map<String, dynamic> rule = entry.value;
+                final port = rule['port'] as String?;
+                final portString = (port != null && port.isNotEmpty) ? ':${rule['port']}' : '';
                 return Chip(
-                  label: Text('${rule['src']} <-> ${rule['dst']}'),
+                  label: Text('${rule['src']} <-> ${rule['dst']}$portString'),
                   onDeleted: () => _removeTemporaryRule(idx),
                   backgroundColor:
                       Theme.of(context).colorScheme.primary.withAlpha(25),
@@ -342,9 +344,10 @@ class _AclTesterScreenState extends State<AclTesterScreen> {
       return;
     }
 
-    final newRule = {
+    final newRule = <String, dynamic>{
       'src': _selectedSourceTag!,
       'dst': _selectedDestinationTag!,
+      'port': '', // Add port support later if needed
     };
 
     bool ruleExists = _temporaryRules.any((rule) =>

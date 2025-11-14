@@ -15,7 +15,7 @@ class NewAclGeneratorService {
   Map<String, dynamic> generatePolicy({
     required List<User> users,
     required List<Node> nodes,
-    List<Map<String, String>> temporaryRules = const [],
+    List<Map<String, dynamic>> temporaryRules = const [],
   }) {
     // --- Étape 1: Création des groupes et pré-déclaration des tagOwners de base ---
     final groups = <String, List<String>>{};
@@ -78,18 +78,21 @@ class NewAclGeneratorService {
 
     // 3.1: Ajouter les règles d'exception manuelles (tag-à-tag)
     for (var rule in temporaryRules) {
-      final src = rule['src'];
-      final dst = rule['dst'];
+      final src = rule['src'] as String?;
+      final dst = rule['dst'] as String?;
+      final port = rule['port'] as String?;
+
       if (src != null && dst != null) {
+        final dstPort = (port != null && port.isNotEmpty) ? ':$port' : ':*';
         acls.add({
           'action': 'accept',
           'src': [src],
-          'dst': ['$dst:*']
+          'dst': ['$dst$dstPort']
         });
         acls.add({
           'action': 'accept',
           'src': [dst],
-          'dst': ['$src:*']
+          'dst': ['$src$dstPort']
         });
       }
     }

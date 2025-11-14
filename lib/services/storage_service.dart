@@ -57,19 +57,19 @@ class StorageService {
   }
 
   /// Sauvegarde les règles ACL temporaires.
-  Future<void> saveTemporaryRules(List<Map<String, String>> rules) async {
+  Future<void> saveTemporaryRules(List<Map<String, dynamic>> rules) async {
     final String rulesJson = json.encode(rules);
     await _storage.write(key: _temporaryAclRules, value: rulesJson);
   }
 
   /// Récupère les règles ACL temporaires.
-  Future<List<Map<String, String>>> getTemporaryRules() async {
+  Future<List<Map<String, dynamic>>> getTemporaryRules() async {
     final String? rulesJson = await _storage.read(key: _temporaryAclRules);
     if (rulesJson != null && rulesJson.isNotEmpty) {
       try {
         final List<dynamic> decodedList = json.decode(rulesJson);
         return decodedList
-            .map((item) => Map<String, String>.from(item))
+            .map((item) => Map<String, dynamic>.from(item))
             .toList();
       } catch (e) {
         // En cas d'erreur de décodage, retourne une liste vide.

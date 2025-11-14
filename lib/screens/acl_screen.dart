@@ -23,10 +23,11 @@ class _AclScreenState extends State<AclScreen> {
       NewAclGeneratorService();
 
   List<Node> _allNodes = [];
-  List<String> _allTags = [];
-  String? _selectedSourceTag;
-  String? _selectedDestinationTag;
-  final List<Map<String, String>> _temporaryRules = [];
+  List<Node> _destinationNodes = [];
+  Node? _selectedSourceNode;
+  Node? _selectedDestinationNode;
+  final _portController = TextEditingController();
+  final List<Map<String, dynamic>> _temporaryRules = [];
 
   @override
   void initState() {
@@ -50,11 +51,7 @@ class _AclScreenState extends State<AclScreen> {
     try {
       final apiService = context.read<AppProvider>().apiService;
       _allNodes = await apiService.getNodes();
-      final Set<String> tags = {};
-      for (var node in _allNodes) {
-        tags.addAll(node.tags);
-      }
-      _allTags = tags.toList()..sort();
+      _destinationNodes = List.from(_allNodes);
     } catch (e) {
       debugPrint('Error fetching nodes: $e');
       if (mounted) {
@@ -207,26 +204,46 @@ class _AclScreenState extends State<AclScreen> {
             ),
             const SizedBox(height: 16),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: _buildTagDropdown(
-                    'Source (Tag)',
-                    _selectedSourceTag,
-                    _allTags,
-                    (tag) {
+                  flex: 2,
+                  child: _buildNodeDropdown(
+                    'Source (Node)',
+                    _selectedSourceNode,
+                    _allNodes,
+                    (node) {
                       setState(() {
-                        _selectedSourceTag = tag;
+                        _selectedSourceNode = node;
+                        _selectedDestinationNode = null; // Reset destination
+                        if (node != null) {
+                          _destinationNodes = _allNodes
+                              .where((n) => n.user != node.user)
+                              .toList();
+                        } else {
+                          _destinationNodes = List.from(_allNodes);
+                        }
                       });
                     },
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _buildTagDropdown(
-                    'Destination (Tag)',
-                    _selectedDestinationTag,
-                    _allTags, // Using _allTags for destination as well for simplicity
-                    (tag) => setState(() => _selectedDestinationTag = tag),
+                  flex: 2,
+                  child: _buildNodeDropdown(
+                    'Destination (Node)',
+                    _selectedDestinationNode,
+                    _destinationNodes, // Use the filtered list
+                    (node) => setState(() => _selectedDestinationNode = node),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 1,
+                  child: TextField(
+                    controller: _portController,
+                    keyboardType: TextInputType.number,
+                    decoration: _buildInputDecoration('Port', 'ex: 443'),
                   ),
                 ),
               ],
@@ -267,9 +284,14 @@ class _AclScreenState extends State<AclScreen> {
               spacing: 8.0,
               children: _temporaryRules.asMap().entries.map((entry) {
                 int idx = entry.key;
-                Map<String, String> rule = entry.value;
+                Map<String, dynamic> rule = entry.value;
+                final port = rule['port'] as String?;
+                final label = port != null && port.isNotEmpty
+                    ? '${rule['src']} <-> ${rule['dst']}:$port'
+                    : '${rule['src']} <-> ${rule['dst']}';
+
                 return Chip(
-                  label: Text('${rule['src']} <-> ${rule['dst']}'),
+                  label: Text(label),
                   onDeleted: () => _removeTemporaryRule(idx),
                   backgroundColor:
                       Theme.of(context).colorScheme.primary.withAlpha(25),
@@ -285,19 +307,19 @@ class _AclScreenState extends State<AclScreen> {
     );
   }
 
-  DropdownButtonFormField<String> _buildTagDropdown(String label,
-      String? selectedTag, List<String> tags, ValueChanged<String?> onChanged) {
+  DropdownButtonFormField<Node> _buildNodeDropdown(String label,
+      Node? selectedNode, List<Node> nodes, ValueChanged<Node?> onChanged) {
     final locale = context.watch<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
 
-    return DropdownButtonFormField<String>(
-      value: selectedTag,
+    return DropdownButtonFormField<Node>(
+      value: selectedNode,
       decoration: _buildInputDecoration(
-          label, isFr ? 'Choisir un tag' : 'Choose a tag'),
-      items: tags.map((String tag) {
-        return DropdownMenuItem<String>(
-          value: tag,
-          child: Text(tag, overflow: TextOverflow.ellipsis),
+          label, isFr ? 'Choisir un nœud' : 'Choose a node'),
+      items: nodes.map((Node node) {
+        return DropdownMenuItem<Node>(
+          value: node,
+          child: Text(node.name, overflow: TextOverflow.ellipsis),
         );
       }).toList(),
       onChanged: onChanged,
@@ -323,35 +345,56 @@ class _AclScreenState extends State<AclScreen> {
     final locale = context.read<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
 
-    if (_selectedSourceTag == null || _selectedDestinationTag == null) {
+    if (_selectedSourceNode == null || _selectedDestinationNode == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               isFr
-                  ? 'Veuillez sélectionner un tag source et un tag destination.'
-                  : 'Please select a source and a destination tag.',
-              style: TextStyle(color: Theme.of(context).colorScheme.onError)),
-          backgroundColor: Theme.of(context).colorScheme.error));
-      return;
-    }
-    if (_selectedSourceTag == _selectedDestinationTag) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-              isFr
-                  ? 'Le tag source et le tag destination ne peuvent pas être identiques.'
-                  : 'Source and destination tags cannot be the same.',
+                  ? 'Veuillez sélectionner un nœud source et un nœud destination.'
+                  : 'Please select a source and a destination node.',
               style: TextStyle(color: Theme.of(context).colorScheme.onError)),
           backgroundColor: Theme.of(context).colorScheme.error));
       return;
     }
 
+    if (_selectedSourceNode!.tags.isEmpty ||
+        _selectedDestinationNode!.tags.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              isFr
+                  ? 'Les nœuds sélectionnés doivent avoir au moins un tag.'
+                  : 'Selected nodes must have at least one tag.',
+              style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+          backgroundColor: Theme.of(context).colorScheme.error));
+      return;
+    }
+
+    final sourceTag = _selectedSourceNode!.tags.first;
+    final destinationTag = _selectedDestinationNode!.tags.first;
+
+    if (sourceTag == destinationTag) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              isFr
+                  ? 'Les tags principaux des nœuds source et destination ne peuvent pas être identiques.'
+                  : 'The main tags of the source and destination nodes cannot be the same.',
+              style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+          backgroundColor: Theme.of(context).colorScheme.error));
+      return;
+    }
+
+    final port = _portController.text.trim();
     final newRule = {
-      'src': _selectedSourceTag!,
-      'dst': _selectedDestinationTag!,
+      'src': sourceTag,
+      'dst': destinationTag,
+      'port': port,
     };
 
-    bool ruleExists = _temporaryRules.any((rule) =>
-        (rule['src'] == newRule['src'] && rule['dst'] == newRule['dst']) ||
-        (rule['src'] == newRule['dst'] && rule['dst'] == newRule['src']));
+    bool ruleExists = _temporaryRules.any((rule) {
+      final bool tagsMatch = (rule['src'] == newRule['src'] && rule['dst'] == newRule['dst']) ||
+                             (rule['src'] == newRule['dst'] && rule['dst'] == newRule['src']);
+      final bool portMatches = (rule['port'] ?? '') == (newRule['port'] ?? '');
+      return tagsMatch && portMatches;
+    });
 
     if (ruleExists) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
