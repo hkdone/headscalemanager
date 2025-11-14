@@ -195,8 +195,8 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         TextButton(
-          child: Text(isFr ? 'Sauvegarder' : 'Save'),
           onPressed: _handleSave,
+          child: Text(isFr ? 'Sauvegarder' : 'Save'),
         ),
       ],
     );

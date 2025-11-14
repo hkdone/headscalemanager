@@ -50,8 +50,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             }
             if (snapshot.hasError) {
               return Center(
-                  child: Text(
-                      '${isFr ? 'Erreur' : 'Error'}: ${snapshot.error}'));
+                  child:
+                      Text('${isFr ? 'Erreur' : 'Error'}: ${snapshot.error}'));
             }
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return RefreshIndicator(
@@ -116,7 +116,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Card(
         elevation: 0,
         color: Theme.of(context).cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 16.0),
           child: Row(
@@ -181,7 +182,8 @@ class _StatItem extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: color, fontSize: 20, fontWeight: FontWeight.bold),
         ),
       ],
     );
@@ -207,8 +209,7 @@ class _UserNodeCard extends StatelessWidget {
         initiallyExpanded: true,
         title: Text(user, style: Theme.of(context).textTheme.titleMedium),
         childrenPadding: const EdgeInsets.only(bottom: 8.0),
-        children:
-            nodes.map((node) => _buildNodeTile(context, node)).toList(),
+        children: nodes.map((node) => _buildNodeTile(context, node)).toList(),
       ),
     );
   }
@@ -219,8 +220,8 @@ class _UserNodeCard extends StatelessWidget {
     final trailingIcon = _buildTrailingIcon(context, node);
 
     return ListTile(
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => NodeDetailScreen(node: node))),
+      onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => NodeDetailScreen(node: node))),
       leading: Icon(Icons.circle,
           color: node.online ? Colors.green : Theme.of(context).disabledColor,
           size: 12),
@@ -261,25 +262,35 @@ class _UserNodeCard extends StatelessWidget {
   }
 
   Widget? _buildTrailingIcon(BuildContext context, Node node) {
-    final hasPendingApproval = node.availableRoutes
-        .any((r) => !node.sharedRoutes.contains(r));
+    final locale = context.watch<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+    final hasPendingApproval =
+        node.availableRoutes.any((r) => !node.sharedRoutes.contains(r));
 
     if (hasPendingApproval) {
       return IconButton(
         icon: const Icon(Icons.warning, color: Colors.amber),
-        tooltip: 'Approbation requise',
+        tooltip: isFr ? 'Approbation requise' : 'Approval required',
         onPressed: () => _showApprovalDialog(context, node),
       );
     }
 
-    final hasDesync = node.sharedRoutes
-        .any((r) => !node.availableRoutes.contains(r));
-    
+    final hasDesync =
+        node.sharedRoutes.any((r) => !node.availableRoutes.contains(r));
+
     if (hasDesync) {
-      return IconButton(
-        icon: const Icon(Icons.link_off, color: Colors.blueGrey),
-        tooltip: 'Nettoyage de la configuration requis',
-        onPressed: () => _showCleanupDialog(context, node),
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.blue.withOpacity(0.2),
+          shape: BoxShape.circle,
+        ),
+        child: IconButton(
+          icon: const Icon(Icons.warning, color: Colors.blue),
+          tooltip: isFr
+              ? 'Nettoyage de la configuration requis'
+              : 'Configuration cleanup required',
+          onPressed: () => _showCleanupDialog(context, node),
+        ),
       );
     }
 
@@ -293,8 +304,10 @@ class _UserNodeCard extends StatelessWidget {
     final pendingRoutes = node.availableRoutes
         .where((r) => !node.sharedRoutes.contains(r))
         .toList();
-    final isExitNodeRequest = pendingRoutes.any((r) => r == '0.0.0.0/0' || r == '::/0');
-    final lanRoutes = pendingRoutes.where((r) => r != '0.0.0.0/0' && r != '::/0').toList();
+    final isExitNodeRequest =
+        pendingRoutes.any((r) => r == '0.0.0.0/0' || r == '::/0');
+    final lanRoutes =
+        pendingRoutes.where((r) => r != '0.0.0.0/0' && r != '::/0').toList();
     final isLanSharerRequest = lanRoutes.isNotEmpty;
 
     String title = isFr ? 'Approbation Requise' : 'Approval Required';
@@ -331,8 +344,8 @@ class _UserNodeCard extends StatelessWidget {
               child: Text(isFr ? 'Oui' : 'Yes'),
               onPressed: () async {
                 Navigator.of(context).pop(); // Close dialog first
-                showSafeSnackBar(context,
-                    isFr ? 'Traitement en cours...' : 'Processing...');
+                showSafeSnackBar(
+                    context, isFr ? 'Traitement en cours...' : 'Processing...');
 
                 bool aclMode = true;
                 try {
@@ -350,24 +363,29 @@ class _UserNodeCard extends StatelessWidget {
 
                     if (clientTagIndex != -1) {
                       String clientTag = newTags[clientTagIndex];
-                      if (isExitNodeRequest && !clientTag.contains(';exit-node')) {
+                      if (isExitNodeRequest &&
+                          !clientTag.contains(';exit-node')) {
                         clientTag += ';exit-node';
                       }
-                      if (isLanSharerRequest && !clientTag.contains(';lan-sharer')) {
+                      if (isLanSharerRequest &&
+                          !clientTag.contains(';lan-sharer')) {
                         clientTag += ';lan-sharer';
                       }
                       newTags[clientTagIndex] = clientTag;
                     } else {
-                      if (isExitNodeRequest && !newTags.contains('tag:exit-node')) {
+                      if (isExitNodeRequest &&
+                          !newTags.contains('tag:exit-node')) {
                         newTags.add('tag:exit-node');
                       }
-                      if (isLanSharerRequest && !newTags.contains('tag:lan-sharer')) {
+                      if (isLanSharerRequest &&
+                          !newTags.contains('tag:lan-sharer')) {
                         newTags.add('tag:lan-sharer');
                       }
                     }
                     await appProvider.apiService.setTags(node.id, newTags);
 
-                    await appProvider.apiService.setNodeRoutes(node.id, pendingRoutes);
+                    await appProvider.apiService
+                        .setNodeRoutes(node.id, pendingRoutes);
 
                     final allUsers = await appProvider.apiService.getUsers();
                     final allNodes = await appProvider.apiService.getNodes();
@@ -375,7 +393,9 @@ class _UserNodeCard extends StatelessWidget {
                         await appProvider.storageService.getTemporaryRules();
                     final aclGenerator = NewAclGeneratorService();
                     final newPolicyMap = aclGenerator.generatePolicy(
-                        users: allUsers, nodes: allNodes, temporaryRules: tempRules);
+                        users: allUsers,
+                        nodes: allNodes,
+                        temporaryRules: tempRules);
                     final newPolicyJson = jsonEncode(newPolicyMap);
                     await appProvider.apiService.setAclPolicy(newPolicyJson);
 
@@ -386,7 +406,8 @@ class _UserNodeCard extends StatelessWidget {
                             : 'Node approved and ACLs updated!');
                   } else {
                     // Simplified logic: Routes only
-                    await appProvider.apiService.setNodeRoutes(node.id, pendingRoutes);
+                    await appProvider.apiService
+                        .setNodeRoutes(node.id, pendingRoutes);
                     showSafeSnackBar(
                         context,
                         isFr
@@ -394,7 +415,7 @@ class _UserNodeCard extends StatelessWidget {
                             : 'Routes approved (ACLs not managed).');
                   }
                 } catch (e) {
-                  showSafeSnackBar(context, isFr ? 'Échec : $e' : 'Failed: $e');
+                  showSafeSnackBar(context, isFr ? 'Échec de l\'approbation: $e' : 'Approval failed: $e');
                 } finally {
                   refreshNodes();
                 }
@@ -413,8 +434,10 @@ class _UserNodeCard extends StatelessWidget {
     final routesToClean = node.sharedRoutes
         .where((r) => !node.availableRoutes.contains(r))
         .toList();
-    final hadExitNode = routesToClean.any((r) => r == '0.0.0.0/0' || r == '::/0');
-    final lanRoutes = routesToClean.where((r) => r != '0.0.0.0/0' && r != '::/0').toList();
+    final hadExitNode =
+        routesToClean.any((r) => r == '0.0.0.0/0' || r == '::/0');
+    final lanRoutes =
+        routesToClean.where((r) => r != '0.0.0.0/0' && r != '::/0').toList();
     final hadLanSharing = lanRoutes.isNotEmpty;
 
     String title = isFr ? 'Nettoyage Requis' : 'Cleanup Required';
@@ -452,7 +475,8 @@ class _UserNodeCard extends StatelessWidget {
               child: Text(isFr ? 'Oui, Nettoyer' : 'Yes, Clean Up'),
               onPressed: () async {
                 Navigator.of(context).pop();
-                showSafeSnackBar(context, isFr ? 'Nettoyage en cours...' : 'Cleaning up...');
+                showSafeSnackBar(
+                    context, isFr ? 'Nettoyage en cours...' : 'Cleaning up...');
 
                 bool aclMode = true;
                 try {
@@ -462,7 +486,9 @@ class _UserNodeCard extends StatelessWidget {
                 }
 
                 try {
-                  final remainingRoutes = node.sharedRoutes.where((r) => node.availableRoutes.contains(r)).toList();
+                  final remainingRoutes = node.sharedRoutes
+                      .where((r) => node.availableRoutes.contains(r))
+                      .toList();
 
                   if (aclMode) {
                     // Full logic: Tags + Routes + ACLs
@@ -480,11 +506,13 @@ class _UserNodeCard extends StatelessWidget {
                       }
                       newTags[clientTagIndex] = clientTag;
                     } else {
-                        newTags.removeWhere((t) => t == 'tag:exit-node' || t == 'tag:lan-sharer');
+                      newTags.removeWhere(
+                          (t) => t == 'tag:exit-node' || t == 'tag:lan-sharer');
                     }
                     await appProvider.apiService.setTags(node.id, newTags);
 
-                    await appProvider.apiService.setNodeRoutes(node.id, remainingRoutes);
+                    await appProvider.apiService
+                        .setNodeRoutes(node.id, remainingRoutes);
 
                     final allUsers = await appProvider.apiService.getUsers();
                     final allNodes = await appProvider.apiService.getNodes();
@@ -492,7 +520,9 @@ class _UserNodeCard extends StatelessWidget {
                         await appProvider.storageService.getTemporaryRules();
                     final aclGenerator = NewAclGeneratorService();
                     final newPolicyMap = aclGenerator.generatePolicy(
-                        users: allUsers, nodes: allNodes, temporaryRules: tempRules);
+                        users: allUsers,
+                        nodes: allNodes,
+                        temporaryRules: tempRules);
                     final newPolicyJson = jsonEncode(newPolicyMap);
                     await appProvider.apiService.setAclPolicy(newPolicyJson);
 
@@ -501,18 +531,18 @@ class _UserNodeCard extends StatelessWidget {
                         isFr
                             ? 'Configuration nettoyée et ACLs mises à jour !'
                             : 'Configuration cleaned up and ACLs updated!');
-
                   } else {
                     // Simplified logic: Routes only
-                    await appProvider.apiService.setNodeRoutes(node.id, remainingRoutes);
-                     showSafeSnackBar(
+                    await appProvider.apiService
+                        .setNodeRoutes(node.id, remainingRoutes);
+                    showSafeSnackBar(
                         context,
                         isFr
                             ? 'Configuration des routes nettoyée (ACLs non gérées).'
                             : 'Route configuration cleaned up (ACLs not managed).');
                   }
                 } catch (e) {
-                  showSafeSnackBar(context, isFr ? 'Échec : $e' : 'Failed: $e');
+                  showSafeSnackBar(context, isFr ? 'Échec du nettoyage: $e' : 'Cleanup failed: $e');
                 } finally {
                   refreshNodes();
                 }

@@ -154,8 +154,8 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         TextButton(
-          child: Text(isFr ? 'Déplacer' : 'Move'),
           onPressed: _handleMove,
+          child: Text(isFr ? 'Déplacer' : 'Move'),
         ),
       ],
     );

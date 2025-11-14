@@ -4,47 +4,41 @@ import java.io.FileInputStream
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
     namespace = "com.dkstudio.headscalemanager"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 35 // Updated as required by plugins
     ndkVersion = "27.0.12077973"
 
-    // Load the key.properties file
     val keystoreProperties = Properties()
     val keystorePropertiesFile = file("C:/Users/dkdone/StudioProjects/headscaleManager/android/key.properties")
     if (keystorePropertiesFile.exists()) {
         keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
     }
 
-    
-
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        // Flag to enable support for the new language APIs for desugaring
+        isCoreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "11"
     }
 
     defaultConfig {
         applicationId = "com.dkstudio.headscalemanager"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        minSdk = 21
+        targetSdk = 35 // It is best practice to keep targetSdk a bit behind compileSdk
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     packagingOptions {
         jniLibs {
-            // Ensure native libraries are 16KB page-aligned.
-            // This is important for Android 15 and devices with 16KB memory page sizes.
             useLegacyPackaging = false
         }
     }
@@ -60,13 +54,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false // Disable R8
-            isShrinkResources = false // Disable resource shrinking
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            // signingConfig = debugSigningConfig // Comment out or remove this line
-
-            // Add the following lines for release signing
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = signingConfigs.getByName("release")
         }
     }
@@ -74,4 +63,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Dependency for core library desugaring
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

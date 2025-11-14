@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/api/headscale_api_service.dart';
+import 'package:headscalemanager/services/notification_service.dart';
 import 'package:headscalemanager/services/storage_service.dart';
 
 /// Fournisseur d'application pour la gestion de l'état global.
@@ -24,7 +25,13 @@ class AppProvider extends ChangeNotifier {
   ///
   /// Initialise les services API et de stockage directement et charge la locale.
   AppProvider() {
-    _loadLocale();
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    await _loadLocale();
+    // Initialise le service de notification après le chargement des autres services.
+    await NotificationService.initialize();
   }
 
   /// Getter pour accéder à l'instance de [HeadscaleApiService].

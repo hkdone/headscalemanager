@@ -3,8 +3,10 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/home_screen.dart';
 import 'package:headscalemanager/screens/help_screen.dart';
 import 'package:headscalemanager/screens/help_screen_en.dart';
-import 'package:headscalemanager/screens/api_keys_screen.dart'; // Import the ApiKeysScreen
+import 'package:headscalemanager/screens/api_keys_screen.dart';
+import 'package:headscalemanager/services/notification_service.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -18,22 +20,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _serverUrlController;
   late TextEditingController _apiKeyController;
   bool _obscureApiKey = true;
+  bool _notificationsEnabled = false;
 
   @override
   void initState() {
     super.initState();
     _serverUrlController = TextEditingController();
     _apiKeyController = TextEditingController();
-    _loadCredentials();
+    _loadSettings();
   }
 
-  Future<void> _loadCredentials() async {
+  Future<void> _loadSettings() async {
     final storage = context.read<AppProvider>().storageService;
     final serverUrl = await storage.getServerUrl();
     final apiKey = await storage.getApiKey();
+    final prefs = await SharedPreferences.getInstance();
     setState(() {
       _serverUrlController.text = serverUrl ?? '';
       _apiKeyController.text = apiKey ?? '';
+      _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? false;
     });
   }
 
@@ -119,18 +124,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-                Text(isFr ? 'Langue' : 'Language',
-                    style: theme.textTheme.titleMedium),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildLanguageButton(context, 'fr'),
-                    const SizedBox(width: 16),
-                    _buildLanguageButton(context, 'en'),
-                  ],
-                ),
-                const SizedBox(height: 24),
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).push(
@@ -141,7 +134,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: theme.textTheme.labelLarge
                           ?.copyWith(color: theme.colorScheme.primary)),
                 ),
-                const SizedBox(height: 8),
+                const Divider(height: 32),
+                SwitchListTile(
+                  title: Text(isFr ? 'Notifications en arrière-plan' : 'Background Notifications', style: theme.textTheme.titleMedium),
+                  subtitle: Text(isFr ? 'Vérifie périodiquement les nouvelles demandes d\'approbation.' : 'Periodically check for new approval requests.', style: theme.textTheme.bodySmall),
+                  value: _notificationsEnabled,
+                  onChanged: (bool value) async {
+                    setState(() {
+                      _notificationsEnabled = value;
+                    });
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('notificationsEnabled', value);
+                    await NotificationService.enableBackgroundTask(value);
+                  },
+                ),
+                const Divider(height: 32),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildLanguageButton(context, 'fr'),
+                    const SizedBox(width: 16),
+                    _buildLanguageButton(context, 'en'),
+                  ],
+                ),
+                const Spacer(),
                 TextButton(
                   onPressed: () {
                     final locale = context.read<AppProvider>().locale;
@@ -157,7 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: theme.textTheme.labelLarge
                           ?.copyWith(color: theme.colorScheme.primary)),
                 ),
-                const Spacer(),
+                const SizedBox(height: 8),
                 ElevatedButton(
                   onPressed: _saveSettings,
                   style: ElevatedButton.styleFrom(

@@ -6,8 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:dart_ping/dart_ping.dart';
 import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-/// Écran affichant les détails d'un nœud Headscale spécifique.
 class NodeDetailScreen extends StatefulWidget {
   final Node node;
 
@@ -20,18 +20,48 @@ class NodeDetailScreen extends StatefulWidget {
 class _NodeDetailScreenState extends State<NodeDetailScreen> {
   bool _isPingingContinuously = false;
   StreamSubscription<PingData>? _pingSubscription;
-  // Variable d'état pour le nœud actuel, afin de pouvoir le mettre à jour.
   late Node _currentNode;
-  // Utilisation d'un Set pour gérer efficacement les routes sélectionnées.
   late Set<String> _selectedRoutes;
   final List<PingData> _pingResponses = [];
+  bool _isMonitoringEnabled = false;
 
   @override
   void initState() {
     super.initState();
-    // Initialise l'état local avec les données du nœud passées au widget.
     _currentNode = widget.node;
     _selectedRoutes = Set<String>.from(_currentNode.sharedRoutes);
+    _loadMonitoringStatus();
+  }
+
+  Future<void> _loadMonitoringStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final monitoredNodes = prefs.getStringList('monitoredNodeIds') ?? [];
+    setState(() {
+      _isMonitoringEnabled = monitoredNodes.contains(_currentNode.id);
+    });
+  }
+
+  Future<void> _toggleMonitoring(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> monitoredNodes = prefs.getStringList('monitoredNodeIds') ?? [];
+    String lastKnownStatusKey = 'monitoredNode_${_currentNode.id}_status';
+
+    setState(() {
+      _isMonitoringEnabled = value;
+    });
+
+    if (value) {
+      if (!monitoredNodes.contains(_currentNode.id)) {
+        monitoredNodes.add(_currentNode.id);
+      }
+      // Store the current status to avoid immediate notification
+      await prefs.setBool(lastKnownStatusKey, _currentNode.online);
+    } else {
+      monitoredNodes.remove(_currentNode.id);
+      // Clean up the stored status
+      await prefs.remove(lastKnownStatusKey);
+    }
+    await prefs.setStringList('monitoredNodeIds', monitoredNodes);
   }
 
   String get _ipv4 {
@@ -89,8 +119,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     final isFr = locale.languageCode == 'fr';
 
     return Scaffold(
-      backgroundColor: theme
-          .scaffoldBackgroundColor, // Utilisation de la couleur de fond du thème
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(widget.node.name, style: theme.appBarTheme.titleTextStyle),
         backgroundColor: theme.appBarTheme.backgroundColor,
@@ -103,12 +132,13 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           children: [
             _buildMainInfoCard(context),
             const SizedBox(height: 16),
+            _buildMonitoringCard(context),
+            const SizedBox(height: 16),
             _buildIpAddressesCard(context),
             const SizedBox(height: 16),
             _buildIdentifiersCard(context),
             const SizedBox(height: 16),
-            _buildRoutesCard(
-                context), // Ajout de la nouvelle carte de gestion des routes
+            _buildRoutesCard(context),
             const SizedBox(height: 16),
             _buildTagsAndRoutesCard(context),
             const SizedBox(height: 16),
@@ -129,9 +159,9 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.circle, // Utilise _currentNode pour le statut
+              Icon(Icons.circle,
                   color: _currentNode.online ? Colors.green : Colors.grey,
-                  size: 16), // Taille de l'icône
+                  size: 16),
               const SizedBox(width: 8),
               Text(
                   _currentNode.online
@@ -139,7 +169,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                       : (isFr ? 'Hors ligne' : 'Offline'),
                   style: theme.textTheme.bodyMedium?.copyWith(
                       color: _currentNode.online ? Colors.green : Colors.grey,
-                      fontWeight: FontWeight.bold)), // Style du texte
+                      fontWeight: FontWeight.bold)),
               const Spacer(),
               if (widget.node.isExitNode)
                 Chip(
@@ -149,19 +179,34 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                         ?.copyWith(color: theme.colorScheme.onPrimary)),
             ],
           ),
-          const SizedBox(height: 16), // Espace vertical
-          Text(_currentNode.hostname, // Utilise _currentNode pour le nom d'hôte
+          const SizedBox(height: 16),
+          Text(_currentNode.hostname,
               style: theme.textTheme.headlineSmall
                   ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text(
-              '${isFr ? 'Utilisateur' : 'User'}: ${_currentNode.user}', // Utilise _currentNode pour l'utilisateur
+              '${isFr ? 'Utilisateur' : 'User'}: ${_currentNode.user}',
               style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(
-              '${isFr ? 'Dernière connexion' : 'Last seen'}: ${_currentNode.lastSeen.toLocal()}', // Utilise _currentNode pour la dernière connexion
+              '${isFr ? 'Dernière connexion' : 'Last seen'}: ${_currentNode.lastSeen.toLocal()}',
               style: theme.textTheme.bodySmall),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMonitoringCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final isFr = context.watch<AppProvider>().locale.languageCode == 'fr';
+
+    return _SectionCard(
+      child: SwitchListTile(
+        title: Text(isFr ? 'Surveiller le statut' : 'Monitor Status', style: theme.textTheme.titleMedium),
+        subtitle: Text(isFr ? 'Recevoir une notification si le nœud se connecte ou se déconnecte.' : 'Receive a notification if the node goes online or offline.', style: theme.textTheme.bodySmall),
+        value: _isMonitoringEnabled,
+        onChanged: _toggleMonitoring,
+        contentPadding: EdgeInsets.zero,
       ),
     );
   }
@@ -196,7 +241,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           Text(isFr ? 'Identifiants' : 'Identifiers',
               style: theme.textTheme.titleLarge
                   ?.copyWith(fontWeight: FontWeight.bold)),
-          const Divider(height: 20), // Séparateur visuel
+          const Divider(height: 20),
           _DetailRowWithCopy(
               label: isFr ? 'ID Nœud' : 'Node ID', value: _currentNode.id),
           _DetailRowWithCopy(
@@ -208,17 +253,14 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     );
   }
 
-  /// Construit la carte de gestion des routes.
   Widget _buildRoutesCard(BuildContext context) {
     final theme = Theme.of(context);
     final locale = context.watch<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
-    // Fusionne les routes disponibles et approuvées pour tout afficher, en évitant les doublons.
     final allPossibleRoutes = (Set<String>.from(_currentNode.availableRoutes)
           ..addAll(_currentNode.sharedRoutes))
         .toList();
 
-    // Si le nœud n'annonce aucune route, on n'affiche pas la carte.
     if (allPossibleRoutes.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -238,7 +280,6 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 10),
-          // Liste des routes avec des cases à cocher.
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -316,13 +357,11 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     );
   }
 
-  /// Sauvegarde les routes sélectionnées via l'API et met à jour l'état local.
   Future<void> _saveRoutes() async {
     final apiService = context.read<AppProvider>().apiService;
     final locale = context.read<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
     try {
-      // Envoie la liste des routes sélectionnées à l'API.
       await apiService.setNodeRoutes(_currentNode.id, _selectedRoutes.toList());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -331,11 +370,9 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                   ? 'Routes mises à jour avec succès.'
                   : 'Routes updated successfully.')),
         );
-        // Recharge les détails du nœud pour refléter les changements immédiatement.
         final updatedNode = await apiService.getNodeDetails(_currentNode.id);
         setState(() {
           _currentNode = updatedNode;
-          // Resynchronise également les routes sélectionnées au cas où.
           _selectedRoutes = Set<String>.from(_currentNode.sharedRoutes);
         });
       }
@@ -468,7 +505,6 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     final relevantPings =
         _pingResponses.where((p) => p.response?.time != null).toList();
 
-    // Limiter le nombre de points affichés pour la lisibilité
     final start = relevantPings.length > 30 ? relevantPings.length - 30 : 0;
     for (int i = start; i < relevantPings.length; i++) {
       final ping = relevantPings[i];

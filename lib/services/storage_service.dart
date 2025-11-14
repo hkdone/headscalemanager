@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Service de stockage sécurisé pour les identifiants et les configurations de l'application.
 class StorageService {
@@ -10,18 +11,21 @@ class StorageService {
   static const _temporaryAclRules = 'TEMPORARY_ACL_RULES';
   static const _languageKey = 'APP_LANGUAGE';
 
-  /// Sauvegarde la langue sélectionnée.
+  /// Sauvegarde la langue sélectionnée dans SharedPreferences.
   Future<void> saveLanguage(String languageCode) async {
-    await _storage.write(key: _languageKey, value: languageCode);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_languageKey, languageCode);
   }
 
-  /// Récupère la langue sélectionnée.
+  /// Récupère la langue sélectionnée depuis SharedPreferences.
   Future<String?> getLanguage() async {
-    return await _storage.read(key: _languageKey);
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_languageKey);
   }
 
   /// Sauvegarde les identifiants de connexion.
-  Future<void> saveCredentials({required String apiKey, required String serverUrl}) async {
+  Future<void> saveCredentials(
+      {required String apiKey, required String serverUrl}) async {
     await _storage.write(key: _apiKey, value: apiKey);
     await _storage.write(key: _serverUrl, value: serverUrl);
   }
@@ -40,7 +44,10 @@ class StorageService {
   Future<bool> hasCredentials() async {
     final apiKey = await getApiKey();
     final serverUrl = await getServerUrl();
-    return apiKey != null && serverUrl != null && apiKey.isNotEmpty && serverUrl.isNotEmpty;
+    return apiKey != null &&
+        serverUrl != null &&
+        apiKey.isNotEmpty &&
+        serverUrl.isNotEmpty;
   }
 
   /// Efface tous les identifiants de connexion stockés.
@@ -61,7 +68,9 @@ class StorageService {
     if (rulesJson != null && rulesJson.isNotEmpty) {
       try {
         final List<dynamic> decodedList = json.decode(rulesJson);
-        return decodedList.map((item) => Map<String, String>.from(item)).toList();
+        return decodedList
+            .map((item) => Map<String, String>.from(item))
+            .toList();
       } catch (e) {
         // En cas d'erreur de décodage, retourne une liste vide.
         return [];
