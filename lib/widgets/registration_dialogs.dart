@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
@@ -66,15 +67,27 @@ Future<void> showTailscaleUpCommandDialog(
                                   fontFamily: 'monospace', fontSize: 14),
                             ),
                             const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.copy),
-                              label: Text(isFr ? 'Copier la commande' : 'Copy Command'),
-                              onPressed: () async {
-                                await Clipboard.setData(
-                                    ClipboardData(text: command));
-                                showSafeSnackBar(
-                                    context, isFr ? 'Commande copiée !' : 'Command copied!');
-                              },
+                            Row(
+                              children: [
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.copy),
+                                  label: Text(isFr ? 'Copier' : 'Copy'),
+                                  onPressed: () async {
+                                    await Clipboard.setData(
+                                        ClipboardData(text: command));
+                                    showSafeSnackBar(context,
+                                        isFr ? 'Commande copiée !' : 'Command copied!');
+                                  },
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.share),
+                                  label: Text(isFr ? 'Partager' : 'Share'),
+                                  onPressed: () {
+                                    Share.share(command);
+                                  },
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -96,14 +109,27 @@ Future<void> showTailscaleUpCommandDialog(
                                     fontFamily: 'monospace', fontSize: 14),
                               ),
                               const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                icon: const Icon(Icons.copy),
-                                label: Text(isFr ? 'Copier l\'URL' : 'Copy URL'),
-                                onPressed: () async {
-                                  await Clipboard.setData(
-                                      ClipboardData(text: loginServer));
-                                  showSafeSnackBar(context, isFr ? 'URL copiée !' : 'URL copied!');
-                                },
+                              Row(
+                                children: [
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.copy),
+                                    label: Text(isFr ? 'Copier' : 'Copy'),
+                                    onPressed: () async {
+                                      await Clipboard.setData(
+                                          ClipboardData(text: loginServer));
+                                      showSafeSnackBar(
+                                          context, isFr ? 'URL copiée !' : 'URL copied!');
+                                    },
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.share),
+                                    label: Text(isFr ? 'Partager' : 'Share'),
+                                    onPressed: () {
+                                      Share.share(loginServer);
+                                    },
+                                  ),
+                                ],
                               ),
                             ],
                           ),
