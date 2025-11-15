@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:headscalemanager/services/new_acl_generator_service.dart';
+import 'package:headscalemanager/widgets/shared_routes_access_dialog.dart';
+import 'package:headscalemanager/utils/ip_utils.dart';
 
 class AclScreen extends StatefulWidget {
   const AclScreen({super.key});
@@ -282,16 +284,24 @@ class _AclScreenState extends State<AclScreen> {
             ),
             Wrap(
               spacing: 8.0,
+              runSpacing: 4.0,
               children: _temporaryRules.asMap().entries.map((entry) {
                 int idx = entry.key;
                 Map<String, dynamic> rule = entry.value;
+                final src = rule['src'] as String;
+                final dst = rule['dst'] as String;
                 final port = rule['port'] as String?;
-                final label = port != null && port.isNotEmpty
-                    ? '${rule['src']} <-> ${rule['dst']}:$port'
-                    : '${rule['src']} <-> ${rule['dst']}';
+
+                final isSubnetRule = !(dst.startsWith('tag:'));
+
+                final label = isSubnetRule
+                    ? '$src -> $dst:${port ?? '*'}'
+                    : (port != null && port.isNotEmpty
+                        ? '$src <-> $dst:$port'
+                        : '$src <-> $dst');
 
                 return Chip(
-                  label: Text(label),
+                  label: Text(label, overflow: TextOverflow.ellipsis),
                   onDeleted: () => _removeTemporaryRule(idx),
                   backgroundColor:
                       Theme.of(context).colorScheme.primary.withAlpha(25),
@@ -341,6 +351,28 @@ class _AclScreenState extends State<AclScreen> {
     );
   }
 
+  bool _ruleExists(Map<String, dynamic> newRule) {
+    return _temporaryRules.any((rule) {
+      final isNewRuleSubnet = !(newRule['dst'] as String).startsWith('tag:');
+      final isOldRuleSubnet = !(rule['dst'] as String).startsWith('tag:');
+
+      final bool srcMatch = rule['src'] == newRule['src'];
+      final bool dstMatch = rule['dst'] == newRule['dst'];
+      final bool portMatch = (rule['port'] ?? '') == (newRule['port'] ?? '');
+
+      if (isNewRuleSubnet || isOldRuleSubnet) {
+        // For subnet rules, we do an exact one-way match
+        return srcMatch && dstMatch && portMatch;
+      } else {
+        // For tag-to-tag rules, check both ways
+        final bool reverseSrcMatch = rule['src'] == newRule['dst'];
+        final bool reverseDstMatch = rule['dst'] == newRule['src'];
+        return ((srcMatch && dstMatch) || (reverseSrcMatch && reverseDstMatch)) &&
+            portMatch;
+      }
+    });
+  }
+
   Future<void> _addTemporaryRule() async {
     final locale = context.read<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
@@ -356,65 +388,138 @@ class _AclScreenState extends State<AclScreen> {
       return;
     }
 
-    if (_selectedSourceNode!.tags.isEmpty ||
-        _selectedDestinationNode!.tags.isEmpty) {
+    if (_selectedSourceNode!.tags.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               isFr
-                  ? 'Les nœuds sélectionnés doivent avoir au moins un tag.'
-                  : 'Selected nodes must have at least one tag.',
+                  ? 'Le nœud source doit avoir au moins un tag.'
+                  : 'Source node must have at least one tag.',
               style: TextStyle(color: Theme.of(context).colorScheme.onError)),
           backgroundColor: Theme.of(context).colorScheme.error));
       return;
     }
-
     final sourceTag = _selectedSourceNode!.tags.first;
-    final destinationTag = _selectedDestinationNode!.tags.first;
 
-    if (sourceTag == destinationTag) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-              isFr
-                  ? 'Les tags principaux des nœuds source et destination ne peuvent pas être identiques.'
-                  : 'The main tags of the source and destination nodes cannot be the same.',
-              style: TextStyle(color: Theme.of(context).colorScheme.onError)),
-          backgroundColor: Theme.of(context).colorScheme.error));
-      return;
+    List<Map<String, dynamic>> newRulesToAdd = [];
+
+    final sharedLanRoutes = _selectedDestinationNode!.sharedRoutes
+        .where((r) => r != '0.0.0.0/0' && r != '::/0')
+        .toList();
+
+    if (sharedLanRoutes.isNotEmpty) {
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => SharedRoutesAccessDialog(
+          destinationNode: _selectedDestinationNode!,
+        ),
+      );
+
+      if (result == null) return; // Dialog was cancelled
+
+      final choice = result['choice'] as RouteAccessChoice;
+      final rules = result['rules'] as Map<String, dynamic>;
+
+      if (choice == RouteAccessChoice.none) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text(isFr ? 'Aucun accès configuré.' : 'No access configured.'),
+        ));
+        return;
+      }
+
+      if (choice == RouteAccessChoice.full) {
+        for (var route in sharedLanRoutes) {
+          newRulesToAdd.add({
+            'src': sourceTag,
+            'dst': route,
+            'port': '*',
+          });
+        }
+      } else if (choice == RouteAccessChoice.custom) {
+        rules.forEach((route, ruleDetails) {
+          final startIp = (ruleDetails['startIp'] as String).trim();
+          final endIp = (ruleDetails['endIp'] as String).trim();
+          final ports = (ruleDetails['ports'] as String).trim();
+
+          if (startIp.isEmpty) return; // Skip if no IP is specified
+
+          String dst;
+          if (endIp.isNotEmpty) {
+            final range = IpUtils.generateIpRange(startIp, endIp);
+            dst = range.join(',');
+          } else {
+            dst = startIp;
+          }
+
+          if (dst.isNotEmpty) {
+            newRulesToAdd.add({
+              'src': sourceTag,
+              'dst': dst,
+              'port': ports.isEmpty ? '*' : ports,
+            });
+          }
+        });
+      }
+    } else {
+      if (_selectedDestinationNode!.tags.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                isFr
+                    ? 'Le nœud destination doit avoir au moins un tag.'
+                    : 'Destination node must have at least one tag.',
+                style:
+                    TextStyle(color: Theme.of(context).colorScheme.onError)),
+            backgroundColor: Theme.of(context).colorScheme.error));
+        return;
+      }
+      final destinationTag = _selectedDestinationNode!.tags.first;
+
+      if (sourceTag == destinationTag) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                isFr
+                    ? 'Les tags principaux ne peuvent pas être identiques.'
+                    : 'Main tags cannot be the same.',
+                style:
+                    TextStyle(color: Theme.of(context).colorScheme.onError)),
+            backgroundColor: Theme.of(context).colorScheme.error));
+        return;
+      }
+
+      final port = _portController.text.trim();
+      newRulesToAdd.add({
+        'src': sourceTag,
+        'dst': destinationTag,
+        'port': port,
+      });
     }
 
-    final port = _portController.text.trim();
-    final newRule = {
-      'src': sourceTag,
-      'dst': destinationTag,
-      'port': port,
-    };
-
-    bool ruleExists = _temporaryRules.any((rule) {
-      final bool tagsMatch = (rule['src'] == newRule['src'] && rule['dst'] == newRule['dst']) ||
-                             (rule['src'] == newRule['dst'] && rule['dst'] == newRule['src']);
-      final bool portMatches = (rule['port'] ?? '') == (newRule['port'] ?? '');
-      return tagsMatch && portMatches;
-    });
-
-    if (ruleExists) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-              isFr ? 'Cette règle existe déjà.' : 'This rule already exists.',
-              style: TextStyle(color: Theme.of(context).colorScheme.onError)),
-          backgroundColor: Theme.of(context).colorScheme.error));
-      return;
+    int addedCount = 0;
+    for (var newRule in newRulesToAdd) {
+      if (!_ruleExists(newRule)) {
+        setState(() {
+          _temporaryRules.add(newRule);
+          addedCount++;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                '${isFr ? 'Règle ignorée car elle existe déjà:' : 'Skipped existing rule:'} ${newRule['dst']}',
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer)),
+            backgroundColor: Theme.of(context).colorScheme.secondaryContainer));
+      }
     }
 
-    setState(() {
-      _temporaryRules.add(newRule);
-    });
-
-    final storage = context.read<AppProvider>().storageService;
-    await storage.saveTemporaryRules(_temporaryRules);
-    await _generateAndExportPolicy(
-        message: isFr
-            ? 'Règle ajoutée et politique appliquée avec succès.'
-            : 'Rule added and policy applied successfully.');
+    if (addedCount > 0) {
+      final storage = context.read<AppProvider>().storageService;
+      await storage.saveTemporaryRules(_temporaryRules);
+      await _generateAndExportPolicy(
+          message: isFr
+              ? '$addedCount règle(s) ajoutée(s) et politique appliquée.'
+              : '$addedCount rule(s) added and policy applied.');
+    }
   }
 
   Future<void> _generateNewAclPolicy({bool showSnackbar = true}) async {

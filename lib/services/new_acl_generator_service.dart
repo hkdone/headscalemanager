@@ -76,14 +76,18 @@ class NewAclGeneratorService {
     // --- Étape 3: Construction des règles ACL ---
     final acls = <Map<String, dynamic>>[];
 
-    // 3.1: Ajouter les règles d'exception manuelles (tag-à-tag)
+    // 3.1: Ajouter les règles d'exception manuelles
     for (var rule in temporaryRules) {
       final src = rule['src'] as String?;
       final dst = rule['dst'] as String?;
       final port = rule['port'] as String?;
 
-      if (src != null && dst != null) {
-        final dstPort = (port != null && port.isNotEmpty) ? ':$port' : ':*';
+      if (src == null || dst == null) continue;
+
+      final dstPort = (port != null && port.isNotEmpty) ? ':$port' : ':*';
+
+      // Si la destination est un tag, la règle est bidirectionnelle
+      if (dst.startsWith('tag:')) {
         acls.add({
           'action': 'accept',
           'src': [src],
@@ -94,6 +98,22 @@ class NewAclGeneratorService {
           'src': [dst],
           'dst': ['$src$dstPort']
         });
+      } else {
+        // Si la destination est une IP/subnet/range, la règle est unidirectionnelle
+        final destinations = dst
+            .split(',')
+            .map((d) => d.trim())
+            .where((d) => d.isNotEmpty)
+            .map((d) => '$d$dstPort')
+            .toList();
+
+        if (destinations.isNotEmpty) {
+          acls.add({
+            'action': 'accept',
+            'src': [src],
+            'dst': destinations,
+          });
+        }
       }
     }
 
