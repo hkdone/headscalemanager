@@ -1,7 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:headscalemanager/api/headscale_api_service.dart';
 import 'package:headscalemanager/models/node.dart';
-import 'package:headscalemanager/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 

@@ -357,31 +357,11 @@ class _UserNodeCard extends StatelessWidget {
                 try {
                   if (aclMode) {
                     // Full logic: Tags + Routes + ACLs
-                    List<String> newTags = List.from(node.tags);
-                    int clientTagIndex =
-                        newTags.indexWhere((t) => t.endsWith('-client'));
-
-                    if (clientTagIndex != -1) {
-                      String clientTag = newTags[clientTagIndex];
-                      if (isExitNodeRequest &&
-                          !clientTag.contains(';exit-node')) {
-                        clientTag += ';exit-node';
-                      }
-                      if (isLanSharerRequest &&
-                          !clientTag.contains(';lan-sharer')) {
-                        clientTag += ';lan-sharer';
-                      }
-                      newTags[clientTagIndex] = clientTag;
-                    } else {
-                      if (isExitNodeRequest &&
-                          !newTags.contains('tag:exit-node')) {
-                        newTags.add('tag:exit-node');
-                      }
-                      if (isLanSharerRequest &&
-                          !newTags.contains('tag:lan-sharer')) {
-                        newTags.add('tag:lan-sharer');
-                      }
-                    }
+                    final newTags = _addCapabilities(
+                      List.from(node.tags),
+                      addExitNode: isExitNodeRequest,
+                      addLanSharer: isLanSharerRequest,
+                    );
                     await appProvider.apiService.setTags(node.id, newTags);
 
                     await appProvider.apiService
@@ -492,23 +472,11 @@ class _UserNodeCard extends StatelessWidget {
 
                   if (aclMode) {
                     // Full logic: Tags + Routes + ACLs
-                    List<String> newTags = List.from(node.tags);
-                    int clientTagIndex =
-                        newTags.indexWhere((t) => t.endsWith('-client'));
-
-                    if (clientTagIndex != -1) {
-                      String clientTag = newTags[clientTagIndex];
-                      if (hadExitNode) {
-                        clientTag = clientTag.replaceAll(';exit-node', '');
-                      }
-                      if (hadLanSharing) {
-                        clientTag = clientTag.replaceAll(';lan-sharer', '');
-                      }
-                      newTags[clientTagIndex] = clientTag;
-                    } else {
-                      newTags.removeWhere(
-                          (t) => t == 'tag:exit-node' || t == 'tag:lan-sharer');
-                    }
+                    final newTags = _removeCapabilities(
+                      List.from(node.tags),
+                      removeExitNode: hadExitNode,
+                      removeLanSharer: hadLanSharing,
+                    );
                     await appProvider.apiService.setTags(node.id, newTags);
 
                     await appProvider.apiService
@@ -552,5 +520,81 @@ class _UserNodeCard extends StatelessWidget {
         );
       },
     );
+  }
+
+  List<String> _addCapabilities(List<String> tags,
+      {bool addExitNode = false, bool addLanSharer = false}) {
+    List<String> newTags = List.from(tags);
+    int clientTagIndex = newTags.indexWhere((t) => t.contains('-client'));
+
+    if (clientTagIndex != -1) {
+      final oldClientTag = newTags[clientTagIndex];
+      final parts = oldClientTag
+          .replaceFirst('tag:', '')
+          .split(';')
+          .where((p) => p.isNotEmpty)
+          .toSet();
+
+      if (addExitNode) parts.add('exit-node');
+      if (addLanSharer) parts.add('lan-sharer');
+
+      final clientPart =
+          parts.firstWhere((p) => p.contains('-client'), orElse: () => '');
+      if (clientPart.isEmpty) return newTags; // Should not happen
+
+      final otherParts = parts.where((p) => p != clientPart).toList()..sort();
+
+      final newClientTagBuilder = StringBuffer('tag:$clientPart');
+      if (otherParts.isNotEmpty) {
+        newClientTagBuilder.write(';${otherParts.join(';')}');
+      }
+      newTags[clientTagIndex] = newClientTagBuilder.toString();
+
+      // Remove standalone tags if they exist, as they are now consolidated
+      if (addExitNode) newTags.removeWhere((t) => t == 'tag:exit-node');
+      if (addLanSharer) newTags.removeWhere((t) => t == 'tag:lan-sharer');
+    } else {
+      if (addExitNode && !newTags.contains('tag:exit-node')) {
+        newTags.add('tag:exit-node');
+      }
+      if (addLanSharer && !newTags.contains('tag:lan-sharer')) {
+        newTags.add('tag:lan-sharer');
+      }
+    }
+    return newTags;
+  }
+
+  List<String> _removeCapabilities(List<String> tags,
+      {bool removeExitNode = false, bool removeLanSharer = false}) {
+    List<String> newTags = List.from(tags);
+    int clientTagIndex = newTags.indexWhere((t) => t.contains('-client'));
+
+    if (clientTagIndex != -1) {
+      final oldClientTag = newTags[clientTagIndex];
+      final parts = oldClientTag
+          .replaceFirst('tag:', '')
+          .split(';')
+          .where((p) => p.isNotEmpty)
+          .toSet();
+
+      if (removeExitNode) parts.remove('exit-node');
+      if (removeLanSharer) parts.remove('lan-sharer');
+
+      final clientPart =
+          parts.firstWhere((p) => p.contains('-client'), orElse: () => '');
+      if (clientPart.isEmpty) return newTags;
+
+      final otherParts = parts.where((p) => p != clientPart).toList()..sort();
+
+      final newClientTagBuilder = StringBuffer('tag:$clientPart');
+      if (otherParts.isNotEmpty) {
+        newClientTagBuilder.write(';${otherParts.join(';')}');
+      }
+      newTags[clientTagIndex] = newClientTagBuilder.toString();
+    } else {
+      if (removeExitNode) newTags.remove('tag:exit-node');
+      if (removeLanSharer) newTags.remove('tag:lan-sharer');
+    }
+    return newTags;
   }
 }

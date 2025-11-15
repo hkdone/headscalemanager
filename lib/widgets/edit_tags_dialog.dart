@@ -26,41 +26,88 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
   @override
   void initState() {
     super.initState();
-    _currentTags = List.from(widget.node.tags);
+    _currentTags = _consolidateTags(List.from(widget.node.tags));
+  }
+
+  List<String> _consolidateTags(List<String> tags) {
+    final clientTagIndex = tags.indexWhere((t) => t.contains('-client'));
+
+    if (clientTagIndex == -1) {
+      return tags;
+    }
+
+    final clientTag = tags[clientTagIndex];
+    final clientTagParts = clientTag.replaceFirst('tag:', '').split(';').where((p) => p.isNotEmpty).toSet();
+
+    final otherTags = <String>[];
+    
+    for (int i = 0; i < tags.length; i++) {
+      if (i == clientTagIndex) continue;
+      final tag = tags[i];
+      final cleanTag = tag.replaceFirst('tag:', '');
+      
+      if (cleanTag == 'exit-node' || cleanTag == 'lan-sharer') {
+        clientTagParts.add(cleanTag);
+      } else {
+        otherTags.add(tag);
+      }
+    }
+
+    final clientPart = clientTagParts.firstWhere((p) => p.contains('-client'), orElse: () => '');
+    if (clientPart.isEmpty) return tags;
+
+    final capabilities = clientTagParts.where((p) => p != clientPart).toList()..sort();
+    
+    final newClientTagBuilder = StringBuffer('tag:$clientPart');
+    if (capabilities.isNotEmpty) {
+      newClientTagBuilder.write(';${capabilities.join(';')}');
+    }
+    
+    return [newClientTagBuilder.toString(), ...otherTags.toSet()];
   }
 
   String get baseTag {
-    return _currentTags
-        .firstWhere((t) => t.endsWith('-client'), orElse: () => '')
-        .replaceFirst('tag:', '');
+    return _currentTags.firstWhere((t) => t.contains('-client'), orElse: () => '').replaceFirst('tag:', '');
   }
 
   bool hasCapabilityTag(String capability) {
-    return baseTag.contains(';$capability');
+    return baseTag.split(';').contains(capability);
+  }
+
+  void _updateCapability(String capability, {required bool add}) {
+    setState(() {
+      final clientTagIndex = _currentTags.indexWhere((t) => t.contains('-client'));
+      if (clientTagIndex == -1) return;
+
+      final oldClientTag = _currentTags[clientTagIndex];
+      final parts = oldClientTag.replaceFirst('tag:', '').split(';').where((p) => p.isNotEmpty).toSet();
+
+      if (add) {
+        parts.add(capability);
+      } else {
+        parts.remove(capability);
+      }
+
+      final clientPart = parts.firstWhere((p) => p.contains('-client'), orElse: () => '');
+      if (clientPart.isEmpty) return;
+
+      final otherParts = parts.where((p) => p != clientPart).toList()..sort();
+      
+      final newClientTagBuilder = StringBuffer('tag:$clientPart');
+      if (otherParts.isNotEmpty) {
+        newClientTagBuilder.write(';${otherParts.join(';')}');
+      }
+      
+      _currentTags[clientTagIndex] = newClientTagBuilder.toString();
+    });
   }
 
   void _addCapability(String capability) {
-    final base = baseTag;
-    if (base.isNotEmpty && !base.contains(';$capability')) {
-      setState(() {
-        final oldTag = 'tag:$base';
-        final newTag = 'tag:$base;$capability';
-        _currentTags.remove(oldTag);
-        _currentTags.add(newTag);
-      });
-    }
+    _updateCapability(capability, add: true);
   }
 
   void _removeCapability(String capability) {
-    final base = baseTag;
-    if (base.isNotEmpty && base.contains(';$capability')) {
-      setState(() {
-        final oldTag = 'tag:$base';
-        final newTag = 'tag:${base.replaceAll(';$capability', '')}';
-        _currentTags.remove(oldTag);
-        _currentTags.add(newTag);
-      });
-    }
+    _updateCapability(capability, add: false);
   }
 
   Future<void> _handleSave() async {
