@@ -5,6 +5,7 @@ import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/new_acl_generator_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
+import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:provider/provider.dart';
 
 class MoveNodeDialog extends StatefulWidget {
@@ -33,13 +34,39 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
     final provider = context.read<AppProvider>();
     final isFr = provider.locale.languageCode == 'fr';
 
-    // Close the dialog first, as operations will take time
     Navigator.of(context).pop();
     showSafeSnackBar(context, isFr ? 'Déplacement en cours...' : 'Moving device...');
 
     try {
+      // 1. Move node to the new user
       await provider.apiService.moveNode(widget.node.id, _selectedUser!);
 
+      // 2. Update tags to reflect the new owner
+      final List<String> oldTags = List.from(widget.node.tags);
+      String capabilities = '';
+      final clientTag =
+          oldTags.firstWhere((t) => t.contains('-client'), orElse: () => '');
+
+      if (clientTag.isNotEmpty) {
+        if (clientTag.contains(';')) {
+          capabilities = clientTag.substring(clientTag.indexOf(';'));
+        }
+      }
+
+      final newUserName = normalizeUserName(_selectedUser!.name);
+      final newClientTag = 'tag:$newUserName-client$capabilities';
+
+      final newTags =
+          oldTags.where((tag) => !tag.contains('-client')).toList();
+      newTags.add(newClientTag);
+
+      await provider.apiService.setTags(widget.node.id, newTags);
+
+      // 3. Show success messages
+      showSafeSnackBar(context, isFr ? 'Appareil déplacé avec succès.' : 'Device moved successfully.');
+      showSafeSnackBar(context, isFr ? 'Un redémarrage du serveur Headscale est recommandé.' : 'A Headscale server restart is recommended.');
+
+      // 4. Handle ACLs if necessary
       bool aclMode = true;
       try {
         await provider.apiService.getAclPolicy();
@@ -53,8 +80,8 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
           builder: (dialogContext) => AlertDialog(
             title: Text(isFr ? 'Mettre à jour les ACLs ?' : 'Update ACLs?'),
             content: Text(isFr
-                ? 'Voulez-vous régénérer et appliquer la politique ACL pour refléter ce changement de propriétaire ?'
-                : 'Do you want to regenerate and apply the ACL policy to reflect this change of ownership?'),
+                ? 'Voulez-vous aussi régénérer la politique ACL pour refléter ce changement ?'
+                : 'Do you also want to regenerate the ACL policy to reflect this change?'),
             actions: [
               TextButton(
                 child: Text(isFr ? 'Non' : 'No'),
@@ -69,7 +96,8 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
         );
 
         if (updateAcls == true) {
-          showSafeSnackBar(context, isFr ? 'Mise à jour des ACLs...' : 'Updating ACLs...');
+          showSafeSnackBar(
+              context, isFr ? 'Mise à jour des ACLs...' : 'Updating ACLs...');
 
           final allUsers = await provider.apiService.getUsers();
           final allNodes = await provider.apiService.getNodes();
@@ -80,18 +108,15 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
           final newPolicyJson = jsonEncode(newPolicyMap);
           await provider.apiService.setAclPolicy(newPolicyJson);
 
-          showSafeSnackBar(context, isFr ? 'Appareil déplacé et ACLs mises à jour !' : 'Device moved and ACLs updated!');
-        } else {
-          showSafeSnackBar(context, isFr ? 'Appareil déplacé.' : 'Device moved.');
+          showSafeSnackBar(context,
+              isFr ? 'ACLs mises à jour !' : 'ACLs updated!');
         }
-      } else {
-        showSafeSnackBar(context, isFr ? 'Appareil déplacé (ACLs non gérées).' : 'Device moved (ACLs not managed).');
       }
 
       widget.onNodeMoved();
-
     } catch (e) {
-        showSafeSnackBar(context, isFr ? 'Échec du déplacement: $e' : 'Failed to move: $e');
+      showSafeSnackBar(
+          context, isFr ? 'Échec du déplacement: $e' : 'Failed to move: $e');
     }
   }
 

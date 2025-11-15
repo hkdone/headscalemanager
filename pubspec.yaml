@@ -3,7 +3,7 @@ description: A new Flutter project.
 
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 1.0.1+50
+version: 1.0.1+53
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -13,8 +13,6 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-
-  yaml_edit: ^2.1.0
 
   # UI & UX
   eva_icons_flutter: ^3.1.0
@@ -34,7 +32,6 @@ dependencies:
   shared_preferences: ^2.2.3
 
 
-  yaml: any
   flutter_launcher_icons: ^0.14.4
   flutter_native_splash: ^2.4.7
 dev_dependencies:

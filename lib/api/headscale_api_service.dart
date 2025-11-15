@@ -236,36 +236,16 @@ class HeadscaleApiService {
 
   Future<void> moveNode(String nodeId, User newUser) async {
     final baseUrl = await _getBaseUrl();
-    
-    final oldNode = await getNodeDetails(nodeId);
-    final oldTags = List<String>.from(oldNode.tags);
 
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/node/$nodeId/user'),
       headers: await _getHeaders(),
-      body: jsonEncode(<String, String>{'user': newUser.name}),
+      body: jsonEncode(<String, String>{'user': newUser.id}),
     );
 
     if (response.statusCode != 200) {
       throw Exception(_handleError('déplacer le nœud', response));
     }
-
-    String capabilities = '';
-    final clientTag = oldTags.firstWhere((t) => t.contains('-client'), orElse: () => '');
-
-    if (clientTag.isNotEmpty) {
-        if(clientTag.contains(';')) {
-            capabilities = clientTag.substring(clientTag.indexOf(';'));
-        }
-    }
-
-    final newUserName = normalizeUserName(newUser.name);
-    final newClientTag = 'tag:$newUserName-client$capabilities';
-
-    final newTags = oldTags.where((tag) => !tag.contains('-client')).toList();
-    newTags.add(newClientTag);
-
-    await setTags(nodeId, newTags);
   }
 
   Future<List<PreAuthKey>> getPreAuthKeys() async {

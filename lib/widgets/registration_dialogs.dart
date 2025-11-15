@@ -236,6 +236,7 @@ Future<void> showHeadscaleRegisterCommandDialog(
                               isFr
                                   ? 'Appareil enregistré avec succès.'
                                   : 'Device registered successfully.');
+                          showSafeSnackBar(context, isFr ? 'Un redémarrage du serveur Headscale est recommandé.' : 'A Headscale server restart is recommended.');
                           // Show the new dialog to add ACL tags
                           _showAddTagsDialog(context, newNode);
                         } catch (e) {
