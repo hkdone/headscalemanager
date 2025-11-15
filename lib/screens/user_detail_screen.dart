@@ -274,7 +274,7 @@ class _NodeCard extends StatelessWidget {
     final isFr = locale.languageCode == 'fr';
     return PopupMenuButton<String>(
       icon: Icon(Icons.more_vert, color: theme.iconTheme.color),
-      onSelected: (String value) {
+      onSelected: (String value) async {
         switch (value) {
           case 'rename':
             showDialog(
@@ -283,10 +283,18 @@ class _NodeCard extends StatelessWidget {
                     node: node, onNodeRenamed: onNodeUpdate));
             break;
           case 'move':
-            showDialog(
+            final moved = await showDialog<bool>(
                 context: context,
                 builder: (dialogContext) =>
                     MoveNodeDialog(node: node, onNodeMoved: onNodeUpdate));
+            if (moved == true && context.mounted) {
+              showSafeSnackBar(
+                context,
+                isFr
+                    ? 'Appareil déplacé. Redémarrage de Headscale recommandé.'
+                    : 'Device moved. Headscale restart recommended.',
+              );
+            }
             break;
           case 'edit_tags':
             _showEditTagsDialog(context);

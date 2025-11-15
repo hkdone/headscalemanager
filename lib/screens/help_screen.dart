@@ -426,6 +426,80 @@ routes:
               ]),
               const SizedBox(height: 24),
 
+              // Section Fonctionnalités Avancées
+              _buildSectionTitle(context, '4. Fonctionnalités Avancées'),
+              _buildInfoCard(context, children: [
+                _buildBodyText(context,
+                    'Cette section décrit les fonctionnalités avancées qui simplifient la gestion de la sécurité et la surveillance de votre réseau.'),
+                const SizedBox(height: 16),
+                _buildSubTitle(
+                    context, '4.1. Gestion des Permissions Simplifiée (ACLs)'),
+                const SizedBox(height: 8),
+                _buildBodyText(context,
+                    'Headscale Manager introduit plusieurs mécanismes pour rendre la gestion des listes de contrôle d\'accès (ACLs) plus intuitive et moins sujette aux erreurs.'),
+                const SizedBox(height: 16),
+                _buildBodyText(context, 'A. Automatisation depuis le Tableau de Bord',
+                    isBold: true),
+                const SizedBox(height: 8),
+                _buildBodyText(context,
+                    'Le tableau de bord est désormais votre centre de commande pour les permissions courantes. Lorsque des nœuds demandent à partager des sous-réseaux ou à devenir un "Exit Node", des icônes d\'avertissement apparaissent.'),
+                const SizedBox(height: 8),
+                _buildBodyText(context, '**Approbation en un clic :**',
+                    isBold: true),
+                _buildBodyText(
+                  context,
+                  '1. **Ajoute les tags pertinents** au nœud (ex: `;lan-sharer` ou `;exit-node`).\n'
+                  '2. **Approuve les routes** demandées.\n'
+                  '3. **Régénère et applique la politique ACL complète**.\n'
+                  '*Avantage :* Plus besoin de modifier manuellement les tags et la politique ACL. Tout est fait en une seule étape.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 8),
+                _buildBodyText(context, '**Nettoyage intelligent :**', isBold: true),
+                _buildBodyText(
+                  context,
+                  'Si un client désactive le partage, une icône bleue apparaît. Le nettoyage :\n'
+                  '1. **Retire les tags** obsolètes.\n'
+                  '2. **Supprime les routes** non annoncées.\n'
+                  '3. **Régénère la politique ACL** pour révoquer les permissions.\n'
+                  '*Avantage :* Maintient votre configuration propre et synchronisée.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 16),
+                _buildBodyText(context, 'B. Autorisations Spécifiques (Exceptions ACL)',
+                    isBold: true),
+                const SizedBox(height: 8),
+                _buildBodyText(context,
+                    'La page "ACLs" permet de créer des exceptions à la règle d\'isolation par utilisateur (ex: autoriser l\'accès entre appareils de `Jean` et `Clarisse`).'),
+                const SizedBox(height: 8),
+                _buildBodyText(context, '**Cas Spécifique : Accès aux Sous-réseaux Partagés**',
+                    isBold: true),
+                _buildBodyText(
+                  context,
+                  'Si la destination partage des sous-réseaux, vous pouvez donner un **Accès Complet** ou un **Accès Personnalisé** (IPs/ports spécifiques), offrant un contrôle très fin.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 16),
+                _buildSubTitle(context, '4.2. Notifications et Surveillance'),
+                const SizedBox(height: 8),
+                _buildBodyText(context, 'A. Notifications en Tâche de Fond',
+                    isBold: true),
+                _buildBodyText(
+                  context,
+                  'Activez dans les **Paramètres**. L\'application vérifie toutes les 15 minutes et vous notifie si une approbation ou un nettoyage est requis.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 8),
+                _buildBodyText(context, 'B. Surveillance du Statut par Nœud',
+                    isBold: true),
+                _buildBodyText(
+                  context,
+                  'Sur la page de **détails d\'un nœud**, activez **"Surveiller le statut"** pour être notifié chaque fois que ce nœud passe de "en ligne" à "hors ligne", ou vice-versa.',
+                  isSmall: true,
+                ),
+              ]),
+              const SizedBox(height: 24),
+
               _buildInfoCard(context, children: [
                 _buildBodyText(
                   context,

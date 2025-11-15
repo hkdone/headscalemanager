@@ -426,6 +426,80 @@ routes:
               ]),
               const SizedBox(height: 24),
 
+              // Advanced Features Section
+              _buildSectionTitle(context, '4. Advanced Features'),
+              _buildInfoCard(context, children: [
+                _buildBodyText(context,
+                    'This section describes advanced features that simplify security management and network monitoring.'),
+                const SizedBox(height: 16),
+                _buildSubTitle(
+                    context, '4.1. Simplified Permission Management (ACLs)'),
+                const SizedBox(height: 8),
+                _buildBodyText(context,
+                    'Headscale Manager introduces several mechanisms to make Access Control List (ACL) management more intuitive and less error-prone.'),
+                const SizedBox(height: 16),
+                _buildBodyText(context, 'A. Automation from the Dashboard',
+                    isBold: true),
+                const SizedBox(height: 8),
+                _buildBodyText(context,
+                    'The dashboard is now your command center for common permissions. When nodes request to share subnets or become an "Exit Node", warning icons appear.'),
+                const SizedBox(height: 8),
+                _buildBodyText(context, '**One-Click Approval:**',
+                    isBold: true),
+                _buildBodyText(
+                  context,
+                  '1. **Adds the relevant tags** to the node (e.g., `;lan-sharer` or `;exit-node`).\n'
+                  '2. **Approves the requested routes**.\n'
+                  '3. **Regenerates and applies the full ACL policy**.\n'
+                  '*Benefit:* No more need to manually edit tags and the ACL policy. Everything is done in a single step.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 8),
+                _buildBodyText(context, '**Smart Cleanup:**', isBold: true),
+                _buildBodyText(
+                  context,
+                  'If a client disables sharing, a blue icon appears. The cleanup process:\n'
+                  '1. **Removes obsolete tags**.\n'
+                  '2. **Deletes unadvertised routes**.\n'
+                  '3. **Regenerates the ACL policy** to revoke permissions.\n'
+                  '*Benefit:* Keeps your configuration clean and synchronized.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 16),
+                _buildBodyText(context, 'B. Specific Permissions (ACL Exceptions)',
+                    isBold: true),
+                const SizedBox(height: 8),
+                _buildBodyText(context,
+                    'The "ACLs" page allows creating exceptions to the user isolation rule (e.g., allowing access between devices of `John` and `Jane`).'),
+                const SizedBox(height: 8),
+                _buildBodyText(context, '**Specific Case: Access to Shared Subnets**',
+                    isBold: true),
+                _buildBodyText(
+                  context,
+                  'If the destination shares subnets, you can grant **Full Access** or **Custom Access** (specific IPs/ports), providing very fine-grained control.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 16),
+                _buildSubTitle(context, '4.2. Notifications and Monitoring'),
+                const SizedBox(height: 8),
+                _buildBodyText(context, 'A. Background Notifications',
+                    isBold: true),
+                _buildBodyText(
+                  context,
+                  'Enable in **Settings**. The app checks every 15 minutes and notifies you if an approval or cleanup is required.',
+                  isSmall: true,
+                ),
+                const SizedBox(height: 8),
+                _buildBodyText(context, 'B. Per-Node Status Monitoring',
+                    isBold: true),
+                _buildBodyText(
+                  context,
+                  'On a **node\'s detail page**, enable **"Monitor Status"** to be notified whenever that node goes from "online" to "offline", or vice-versa.',
+                  isSmall: true,
+                ),
+              ]),
+              const SizedBox(height: 24),
+
               _buildInfoCard(context, children: [
                 _buildBodyText(
                   context,

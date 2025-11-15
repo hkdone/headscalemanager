@@ -29,13 +29,13 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
   }
 
   Future<void> _handleMove() async {
-    if (_selectedUser == null) return;
+    if (_selectedUser == null) {
+      Navigator.of(context).pop(false);
+      return;
+    }
 
     final provider = context.read<AppProvider>();
     final isFr = provider.locale.languageCode == 'fr';
-
-    Navigator.of(context).pop();
-    showSafeSnackBar(context, isFr ? 'Déplacement en cours...' : 'Moving device...');
 
     try {
       // 1. Move node to the new user
@@ -62,11 +62,7 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
 
       await provider.apiService.setTags(widget.node.id, newTags);
 
-      // 3. Show success messages
-      showSafeSnackBar(context, isFr ? 'Appareil déplacé avec succès.' : 'Device moved successfully.');
-      showSafeSnackBar(context, isFr ? 'Un redémarrage du serveur Headscale est recommandé.' : 'A Headscale server restart is recommended.');
-
-      // 4. Handle ACLs if necessary
+      // 3. Handle ACLs if necessary
       bool aclMode = true;
       try {
         await provider.apiService.getAclPolicy();
@@ -74,7 +70,7 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
         aclMode = false;
       }
 
-      if (aclMode) {
+      if (aclMode && mounted) {
         final bool? updateAcls = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
@@ -95,7 +91,7 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
           ),
         );
 
-        if (updateAcls == true) {
+        if (updateAcls == true && mounted) {
           showSafeSnackBar(
               context, isFr ? 'Mise à jour des ACLs...' : 'Updating ACLs...');
 
@@ -113,10 +109,17 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
         }
       }
 
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
       widget.onNodeMoved();
     } catch (e) {
-      showSafeSnackBar(
-          context, isFr ? 'Échec du déplacement: $e' : 'Failed to move: $e');
+      if (mounted) {
+        // Show error and then pop
+        showSafeSnackBar(
+            context, isFr ? 'Échec du déplacement: $e' : 'Failed to move: $e');
+        Navigator.of(context).pop(false);
+      }
     }
   }
 

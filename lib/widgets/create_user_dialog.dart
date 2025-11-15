@@ -10,10 +10,7 @@ import 'package:provider/provider.dart';
 /// Permet à l'utilisateur de saisir un nom d'utilisateur. Le dialogue gère
 /// la logique d'ajout du suffixe de domaine et l'appel à l'API Headscale.
 class CreateUserDialog extends StatefulWidget {
-  /// Fonction de rappel appelée après la création réussie de l'utilisateur.
-  final VoidCallback onUserCreated;
-
-  const CreateUserDialog({super.key, required this.onUserCreated});
+  const CreateUserDialog({super.key});
 
   @override
   State<CreateUserDialog> createState() => _CreateUserDialogState();
@@ -50,6 +47,11 @@ class _CreateUserDialogState extends State<CreateUserDialog> {
           child: Text(isFr ? 'Créer' : 'Create'),
           onPressed: () async {
             final String name = _nameController.text.trim();
+            if (name.isEmpty) {
+              Navigator.of(context).pop(false);
+              return;
+            }
+
             final serverUrl = await appProvider.storageService.getServerUrl();
             final String? baseDomain = serverUrl?.extractBaseDomain();
 
@@ -57,31 +59,28 @@ class _CreateUserDialogState extends State<CreateUserDialog> {
             if (baseDomain != null && baseDomain.isNotEmpty) {
               suffix = '@$baseDomain';
             } else {
-              // Fallback if base domain cannot be extracted
               suffix = '@headscale.local'; // A generic fallback
             }
 
-            if (name.isNotEmpty) {
-              String finalName = name;
-              if (!name.contains('@')) {
-                // Only append suffix if no @ is present
-                finalName = '$name$suffix';
-              }
+            String finalName = name;
+            if (!name.contains('@')) {
+              finalName = '$name$suffix';
+            }
 
-              try {
-                await appProvider.apiService.createUser(finalName);
-                Navigator.of(context).pop(); // Close the dialog
-                widget
-                    .onUserCreated(); // Call the callback to refresh user list
-              } catch (e) {
-                debugPrint('Erreur lors de la création de l\'utilisateur : $e');
-                if (!mounted) return;
-                Navigator.of(context).pop(); // Close the dialog even on error
+            try {
+              await appProvider.apiService.createUser(finalName);
+              if (mounted) {
+                Navigator.of(context).pop(true); // Success
+              }
+            } catch (e) {
+              debugPrint('Erreur lors de la création de l\'utilisateur : $e');
+              if (mounted) {
                 showSafeSnackBar(
                     context,
                     isFr
                         ? 'Échec de la création de l\'utilisateur : $e'
                         : 'Failed to create user: $e');
+                Navigator.of(context).pop(false); // Failure
               }
             }
           },

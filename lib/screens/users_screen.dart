@@ -6,6 +6,7 @@ import 'package:headscalemanager/screens/pre_auth_keys_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/widgets/create_user_dialog.dart';
 import 'package:headscalemanager/widgets/delete_user_dialog.dart';
+import 'package:headscalemanager/utils/snack_bar_utils.dart';
 
 /// Écran de gestion des utilisateurs Headscale.
 class UsersScreen extends StatefulWidget {
@@ -103,11 +104,17 @@ class _UsersScreenState extends State<UsersScreen> {
         ),
         const SizedBox(height: 16),
         FloatingActionButton(
-          onPressed: () {
-            showDialog(
+          onPressed: () async {
+            final bool? userCreated = await showDialog<bool>(
               context: context,
-              builder: (ctx) => CreateUserDialog(onUserCreated: _refreshUsers),
+              builder: (ctx) => const CreateUserDialog(),
             );
+            if (userCreated == true) {
+              _refreshUsers();
+              if (mounted) {
+                showSafeSnackBar(context, isFr ? 'Utilisateur créé avec succès.' : 'User created successfully.');
+              }
+            }
           },
           heroTag: 'createUser',
           tooltip: isFr ? 'Créer un utilisateur' : 'Create user',

@@ -241,3 +241,65 @@ The ACL page has two main functions:
 ### 3.4. Testeur ACL (ACL Tester)
 
 This new page, accessible via a dedicated button, allows you to test and visualize the impact of different ACL policies without applying them directly to your Headscale server. It\'s a safe environment for experimentation.
+
+## 4. Advanced Features
+
+This section describes advanced features that simplify security management and network monitoring.
+
+### 4.1. Simplified Permission Management (ACLs)
+
+Headscale Manager introduces several mechanisms to make Access Control List (ACL) management more intuitive and less error-prone.
+
+#### A. Automation from the Dashboard
+
+The dashboard is now your command center for common permissions. When nodes request to share subnets or become an "Exit Node", warning icons appear.
+
+*   **One-Click Approval:**
+    *   **What it does:** By clicking the approval button (orange warning icon), the application automatically performs three actions:
+        1.  **Adds the relevant tags** to the node (e.g., `;lan-sharer` or `;exit-node` are added to the existing `*-client` tag).
+        2.  **Approves the routes** requested by the node.
+        3.  **Regenerates and applies the full ACL policy** to your Headscale server.
+    *   **Benefit:** You no longer need to manually edit tags and then go to the ACL page to regenerate the policy. Everything is done in a single step, ensuring permissions are granted immediately and correctly.
+
+*   **Smart Cleanup:**
+    *   **What it does:** If a client disables route sharing or the exit node function, a blue warning icon appears. The cleanup button allows you to:
+        1.  **Remove the obsolete tags**.
+        2.  **Delete the routes** that are no longer advertised.
+        3.  **Regenerate and apply the ACL policy** to revoke the old permissions.
+    *   **Benefit:** Keeps your ACL configuration clean and synchronized with the actual state of your clients.
+
+#### B. Specific Permissions (ACL Exceptions)
+
+The "ACLs" page contains a powerful section: **"Specific Permissions"**. Its purpose is to create exceptions to the strict user isolation rule.
+
+*   **Use Case:** Allow a device from user "John" to access a service hosted on a device from user "Jane".
+
+*   **How it works:**
+    1.  **Select Source and Destination:** Choose the source node (the one initiating the connection) and the destination node. The application uses the first tag of each node to create the rule.
+    2.  **Specify the Port:** Enter the destination port or port range (e.g., `80`, `443`, `1000-2000`).
+    3.  **Add and Apply:** By clicking this button, the ACL policy is **immediately regenerated and applied** to the server, including this new exception rule.
+
+*   **Specific Case: Access to Shared Subnets**
+    *   If the destination node shares one or more subnets (it has the `;lan-sharer` tag), a dialog will open asking what type of access to grant:
+        *   **Full Access:** Allows the source node to access all subnets shared by the destination entirely.
+        *   **Custom Access:** Allows you to specify unique IP addresses, IP ranges (e.g., `192.168.1.10-192.168.1.20`), and specific ports within those subnets.
+    *   This provides very fine-grained control over access permissions to shared local networks.
+
+### 4.2. Notifications and Monitoring
+
+#### A. Background Notifications
+
+To be informed of important events without having to open the application:
+
+1.  **Activation:** Go to **Settings** and enable the **"Background Notifications"** switch.
+2.  **How it works:** The application will check your network status every 15 minutes (if a network connection is available) and send you a push notification if:
+    *   A node requires **approval** for new routes.
+    *   A node requires a **cleanup** of its configuration.
+
+#### B. Per-Node Status Monitoring
+
+If you have critical devices (a server, a gateway, etc.), you can be specifically notified of their status changes.
+
+1.  **Activation:** Navigate to a **node's detail page**.
+2.  Enable the **"Monitor Status"** switch.
+3.  **How it works:** The background task will send you a notification whenever this node goes from "online" to "offline", or vice-versa.

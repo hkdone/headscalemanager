@@ -87,7 +87,7 @@ class NodeManagementTile extends StatelessWidget {
         // Menu contextuel pour les actions de gestion du nœud.
         trailing: PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert),
-          onSelected: (String value) {
+          onSelected: (String value) async {
             switch (value) {
               case 'rename':
                 // Affiche le dialogue pour renommer le nœud.
@@ -99,11 +99,19 @@ class NodeManagementTile extends StatelessWidget {
                 break;
               case 'move':
                 // Affiche le dialogue pour déplacer le nœud.
-                showDialog(
+                final moved = await showDialog<bool>(
                   context: context,
                   builder: (ctx) =>
                       MoveNodeDialog(node: node, onNodeMoved: onNodeUpdate),
                 );
+                if (moved == true && context.mounted) {
+                  showSafeSnackBar(
+                    context,
+                    isFr
+                        ? 'Appareil déplacé. Redémarrage de Headscale recommandé.'
+                        : 'Device moved. Headscale restart recommended.',
+                  );
+                }
                 break;
               case 'enable_exit_node':
                 // Affiche le dialogue pour activer le nœud de sortie.

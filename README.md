@@ -326,3 +326,65 @@ Cet écran (accessible via le bouton `api` sur l'écran du tableau de bord) vous
 - **Créer Clé (icône '+' en bas à droite) :** Ouvre un dialogue pour créer une nouvelle clé d'API. La nouvelle clé sera affichée à l'écran et devra être copiée immédiatement, car elle ne sera plus visible par la suite.
 - **Expirer Clé (icône d'horloge à côté de chaque clé) :** Fait expirer une clé d'API existante après confirmation.
 - **Supprimer Clé (icône de poubelle à côté de chaque clé) :** Supprime une clé d'API existante après confirmation.
+
+## 4. Fonctionnalités Avancées
+
+Cette section décrit les fonctionnalités avancées qui simplifient la gestion de la sécurité et la surveillance de votre réseau.
+
+### 4.1. Gestion des Permissions Simplifiée (ACLs)
+
+Headscale Manager introduit plusieurs mécanismes pour rendre la gestion des listes de contrôle d'accès (ACLs) plus intuitive et moins sujette aux erreurs.
+
+#### A. Automatisation depuis le Tableau de Bord
+
+Le tableau de bord est désormais votre centre de commande pour les permissions courantes. Lorsque des nœuds demandent à partager des sous-réseaux ou à devenir un "Exit Node", des icônes d'avertissement apparaissent.
+
+*   **Approbation en un clic :**
+    *   **Ce que ça fait :** En cliquant sur le bouton d'approbation (icône d'avertissement orange), l'application effectue trois actions automatiquement :
+        1.  **Ajoute les tags pertinents** au nœud (ex: `;lan-sharer` ou `;exit-node` sont ajoutés au tag `*-client` existant).
+        2.  **Approuve les routes** demandées par le nœud.
+        3.  **Régénère et applique la politique ACL complète** sur votre serveur Headscale.
+    *   **Avantage :** Vous n'avez plus besoin de modifier manuellement les tags, puis d'aller sur la page ACL pour régénérer la politique. Tout est fait en une seule étape, garantissant que les permissions sont accordées immédiatement et correctement.
+
+*   **Nettoyage intelligent :**
+    *   **Ce que ça fait :** Si un client désactive le partage de route ou la fonction d'exit node, une icône d'avertissement bleue apparaît. Le bouton de nettoyage permet de :
+        1.  **Retirer les tags** devenus obsolètes.
+        2.  **Supprimer les routes** qui ne sont plus annoncées.
+        3.  **Régénérer et appliquer la politique ACL** pour révoquer les anciennes permissions.
+    *   **Avantage :** Maintient votre configuration ACL propre et synchronisée avec l'état réel de vos clients.
+
+#### B. Autorisations Spécifiques (Exceptions ACL)
+
+La page "ACLs" contient une section puissante : **"Autorisations Spécifiques"**. Son but est de créer des exceptions à la règle d'isolation stricte par utilisateur.
+
+*   **Cas d'usage :** Permettre à un appareil de l'utilisateur "Jean" d'accéder à un service hébergé sur un appareil de l'utilisatrice "Clarisse".
+
+*   **Comment ça marche :**
+    1.  **Sélectionnez la Source et la Destination :** Choisissez le nœud source (celui qui initie la connexion) et le nœud destination. L'application utilise le premier tag de chaque nœud pour créer la règle.
+    2.  **Spécifiez le Port :** Entrez le port ou la plage de ports de destination (ex: `80`, `443`, `1000-2000`).
+    3.  **Ajouter et Appliquer :** En cliquant sur ce bouton, la politique ACL est **immédiatement régénérée et appliquée** au serveur, incluant cette nouvelle règle d'exception.
+
+*   **Cas Spécifique : Accès aux Sous-réseaux Partagés**
+    *   Si le nœud de destination partage un ou plusieurs sous-réseaux (il a le tag `;lan-sharer`), une boîte de dialogue s'ouvrira pour vous demander quel type d'accès donner :
+        *   **Accès Complet :** Autorise le nœud source à accéder à l'intégralité de tous les sous-réseaux partagés par la destination.
+        *   **Accès Personnalisé :** Vous permet de spécifier des adresses IP uniques, des plages d'IP (ex: `192.168.1.10-192.168.1.20`) et des ports spécifiques à l'intérieur de ces sous-réseaux.
+    *   Cela offre un contrôle très fin sur les permissions d'accès aux réseaux locaux partagés.
+
+### 4.2. Notifications et Surveillance
+
+#### A. Notifications en Tâche de Fond
+
+Pour être informé des événements importants sans avoir à ouvrir l'application :
+
+1.  **Activation :** Allez dans **Paramètres** et activez l'interrupteur **"Notifications en arrière-plan"**.
+2.  **Fonctionnement :** L'application vérifiera l'état de votre réseau toutes les 15 minutes (si une connexion réseau est disponible) et vous enverra une notification push si :
+    *   Un nœud nécessite une **approbation** pour de nouvelles routes.
+    *   Un nœud nécessite un **nettoyage** de sa configuration.
+
+#### B. Surveillance du Statut par Nœud
+
+Si vous avez des appareils critiques (un serveur, une passerelle...), vous pouvez être notifié spécifiquement de leurs changements de statut.
+
+1.  **Activation :** Naviguez vers la page de **détails d'un nœud**.
+2.  Activez l'interrupteur **"Surveiller le statut"**.
+3.  **Fonctionnement :** La tâche de fond vous enverra une notification chaque fois que ce nœud passera de "en ligne" à "hors ligne", ou vice-versa.
