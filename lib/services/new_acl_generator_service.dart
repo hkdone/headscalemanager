@@ -37,7 +37,6 @@ class NewAclGeneratorService {
     // --- Étape 2: Définition des propriétaires de tags SPÉCIFIQUES et des approbateurs automatiques ---
     final autoApprovers = {
       'routes': <String, List<String>>{},
-      'exitNodes': <String>[],
     };
 
     for (var node in nodes) {
@@ -51,7 +50,9 @@ class NewAclGeneratorService {
           tagOwners[tag]!.add(groupName);
         }
 
-        if (tag.contains(';lan-sharer')) {
+        // Pour Headscale > 0.26, le champ 'exitNodes' n'est plus supporté.
+        // L'approbation d'un exit node se fait en approuvant ses routes (0.0.0.0/0 et/ou ::/0).
+        if (tag.contains(';lan-sharer') || tag.contains(';exit-node')) {
           for (var route in node.sharedRoutes) {
             final routesMap =
                 autoApprovers['routes'] as Map<String, List<String>>;
@@ -61,13 +62,6 @@ class NewAclGeneratorService {
             if (!routesMap[route]!.contains(tag)) {
               routesMap[route]!.add(tag);
             }
-          }
-        }
-
-        if (tag.contains(';exit-node')) {
-          final exitNodesList = autoApprovers['exitNodes'] as List<String>;
-          if (!exitNodesList.contains(tag)) {
-            exitNodesList.add(tag);
           }
         }
       }
@@ -126,7 +120,9 @@ class NewAclGeneratorService {
     for (var user in users) {
       final groupName = 'group:${user.name}';
       final userNodes = nodes.where((node) => node.user == user.name).toList();
-      final userTags = userNodes.expand((node) => node.tags).toSet(); // Tous les tags des nœuds de l'utilisateur
+      final userTags = userNodes
+          .expand((node) => node.tags)
+          .toSet(); // Tous les tags des nœuds de l'utilisateur
 
       if (userTags.isEmpty) continue;
 
@@ -140,10 +136,14 @@ class NewAclGeneratorService {
 
       // Ajouter les destinations spécifiques aux routes LAN via les nœuds de sortie/LAN sharer
       for (var node in userNodes) {
-        final nodeTags = node.tags.where((tag) => tag.contains(';exit-node') || tag.contains(';lan-sharer')).toSet();
+        final nodeTags = node.tags
+            .where((tag) =>
+                tag.contains(';exit-node') || tag.contains(';lan-sharer'))
+            .toSet();
         if (nodeTags.isNotEmpty) {
           for (var route in node.sharedRoutes) {
-            if (route != '0.0.0.0/0' && route != '::/0') { // Routes LAN
+            if (route != '0.0.0.0/0' && route != '::/0') {
+              // Routes LAN
               destinations.add('$route:*'); // Ajout de la route LAN simple
             }
           }
@@ -172,18 +172,25 @@ class NewAclGeneratorService {
       // Règle pour l'accès aux nœuds de sortie et LAN sharer par le groupe de l'utilisateur
       final userExitNodeLanSharerTags = userNodes
           .expand((node) => node.tags)
-          .where((tag) => tag.contains(';exit-node') || tag.contains(';lan-sharer'))
+          .where((tag) =>
+              tag.contains(';exit-node') || tag.contains(';lan-sharer'))
           .toSet();
 
       if (userExitNodeLanSharerTags.isNotEmpty) {
         // Ajouter les destinations spécifiques aux routes LAN via les nœuds de sortie/LAN sharer pour le groupe
-        final groupDestinations = userExitNodeLanSharerTags.map((tag) => '$tag:*').toSet();
+        final groupDestinations =
+            userExitNodeLanSharerTags.map((tag) => '$tag:*').toSet();
         for (var node in userNodes) {
-          final nodeTags = node.tags.where((tag) => tag.contains(';exit-node') || tag.contains(';lan-sharer')).toSet();
+          final nodeTags = node.tags
+              .where((tag) =>
+                  tag.contains(';exit-node') || tag.contains(';lan-sharer'))
+              .toSet();
           if (nodeTags.isNotEmpty) {
             for (var route in node.sharedRoutes) {
-              if (route != '0.0.0.0/0' && route != '::/0') { // Routes LAN
-                groupDestinations.add('$route:*'); // Ajout de la route LAN simple
+              if (route != '0.0.0.0/0' && route != '::/0') {
+                // Routes LAN
+                groupDestinations
+                    .add('$route:*'); // Ajout de la route LAN simple
               }
             }
           }
@@ -204,7 +211,6 @@ class NewAclGeneratorService {
       'autoApprovers': autoApprovers,
       'acls': acls,
       'hosts': <String, dynamic>{},
-      'tests': <Map<String, dynamic>>[],
     };
   }
 }

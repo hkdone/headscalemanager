@@ -61,8 +61,8 @@ class _SharedRoutesAccessDialogState extends State<SharedRoutesAccessDialog> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         TextButton(
-          child: Text(isFr ? 'Confirmer' : 'Confirm'),
           onPressed: _handleConfirm,
+          child: Text(isFr ? 'Confirmer' : 'Confirm'),
         ),
       ],
     );
