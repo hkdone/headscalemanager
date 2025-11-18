@@ -31,8 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
     DashboardScreen(),
     UsersScreen(),
     AclScreen(),
-    NetworkOverviewScreen(),
     AclManagerScreen(),
+    NetworkOverviewScreen(),
   ];
 
   /// Gère le changement d'élément sélectionné dans la barre de navigation.
@@ -100,15 +100,15 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(EvaIcons.shield),
             label: 'ACLs',
           ),
+          // Élément pour le Gestionnaire d'ACL.
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.account_tree_outlined),
+            label: 'View',
+          ),
           // Élément pour la vue d'ensemble du réseau.
           BottomNavigationBarItem(
             icon: const Icon(EvaIcons.globe2Outline),
             label: isFr ? 'Réseau' : 'Network',
-          ),
-          // Élément pour le Gestionnaire d'ACL.
-          BottomNavigationBarItem(
-            icon: const Icon(EvaIcons.lockOutline),
-            label: isFr ? 'Gestion ACL' : 'ACL Manager',
           ),
         ],
         currentIndex: _selectedIndex, // Index de l'élément actuellement actif.

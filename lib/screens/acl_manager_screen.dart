@@ -34,7 +34,7 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
   List<User> _users = [];
   List<Node> _nodes = [];
   Map<String, dynamic> _aclPolicy = {};
-  bool _showGraphView = false;
+  bool _showGraphView = true;
   String _serverUrl = '';
 
   @override
@@ -89,7 +89,7 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(isFr ? 'Gestionnaire ACL' : 'ACL Manager',
+        title: Text('View',
             style: Theme.of(context).appBarTheme.titleTextStyle),
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
@@ -114,7 +114,11 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: Implement adding a new rule
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isFr ? 'Cette fonctionnalité arrive bientôt.' : 'This feature is coming soon.'),
+            ),
+          );
         },
         tooltip: isFr ? 'Ajouter une règle' : 'Add rule',
         child: const Icon(Icons.add),

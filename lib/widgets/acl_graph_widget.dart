@@ -3,7 +3,15 @@ import 'package:graphview/GraphView.dart';
 import 'package:headscalemanager/models/node.dart' as headscale_node;
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/services/acl_parser_service.dart';
+import 'package:headscalemanager/widgets/animated_edge_painter.dart';
 import 'package:headscalemanager/widgets/diamond_painter.dart';
+
+class _NoOpEdgeRenderer extends EdgeRenderer {
+  @override
+  void renderEdge(Canvas canvas, Edge edge, Paint paint) {
+    // Do nothing
+  }
+}
 
 class AclGraphWidget extends StatefulWidget {
   final List<User> users;
@@ -23,23 +31,44 @@ class AclGraphWidget extends StatefulWidget {
   State<AclGraphWidget> createState() => _AclGraphWidgetState();
 }
 
-class _AclGraphWidgetState extends State<AclGraphWidget> {
+class _AclGraphWidgetState extends State<AclGraphWidget>
+    with SingleTickerProviderStateMixin {
   final Graph graph = Graph();
   late AclParserService _parser;
   final Map<String, headscale_node.Node> _idToNodeMap = {};
+  final Map<Node, Widget> _nodeWidgetCache = {};
   bool _graphBuilt = false;
-  final BuchheimWalkerConfiguration configuration =
-      BuchheimWalkerConfiguration();
+  final TransformationController _transformationController =
+      TransformationController();
+  late final BuchheimWalkerConfiguration _configuration;
+  late final TidierTreeLayoutAlgorithm _algorithm;
+  late final TidierTreeLayoutAlgorithm _nodeAlgorithm;
+  late final AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
 
-    configuration
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat();
+
+    _configuration = BuchheimWalkerConfiguration()
       ..siblingSeparation = (100)
       ..levelSeparation = (100)
       ..subtreeSeparation = (150)
       ..orientation = (BuchheimWalkerConfiguration.ORIENTATION_TOP_BOTTOM);
+
+    _algorithm = TidierTreeLayoutAlgorithm(
+      _configuration,
+      AnimatedEdgePainter(_configuration, _animationController),
+    );
+
+    _nodeAlgorithm = TidierTreeLayoutAlgorithm(
+      _configuration,
+      _NoOpEdgeRenderer(),
+    );
 
     _parser = AclParserService(
       aclPolicy: widget.aclPolicy,
@@ -53,15 +82,49 @@ class _AclGraphWidgetState extends State<AclGraphWidget> {
   }
 
   @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_graphBuilt) {
       _buildGraph();
+
+      // Run the layout algorithm to calculate node positions
+      _algorithm.run(graph, 0, 0);
+
+      // Find the server node and calculate the transformation to center it
+      try {
+        final serverNode = graph.nodes
+            .firstWhere((n) => n.key?.value == 'server_headscale_server');
+        final serverX = serverNode.x;
+        final serverY = serverNode.y;
+
+        final screenWidth = MediaQuery.of(context).size.width;
+        final screenHeight = MediaQuery.of(context).size.height;
+
+        // Center the node in the viewport
+        final dx = -serverX +
+            (screenWidth / 2) -
+            40; // 40 is half of the node width (80)
+        final dy = -serverY +
+            (screenHeight / 2) -
+            40; // 40 is half of the node height (80)
+
+        _transformationController.value = Matrix4.identity()..translate(dx, dy);
+      } catch (e) {
+        // Server node not found, do nothing
+      }
+
       _graphBuilt = true;
     }
   }
 
   void _buildGraph() {
+    _nodeWidgetCache.clear();
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final Color intraUserColor =
         isDarkMode ? Colors.cyanAccent[200]! : Colors.blue[800]!;
@@ -82,8 +145,9 @@ class _AclGraphWidgetState extends State<AclGraphWidget> {
       graph.addNode(userNode);
       graph.addEdge(serverNode, userNode,
           paint: Paint()
-            ..color = defaultColor
-            ..strokeWidth = 1.5);
+            ..color = Colors.orange
+            ..strokeWidth = 2.5
+            ..maskFilter = const MaskFilter.blur(BlurStyle.solid, 2.5));
     }
 
     for (var machine in widget.nodes) {
@@ -95,8 +159,9 @@ class _AclGraphWidgetState extends State<AclGraphWidget> {
       if (userNode != null) {
         graph.addEdge(userNode, machineNode,
             paint: Paint()
-              ..color = defaultColor
-              ..strokeWidth = 1.5);
+              ..color = Colors.orange
+              ..strokeWidth = 2.5
+              ..maskFilter = const MaskFilter.blur(BlurStyle.solid, 2.5));
       }
 
       final permissions = _parser.getPermissionsForNode(machine);
@@ -118,7 +183,8 @@ class _AclGraphWidgetState extends State<AclGraphWidget> {
             graph.addEdge(machineNode, destMachineNode,
                 paint: Paint()
                   ..color = color
-                  ..strokeWidth = 2.0);
+                  ..strokeWidth = 2.5
+                  ..maskFilter = const MaskFilter.blur(BlurStyle.solid, 2.5));
           }
         }
       }
@@ -128,8 +194,9 @@ class _AclGraphWidgetState extends State<AclGraphWidget> {
         graph.addNode(exitNodeSymbol);
         graph.addEdge(machineNode, exitNodeSymbol,
             paint: Paint()
-              ..color = defaultColor
-              ..strokeWidth = 1.0
+              ..color = Colors.orange
+              ..strokeWidth = 2.5
+              ..maskFilter = const MaskFilter.blur(BlurStyle.solid, 2.5)
               ..style = PaintingStyle.stroke);
       }
 
@@ -138,8 +205,9 @@ class _AclGraphWidgetState extends State<AclGraphWidget> {
         graph.addNode(subnetSymbol);
         graph.addEdge(machineNode, subnetSymbol,
             paint: Paint()
-              ..color = defaultColor
-              ..strokeWidth = 1.0
+              ..color = Colors.orange
+              ..strokeWidth = 2.5
+              ..maskFilter = const MaskFilter.blur(BlurStyle.solid, 2.5)
               ..style = PaintingStyle.stroke);
       }
     }
@@ -364,29 +432,51 @@ class _AclGraphWidgetState extends State<AclGraphWidget> {
     );
   }
 
+  Widget _getOrCreateNodeWidget(Node node) {
+    return _nodeWidgetCache.putIfAbsent(node, () {
+      final item = _getItemFromNode(node);
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: item != null ? () => _showDetailsDialog(item) : null,
+        child: _buildNodeWidget(node),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return InteractiveViewer(
+      transformationController: _transformationController,
       constrained: false,
       boundaryMargin: const EdgeInsets.all(200),
       minScale: 0.01,
       maxScale: 5.0,
-      child: GraphView(
-        graph: graph,
-        algorithm: TidierTreeLayoutAlgorithm(
-            configuration, TreeEdgeRenderer(configuration)),
-        paint: Paint()
-          ..color = Colors.transparent
-          ..strokeWidth = 1
-          ..style = PaintingStyle.stroke,
-        builder: (Node node) {
-          final item = _getItemFromNode(node);
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: item != null ? () => _showDetailsDialog(item) : null,
-            child: _buildNodeWidget(node),
-          );
-        },
+      child: Stack(
+        children: [
+          AnimatedBuilder(
+            animation: _animationController,
+            builder: (context, child) {
+              return GraphView(
+                graph: graph,
+                algorithm: _algorithm,
+                builder: (node) {
+                  return IgnorePointer(
+                    child: Opacity(
+                      opacity: 0.0,
+                      child: _getOrCreateNodeWidget(node),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          GraphView(
+            graph: graph,
+            algorithm: _nodeAlgorithm,
+            builder: _getOrCreateNodeWidget,
+            paint: Paint()..color = Colors.transparent,
+          ),
+        ],
       ),
     );
   }
