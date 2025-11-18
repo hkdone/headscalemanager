@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/acl_screen.dart';
 import 'package:headscalemanager/screens/dashboard_screen.dart';
-import 'package:headscalemanager/screens/acl_tester_screen.dart';
+import 'package:headscalemanager/screens/acl_manager_screen.dart';
 import 'package:headscalemanager/screens/network_overview_screen.dart';
 import 'package:headscalemanager/screens/settings_screen.dart';
 import 'package:headscalemanager/screens/users_screen.dart';
@@ -32,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
     UsersScreen(),
     AclScreen(),
     NetworkOverviewScreen(),
-    AclTesterScreen(),
+    AclManagerScreen(),
   ];
 
   /// Gère le changement d'élément sélectionné dans la barre de navigation.
@@ -105,10 +105,10 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(EvaIcons.globe2Outline),
             label: isFr ? 'Réseau' : 'Network',
           ),
-          // Élément pour le Testeur d'ACL.
+          // Élément pour le Gestionnaire d'ACL.
           BottomNavigationBarItem(
-            icon: const Icon(EvaIcons.colorPalette),
-            label: isFr ? 'Test ACL' : 'ACL Test',
+            icon: const Icon(EvaIcons.lockOutline),
+            label: isFr ? 'Gestion ACL' : 'ACL Manager',
           ),
         ],
         currentIndex: _selectedIndex, // Index de l'élément actuellement actif.
