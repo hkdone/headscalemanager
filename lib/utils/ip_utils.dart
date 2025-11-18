@@ -95,4 +95,9 @@ class IpUtils {
     }
     return result;
   }
+
+  /// Validates if a given string is in CIDR notation.
+  static bool isCIDR(String input) {
+    return input.contains('/');
+  }
 }
