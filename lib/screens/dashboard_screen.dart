@@ -16,6 +16,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late Future<List<Node>> _nodesFuture;
+  String _filterStatus = 'all'; // 'all', 'online', 'offline'
 
   @override
   void initState() {
@@ -69,29 +70,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
               );
             }
 
-            final nodes = snapshot.data!;
-            final nodesByUser = <String, List<Node>>{};
-            for (var node in nodes) {
-              (nodesByUser[node.user] ??= []).add(node);
-            }
+            final allNodes = snapshot.data!;
+            final connectedNodesCount = allNodes.where((node) => node.online).length;
+            final disconnectedNodesCount = allNodes.length - connectedNodesCount;
 
-            final users = nodesByUser.keys.toList();
-            final connectedNodes = nodes.where((node) => node.online).length;
-            final disconnectedNodes = nodes.length - connectedNodes;
+            final filteredNodes = allNodes.where((node) {
+              if (_filterStatus == 'online') return node.online;
+              if (_filterStatus == 'offline') return !node.online;
+              return true;
+            }).toList();
+
+            final filteredNodesByUser = <String, List<Node>>{};
+            for (var node in filteredNodes) {
+              (filteredNodesByUser[node.user] ??= []).add(node);
+            }
+            final users = filteredNodesByUser.keys.toList();
 
             return RefreshIndicator(
               onRefresh: _refreshNodes,
               child: Column(
                 children: [
                   _buildSummarySection(
-                      users.length, connectedNodes, disconnectedNodes, isFr),
+                      users.length, connectedNodesCount, disconnectedNodesCount, isFr),
+                  _buildFilterChips(isFr),
                   Expanded(
                     child: ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
                       itemCount: users.length,
                       itemBuilder: (context, index) {
                         final user = users[index];
-                        final userNodes = nodesByUser[user]!;
+                        final userNodes = filteredNodesByUser[user]!;
                         return _UserNodeCard(
                           user: user,
                           nodes: userNodes,
@@ -149,6 +157,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChips(bool isFr) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          FilterChip(
+            label: Text(isFr ? 'Tous' : 'All'),
+            selected: _filterStatus == 'all',
+            onSelected: (selected) {
+              if (selected) setState(() => _filterStatus = 'all');
+            },
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            label: Text(isFr ? 'En ligne' : 'Online'),
+            selected: _filterStatus == 'online',
+            onSelected: (selected) {
+              if (selected) setState(() => _filterStatus = 'online');
+            },
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            label: Text(isFr ? 'Hors ligne' : 'Offline'),
+            selected: _filterStatus == 'offline',
+            onSelected: (selected) {
+              if (selected) setState(() => _filterStatus = 'offline');
+            },
+          ),
+        ],
       ),
     );
   }

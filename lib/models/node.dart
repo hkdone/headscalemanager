@@ -34,6 +34,9 @@ class Node {
   /// CORRECTION : Doit être basé sur les routes approuvées (sharedRoutes).
   final bool isExitNode;
 
+  /// Indique si ce nœud partage des routes LAN (autres que 0.0.0.0/0 ou ::/0).
+  final bool isLanSharer;
+
   /// Liste des tags associés à ce nœud.
   final List<String> tags;
 
@@ -58,6 +61,7 @@ class Node {
     required this.sharedRoutes,
     required this.availableRoutes,
     required this.isExitNode,
+    required this.isLanSharer,
     required this.tags,
     required this.baseDomain,
     required this.endpoint,
@@ -89,6 +93,7 @@ class Node {
     // CORRECTION LOGIQUE : Un nœud est un "exit node" si ses routes de sortie sont APPROUVÉES.
     final bool isExitNode =
         approved.contains('0.0.0.0/0') || approved.contains('::/0');
+    final bool isLanSharer = approved.any((route) => route != '0.0.0.0/0' && route != '::/0');
 
     return Node(
       id: json['id'] ?? '',
@@ -105,6 +110,7 @@ class Node {
       availableRoutes:
           available, // Nouveau champ mappé depuis 'availableRoutes'
       isExitNode: isExitNode,
+      isLanSharer: isLanSharer,
       tags: List<String>.from(
           json['forcedTags'] ?? json['validTags'] ?? json['tags'] ?? []),
       baseDomain: baseDomain,

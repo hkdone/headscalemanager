@@ -40,16 +40,18 @@ class AllowedSubnet {
   AllowedSubnet({required this.subnet, required this.ports, this.sourceNode});
 
   @override
-  String toString() => '$subnet (from ${sourceNode?.name ?? "unknown"}) (${ports.join(',')})';
+  String toString() =>
+      '$subnet (from ${sourceNode?.name ?? "unknown"}) (${ports.join(',')})';
 }
 
 class AllowedExitNode {
   final Node node;
+  final Node? sourceNode; // Le nœud qui accorde l'accès à cet exit node
 
-  AllowedExitNode({required this.node});
+  AllowedExitNode({required this.node, this.sourceNode});
 
   @override
-  String toString() => node.name;
+  String toString() => '${node.name} (via ${sourceNode?.name ?? "direct"})';
 }
 
 class AclParserService {
@@ -92,7 +94,8 @@ class AclParserService {
       tagOwners.forEach((tag, owners) {
         final List<String> ownerAliases = (owners as List).cast<String>();
         for (var ownerAlias in ownerAliases) {
-          final user = allUsers.firstWhere((u) => u.name == ownerAlias, orElse: () => User(id: '', name: '', createdAt: DateTime.now()));
+          final user = allUsers.firstWhere((u) => u.name == ownerAlias,
+              orElse: () => User(id: '', name: '', createdAt: DateTime.now()));
           if (user.id.isNotEmpty) {
             final userNodes = allNodes.where((n) => n.user == user.name);
             _aliases[tag] = userNodes.expand((n) => n.ipAddresses).toList();
@@ -116,21 +119,42 @@ class AclParserService {
       return sourceNode.ipAddresses;
     }
     if (_aliases.containsKey(alias)) {
-      return _aliases[alias]!.expand((a) => _resolveAlias(a, sourceNode)).toList();
+      return _aliases[alias]!
+          .expand((a) => _resolveAlias(a, sourceNode))
+          .toList();
     }
     if (IpUtils.isCIDR(alias)) {
       return [alias];
     }
-    // It might be a tag or a user
-    final user = allUsers.firstWhere((u) => u.name == alias, orElse: () => User(id: '', name: '', createdAt: DateTime.now()));
+    // Handle complex tags like "tag:a;b;c"
+    if (alias.startsWith('tag:')) {
+      final requiredTags = alias
+          .split(';')
+          .where((t) => t.isNotEmpty)
+          .map((t) => t.startsWith('tag:') ? t : 'tag:$t')
+          .toSet();
+
+      if (requiredTags.isNotEmpty) {
+        final matchingNodes = allNodes.where((node) {
+          // Check if the node's tags contain ALL of the required tags.
+          return requiredTags.every((reqTag) => node.tags.contains(reqTag));
+        });
+        if (matchingNodes.isNotEmpty) {
+          return matchingNodes.expand((n) => n.ipAddresses).toList();
+        }
+      }
+    }
+    // Check if it's a user name
+    final user = allUsers.firstWhere((u) => u.name == alias,
+        orElse: () => User(id: '', name: '', createdAt: DateTime.now()));
     if (user.id.isNotEmpty) {
-      return allNodes.where((n) => n.user == user.name).expand((n) => n.ipAddresses).toList();
+      return allNodes
+          .where((n) => n.user == user.name)
+          .expand((n) => n.ipAddresses)
+          .toList();
     }
-    final nodesWithTag = allNodes.where((n) => n.tags.contains(alias));
-    if (nodesWithTag.isNotEmpty) {
-      return nodesWithTag.expand((n) => n.ipAddresses).toList();
-    }
-    return [alias]; // Could be a raw IP
+    // If none of the above, treat it as a raw IP or an unresolved alias
+    return [alias];
   }
 
   NodePermission getPermissionsForNode(Node node) {
@@ -140,7 +164,8 @@ class AclParserService {
     final Set<String> processedRules = HashSet();
 
     if (!aclPolicy.containsKey('acls')) {
-      return NodePermission(allowedPeers: [], allowedSubnets: [], allowedExitNodes: []);
+      return NodePermission(
+          allowedPeers: [], allowedSubnets: [], allowedExitNodes: []);
     }
 
     final List<dynamic> acls = aclPolicy['acls'];
@@ -155,7 +180,8 @@ class AclParserService {
       }
 
       final List<String> destinations = (rule['dst'] as List).cast<String>();
-      final List<String> defaultPorts = (rule['ports'] as List?)?.cast<String>() ?? ['*'];
+      final List<String> defaultPorts =
+          (rule['ports'] as List?)?.cast<String>() ?? ['*'];
 
       for (var dest in destinations) {
         final ruleSignature = '${rule.hashCode}-$dest';
@@ -179,26 +205,36 @@ class AclParserService {
           }
         }
 
-        final List<String> resolvedDestIpsOrCidrs = _resolveAlias(destAddr, node).toList();
+        final List<String> resolvedDestIpsOrCidrs =
+            _resolveAlias(destAddr, node).toList();
 
         for (var destIpOrCidr in resolvedDestIpsOrCidrs) {
           final trimmedDest = destIpOrCidr.trim();
+
           if (IpUtils.isCIDR(trimmedDest)) {
-            final sourceNode = _routeSourceMap[trimmedDest];
-            allowedSubnets.add(AllowedSubnet(subnet: trimmedDest, ports: ports, sourceNode: sourceNode));
-          } else if (_nodeIpMap.containsKey(trimmedDest)) {
-            final destNode = _nodeIpMap[trimmedDest]!;
-            if (destNode.id == node.id) continue;
+            // The destination is a subnet (CIDR).
+            final advertiserNode = _routeSourceMap[trimmedDest];
 
-            if (destNode.isExitNode) {
-              allowedExitNodes.add(AllowedExitNode(node: destNode));
+            if (trimmedDest == '0.0.0.0/0' || trimmedDest == '::/0') {
+              // This is a permission to use an exit node.
+              if (advertiserNode != null) {
+                allowedExitNodes.add(AllowedExitNode(
+                    node: advertiserNode, sourceNode: advertiserNode));
+              }
             } else {
-              allowedPeers.add(AllowedPeer(node: destNode, ports: ports));
+              // This is a permission to access a shared LAN.
+              allowedSubnets.add(AllowedSubnet(
+                  subnet: trimmedDest,
+                  ports: ports,
+                  sourceNode: advertiserNode));
             }
+          } else if (_nodeIpMap.containsKey(trimmedDest)) {
+            // The destination is another node's IP.
+            final destNode = _nodeIpMap[trimmedDest]!;
+            if (destNode.id == node.id) continue; // Skip self
 
-            for (var route in destNode.sharedRoutes) {
-              allowedSubnets.add(AllowedSubnet(subnet: route.trim(), ports: ports, sourceNode: destNode));
-            }
+            // This is a peer-to-peer permission.
+            allowedPeers.add(AllowedPeer(node: destNode, ports: ports));
           }
         }
       }
@@ -211,7 +247,8 @@ class AclParserService {
         final existingPorts = uniquePeers[peer.node.id]!.ports;
         final newPorts = {...existingPorts, ...peer.ports}.toSet().toList();
         if (newPorts.length > 1) newPorts.remove('*');
-        uniquePeers[peer.node.id] = AllowedPeer(node: peer.node, ports: newPorts);
+        uniquePeers[peer.node.id] =
+            AllowedPeer(node: peer.node, ports: newPorts);
       } else {
         uniquePeers[peer.node.id] = peer;
       }
@@ -242,15 +279,19 @@ class AclParserService {
       }
     }
 
-    final uniqueExitNodes = LinkedHashMap<String, AllowedExitNode>.fromEntries(
-            allowedExitNodes.map((e) => MapEntry(e.node.id, e)))
-        .values
-        .toList();
+    final uniqueExitNodes = <String, AllowedExitNode>{};
+    for (var exitNode in allowedExitNodes) {
+      if (uniqueExitNodes.containsKey(exitNode.node.id)) {
+        // Potentially merge info if needed in the future, for now, first one wins.
+      } else {
+        uniqueExitNodes[exitNode.node.id] = exitNode;
+      }
+    }
 
     return NodePermission(
       allowedPeers: uniquePeers.values.toList(),
       allowedSubnets: subnetMap.values.toList(),
-      allowedExitNodes: uniqueExitNodes,
+      allowedExitNodes: uniqueExitNodes.values.toList(),
     );
   }
 }
