@@ -39,14 +39,17 @@ class _AclScreenState extends State<AclScreen> {
 
   Future<void> _loadInitialData() async {
     setState(() => _isLoading = true);
-    await _fetchNodes();
+    // No need for listen: false here as it's in initState
     final storage = context.read<AppProvider>().storageService;
+    await _fetchNodes();
     final loadedRules = await storage.getTemporaryRules();
-    setState(() {
-      _temporaryRules.addAll(loadedRules);
-    });
-    await _generateNewAclPolicy(showSnackbar: false);
-    setState(() => _isLoading = false);
+    if (mounted) {
+      setState(() {
+        _temporaryRules.addAll(loadedRules);
+      });
+      await _generateNewAclPolicy(showSnackbar: false);
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _fetchNodes() async {
@@ -67,7 +70,9 @@ class _AclScreenState extends State<AclScreen> {
   void _updateAclControllerText() {
     const JsonEncoder encoder = JsonEncoder.withIndent('  ');
     _aclController.text = encoder.convert(_currentAclPolicy);
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -99,8 +104,8 @@ class _AclScreenState extends State<AclScreen> {
                     const SizedBox(height: 10),
                     TextField(
                       controller: _aclController,
-                      maxLines: 20, // Donne une bonne taille de départ
-                      minLines: 5, // Et une taille minimale
+                      maxLines: 20,
+                      minLines: 5,
                       decoration: _buildInputDecoration('Politique ACL', '')
                           .copyWith(
                               filled: true,
@@ -125,11 +130,13 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   PopupMenuButton<String> _buildActionsMenu() {
+    // This is inside build, so watch is fine. The onSelected callback is the issue.
     final locale = context.watch<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
 
     return PopupMenuButton<String>(
       onSelected: (value) {
+        // We use context.read inside the callbacks
         switch (value) {
           case 'export':
             _exportAclPolicyToServer();
@@ -217,7 +224,7 @@ class _AclScreenState extends State<AclScreen> {
                     (node) {
                       setState(() {
                         _selectedSourceNode = node;
-                        _selectedDestinationNode = null; // Reset destination
+                        _selectedDestinationNode = null;
                         if (node != null) {
                           _destinationNodes = _allNodes
                               .where((n) => n.user != node.user)
@@ -235,7 +242,7 @@ class _AclScreenState extends State<AclScreen> {
                   child: _buildNodeDropdown(
                     'Destination (Node)',
                     _selectedDestinationNode,
-                    _destinationNodes, // Use the filtered list
+                    _destinationNodes,
                     (node) => setState(() => _selectedDestinationNode = node),
                   ),
                 ),
@@ -292,13 +299,11 @@ class _AclScreenState extends State<AclScreen> {
                 final dst = rule['dst'] as String;
                 final port = rule['port'] as String?;
 
-                final isSubnetRule = !(dst.startsWith('tag:'));
+                final srcNodeName = _getNodeNameFromIpOrSubnet(src);
+                final dstNodeName = _getNodeNameFromIpOrSubnet(dst);
 
-                final label = isSubnetRule
-                    ? '$src -> $dst:${port ?? '*'}'
-                    : (port != null && port.isNotEmpty
-                        ? '$src <-> $dst:$port'
-                        : '$src <-> $dst');
+                final label =
+                    '$srcNodeName -> $dstNodeName:${port != null && port.isNotEmpty ? port : '*'}';
 
                 return Chip(
                   label: Text(label, overflow: TextOverflow.ellipsis),
@@ -315,6 +320,18 @@ class _AclScreenState extends State<AclScreen> {
         ),
       ),
     );
+  }
+
+  String _getNodeNameFromIpOrSubnet(String ipOrSubnet) {
+    try {
+      return _allNodes
+          .firstWhere((node) =>
+              node.ipAddresses.contains(ipOrSubnet) ||
+              node.sharedRoutes.contains(ipOrSubnet))
+          .name;
+    } catch (e) {
+      return ipOrSubnet;
+    }
   }
 
   DropdownButtonFormField<Node> _buildNodeDropdown(String label,
@@ -353,27 +370,15 @@ class _AclScreenState extends State<AclScreen> {
 
   bool _ruleExists(Map<String, dynamic> newRule) {
     return _temporaryRules.any((rule) {
-      final isNewRuleSubnet = !(newRule['dst'] as String).startsWith('tag:');
-      final isOldRuleSubnet = !(rule['dst'] as String).startsWith('tag:');
-
       final bool srcMatch = rule['src'] == newRule['src'];
       final bool dstMatch = rule['dst'] == newRule['dst'];
       final bool portMatch = (rule['port'] ?? '') == (newRule['port'] ?? '');
-
-      if (isNewRuleSubnet || isOldRuleSubnet) {
-        // For subnet rules, we do an exact one-way match
-        return srcMatch && dstMatch && portMatch;
-      } else {
-        // For tag-to-tag rules, check both ways
-        final bool reverseSrcMatch = rule['src'] == newRule['dst'];
-        final bool reverseDstMatch = rule['dst'] == newRule['src'];
-        return ((srcMatch && dstMatch) || (reverseSrcMatch && reverseDstMatch)) &&
-            portMatch;
-      }
+      return srcMatch && dstMatch && portMatch;
     });
   }
 
   Future<void> _addTemporaryRule() async {
+    if (!mounted) return;
     final locale = context.read<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
 
@@ -388,17 +393,17 @@ class _AclScreenState extends State<AclScreen> {
       return;
     }
 
-    if (_selectedSourceNode!.tags.isEmpty) {
+    if (_selectedSourceNode!.ipAddresses.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               isFr
-                  ? 'Le nœud source doit avoir au moins un tag.'
-                  : 'Source node must have at least one tag.',
+                  ? 'Le nœud source doit avoir au moins une adresse IP.'
+                  : 'Source node must have at least one IP address.',
               style: TextStyle(color: Theme.of(context).colorScheme.onError)),
           backgroundColor: Theme.of(context).colorScheme.error));
       return;
     }
-    final sourceTag = _selectedSourceNode!.tags.first;
+    final sourceIp = _selectedSourceNode!.ipAddresses.first;
 
     List<Map<String, dynamic>> newRulesToAdd = [];
 
@@ -415,7 +420,7 @@ class _AclScreenState extends State<AclScreen> {
         ),
       );
 
-      if (result == null) return; // Dialog was cancelled
+      if (result == null) return;
 
       final choice = result['choice'] as RouteAccessChoice;
       final rules = result['rules'] as Map<String, dynamic>;
@@ -431,7 +436,7 @@ class _AclScreenState extends State<AclScreen> {
       if (choice == RouteAccessChoice.full) {
         for (var route in sharedLanRoutes) {
           newRulesToAdd.add({
-            'src': sourceTag,
+            'src': sourceIp,
             'dst': route,
             'port': '*',
           });
@@ -442,7 +447,7 @@ class _AclScreenState extends State<AclScreen> {
           final endIp = (ruleDetails['endIp'] as String).trim();
           final ports = (ruleDetails['ports'] as String).trim();
 
-          if (startIp.isEmpty) return; // Skip if no IP is specified
+          if (startIp.isEmpty) return;
 
           String dst;
           if (endIp.isNotEmpty) {
@@ -454,7 +459,7 @@ class _AclScreenState extends State<AclScreen> {
 
           if (dst.isNotEmpty) {
             newRulesToAdd.add({
-              'src': sourceTag,
+              'src': sourceIp,
               'dst': dst,
               'port': ports.isEmpty ? '*' : ports,
             });
@@ -462,35 +467,33 @@ class _AclScreenState extends State<AclScreen> {
         });
       }
     } else {
-      if (_selectedDestinationNode!.tags.isEmpty) {
+      if (_selectedDestinationNode!.ipAddresses.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(
                 isFr
-                    ? 'Le nœud destination doit avoir au moins un tag.'
-                    : 'Destination node must have at least one tag.',
-                style:
-                    TextStyle(color: Theme.of(context).colorScheme.onError)),
+                    ? 'Le nœud destination doit avoir au moins une adresse IP.'
+                    : 'Destination node must have at least one IP address.',
+                style: TextStyle(color: Theme.of(context).colorScheme.onError)),
             backgroundColor: Theme.of(context).colorScheme.error));
         return;
       }
-      final destinationTag = _selectedDestinationNode!.tags.first;
+      final destinationIp = _selectedDestinationNode!.ipAddresses.first;
 
-      if (sourceTag == destinationTag) {
+      if (sourceIp == destinationIp) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(
                 isFr
-                    ? 'Les tags principaux ne peuvent pas être identiques.'
-                    : 'Main tags cannot be the same.',
-                style:
-                    TextStyle(color: Theme.of(context).colorScheme.onError)),
+                    ? 'Les nœuds source et destination ne peuvent pas être identiques.'
+                    : 'Source and destination nodes cannot be the same.',
+                style: TextStyle(color: Theme.of(context).colorScheme.onError)),
             backgroundColor: Theme.of(context).colorScheme.error));
         return;
       }
 
       final port = _portController.text.trim();
       newRulesToAdd.add({
-        'src': sourceTag,
-        'dst': destinationTag,
+        'src': sourceIp,
+        'dst': destinationIp,
         'port': port,
       });
     }
@@ -523,6 +526,7 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Future<void> _generateNewAclPolicy({bool showSnackbar = true}) async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final appProvider = context.read<AppProvider>();
@@ -541,7 +545,7 @@ class _AclScreenState extends State<AclScreen> {
 
       _updateAclControllerText();
 
-      final locale = context.read<AppProvider>().locale;
+      final locale = appProvider.locale;
       final isFr = locale.languageCode == 'fr';
 
       if (showSnackbar && mounted) {
@@ -597,6 +601,7 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Future<void> _removeTemporaryRule(int index) async {
+    if (!mounted) return;
     final locale = context.read<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
 
@@ -635,6 +640,7 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Future<void> _clearTemporaryRules() async {
+    if (!mounted) return;
     final locale = context.read<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
 
@@ -679,6 +685,7 @@ class _AclScreenState extends State<AclScreen> {
 
   Future<void> _exportAclPolicyToServer(
       {bool showConfirmation = true, String? successMessage}) async {
+    if (!mounted) return;
     final locale = context.read<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
 
@@ -736,8 +743,6 @@ class _AclScreenState extends State<AclScreen> {
       debugPrint(
           'Erreur lors de l\'exportation de la politique ACL vers le serveur : $e');
       if (mounted) {
-        final locale = context.read<AppProvider>().locale;
-        final isFr = locale.languageCode == 'fr';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
@@ -755,14 +760,15 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Future<void> _fetchAclPolicyFromServer() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final apiService = context.read<AppProvider>().apiService;
+      final appProvider = context.read<AppProvider>();
+      final apiService = appProvider.apiService;
       final aclJsonString = await apiService.getAclPolicy();
       _currentAclPolicy = json.decode(aclJsonString);
-      // On ne vide plus les règles temporaires, on les garde
       _updateAclControllerText();
-      final locale = context.read<AppProvider>().locale;
+      final locale = appProvider.locale;
       final isFr = locale.languageCode == 'fr';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -799,6 +805,7 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Future<void> _shareAclFile() async {
+    if (!mounted) return;
     try {
       const JsonEncoder encoder = JsonEncoder.withIndent('  ');
       final String aclJsonString = encoder.convert(_currentAclPolicy);
@@ -843,6 +850,7 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   Future<void> _resetAclPolicy() async {
+    if (!mounted) return;
     final locale = context.read<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
 
@@ -890,7 +898,6 @@ class _AclScreenState extends State<AclScreen> {
     const JsonEncoder encoder = JsonEncoder.withIndent('  ');
     _aclController.text = encoder.convert(defaultPolicy);
 
-    // Also clear temporary rules as they are now irrelevant
     setState(() {
       _temporaryRules.clear();
     });
