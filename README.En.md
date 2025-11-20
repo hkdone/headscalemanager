@@ -10,6 +10,8 @@ This application is a flutter application and allows you to compile for IOS, MAC
 The code is free to use.
 However, please be aware that I have published the application for free on the Play Store and I am not responsible for any paid version on the App Store that a user might publish.
 
+![AISelect_20251120_140826](https://github.com/user-attachments/assets/9f88d2b5-77b6-4129-bed5-70f32e558765)
+
 
 ## How it works: API
 
