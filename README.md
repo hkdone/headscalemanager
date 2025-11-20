@@ -10,6 +10,8 @@ Cette application est une application flutter et vous permet de compiler pour IO
 Le code est libre d'utilisation.
 Sachez toutefois que j'ai publié gratuitement l'application sur le playstore et que je ne suis pas responsable d'une version payante sur applestore qu'un utilisateur pourrais publier.
 
+![AISelect_20251120_140826](https://github.com/user-attachments/assets/c4026256-2474-4ded-bc26-67302d825d54)
+
 
 ## Fonctionnement : API
 
