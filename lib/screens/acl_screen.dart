@@ -420,20 +420,50 @@ class _AclScreenState extends State<AclScreen> {
         ),
       );
 
-      if (result == null) return;
+      // Debug: Afficher le résultat reçu du dialogue
+      debugPrint('DEBUG: Résultat reçu du dialogue: $result');
+
+      if (result == null) {
+        debugPrint('DEBUG: Résultat est null, arrêt du processus');
+        return;
+      }
+
+      try {
+        final choice = result['choice'] as RouteAccessChoice;
+        final rules = result['rules'] as Map<String, dynamic>;
+
+        // Debug: Afficher le choix et les règles extraites
+        debugPrint('DEBUG: Choix extrait: $choice');
+        debugPrint('DEBUG: Règles extraites: $rules');
+      } catch (e) {
+        debugPrint('DEBUG: Erreur lors de l\'extraction du choix/règles: $e');
+        debugPrint(
+            'DEBUG: Type de result[\'choice\']: ${result['choice'].runtimeType}');
+        return;
+      }
 
       final choice = result['choice'] as RouteAccessChoice;
       final rules = result['rules'] as Map<String, dynamic>;
 
       if (choice == RouteAccessChoice.none) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content:
-              Text(isFr ? 'Aucun accès configuré.' : 'No access configured.'),
-        ));
-        return;
-      }
-
-      if (choice == RouteAccessChoice.full) {
+        // Fallback: add rule for the node itself if subnet access is denied
+        if (_selectedDestinationNode!.ipAddresses.isNotEmpty) {
+          final destinationIp = _selectedDestinationNode!.ipAddresses.first;
+          final port = _portController.text.trim();
+          newRulesToAdd.add({
+            'src': sourceIp,
+            'dst': destinationIp,
+            'port': port.isEmpty ? '*' : port,
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(isFr
+                ? 'Accès au sous-réseau non configuré et le nœud n\'a pas d\'IP pour une règle de base.'
+                : 'Subnet access not configured and the node has no IP for a fallback rule.'),
+          ));
+          return;
+        }
+      } else if (choice == RouteAccessChoice.full) {
         for (var route in sharedLanRoutes) {
           newRulesToAdd.add({
             'src': sourceIp,
@@ -499,13 +529,22 @@ class _AclScreenState extends State<AclScreen> {
     }
 
     int addedCount = 0;
+
+    // Debug: Afficher les règles à ajouter
+    debugPrint('DEBUG: Nombre de règles à ajouter: ${newRulesToAdd.length}');
+    for (var rule in newRulesToAdd) {
+      debugPrint('DEBUG: Règle à ajouter: $rule');
+    }
+
     for (var newRule in newRulesToAdd) {
       if (!_ruleExists(newRule)) {
         setState(() {
           _temporaryRules.add(newRule);
           addedCount++;
         });
+        debugPrint('DEBUG: Règle ajoutée: $newRule');
       } else {
+        debugPrint('DEBUG: Règle ignorée (existe déjà): $newRule');
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(
                 '${isFr ? 'Règle ignorée car elle existe déjà:' : 'Skipped existing rule:'} ${newRule['dst']}',
@@ -515,6 +554,8 @@ class _AclScreenState extends State<AclScreen> {
       }
     }
 
+    debugPrint('DEBUG: Nombre de règles ajoutées: $addedCount');
+
     if (addedCount > 0) {
       final storage = context.read<AppProvider>().storageService;
       await storage.saveTemporaryRules(_temporaryRules);
@@ -522,6 +563,13 @@ class _AclScreenState extends State<AclScreen> {
           message: isFr
               ? '$addedCount règle(s) ajoutée(s) et politique appliquée.'
               : '$addedCount rule(s) added and policy applied.');
+    } else {
+      // Debug: Afficher un message si aucune règle n'a été ajoutée
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              isFr ? 'Aucune règle n\'a été ajoutée.' : 'No rules were added.',
+              style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+          backgroundColor: Theme.of(context).colorScheme.error));
     }
   }
 

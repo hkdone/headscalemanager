@@ -1,5 +1,4 @@
 import 'dart:collection';
-
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/utils/ip_utils.dart';
@@ -33,15 +32,21 @@ class AllowedPeer {
 }
 
 class AllowedSubnet {
-  final String subnet;
+  final String subnet; // Le sous-réseau parent (ex: 192.168.1.0/24)
+  final String specificRule; // La règle spécifique (ex: 192.168.1.22)
   final List<String> ports;
   final Node? sourceNode;
 
-  AllowedSubnet({required this.subnet, required this.ports, this.sourceNode});
+  AllowedSubnet({
+    required this.subnet,
+    required this.specificRule,
+    required this.ports,
+    this.sourceNode,
+  });
 
   @override
   String toString() =>
-      '$subnet (from ${sourceNode?.name ?? "unknown"}) (${ports.join(',')})';
+      '$specificRule (dans $subnet via ${sourceNode?.name ?? "unknown"}) (${ports.join(',')})';
 }
 
 class AllowedExitNode {
@@ -175,7 +180,10 @@ class AclParserService {
 
       final List<String> sources = (rule['src'] as List).cast<String>();
       final sourceIps = sources.expand((s) => _resolveAlias(s, node)).toSet();
-      if (!sourceIps.any((ip) => node.ipAddresses.contains(ip))) {
+
+      // Vérifie si le nœud actuel est concerné par la source
+      bool isSource = sourceIps.any((ip) => node.ipAddresses.contains(ip));
+      if (!isSource && !sources.contains('*')) {
         continue;
       }
 
@@ -211,36 +219,54 @@ class AclParserService {
         for (var destIpOrCidr in resolvedDestIpsOrCidrs) {
           final trimmedDest = destIpOrCidr.trim();
 
-          if (IpUtils.isCIDR(trimmedDest)) {
-            // The destination is a subnet (CIDR).
+          // CAS 1 : Correspondance exacte
+          if (_routeSourceMap.containsKey(trimmedDest)) {
             final advertiserNode = _routeSourceMap[trimmedDest];
-
             if (trimmedDest == '0.0.0.0/0' || trimmedDest == '::/0') {
-              // This is a permission to use an exit node.
               if (advertiserNode != null) {
                 allowedExitNodes.add(AllowedExitNode(
                     node: advertiserNode, sourceNode: advertiserNode));
               }
             } else {
-              // This is a permission to access a shared LAN.
               allowedSubnets.add(AllowedSubnet(
                   subnet: trimmedDest,
+                  specificRule: trimmedDest,
                   ports: ports,
                   sourceNode: advertiserNode));
             }
-          } else if (_nodeIpMap.containsKey(trimmedDest)) {
-            // The destination is another node's IP.
-            final destNode = _nodeIpMap[trimmedDest]!;
-            if (destNode.id == node.id) continue; // Skip self
+          }
+          // CAS 2 : Inclusion (Calcul mathématique)
+          else {
+            bool foundParentRoute = false;
 
-            // This is a peer-to-peer permission.
-            allowedPeers.add(AllowedPeer(node: destNode, ports: ports));
+            for (var knownRoute in _routeSourceMap.keys) {
+              if (knownRoute == '0.0.0.0/0' || knownRoute == '::/0') continue;
+
+              // Utilisation du nouveau helper
+              if (_isIpInSubnet(trimmedDest, knownRoute)) {
+                final advertiserNode = _routeSourceMap[knownRoute];
+                allowedSubnets.add(AllowedSubnet(
+                    subnet: knownRoute, // Parent
+                    specificRule: trimmedDest, // Règle spécifique
+                    ports: ports,
+                    sourceNode: advertiserNode));
+                foundParentRoute = true;
+                break;
+              }
+            }
+
+            // CAS 3 : Peer direct
+            if (!foundParentRoute && _nodeIpMap.containsKey(trimmedDest)) {
+              final destNode = _nodeIpMap[trimmedDest]!;
+              if (destNode.id != node.id) {
+                allowedPeers.add(AllowedPeer(node: destNode, ports: ports));
+              }
+            }
           }
         }
       }
     }
 
-    // Deduplicate and merge permissions
     final uniquePeers = <String, AllowedPeer>{};
     for (var peer in allowedPeers) {
       if (uniquePeers.containsKey(peer.node.id)) {
@@ -254,44 +280,56 @@ class AclParserService {
       }
     }
 
-    final subnetMap = <String, AllowedSubnet>{};
-    for (var subnet in allowedSubnets) {
-      final key = subnet.subnet.trim();
-      if (subnetMap.containsKey(key)) {
-        final existing = subnetMap[key]!;
-        final newPorts = {...existing.ports, ...subnet.ports}.toSet().toList();
-        if (newPorts.length > 1) newPorts.remove('*');
-
-        // Prefer the entry that has a source node.
-        final sourceNode = subnet.sourceNode ?? existing.sourceNode;
-
-        subnetMap[key] = AllowedSubnet(
-          subnet: key,
-          ports: newPorts,
-          sourceNode: sourceNode,
-        );
-      } else {
-        subnetMap[key] = AllowedSubnet(
-          subnet: key,
-          ports: subnet.ports,
-          sourceNode: subnet.sourceNode,
-        );
-      }
-    }
-
     final uniqueExitNodes = <String, AllowedExitNode>{};
     for (var exitNode in allowedExitNodes) {
-      if (uniqueExitNodes.containsKey(exitNode.node.id)) {
-        // Potentially merge info if needed in the future, for now, first one wins.
-      } else {
+      if (!uniqueExitNodes.containsKey(exitNode.node.id)) {
         uniqueExitNodes[exitNode.node.id] = exitNode;
       }
     }
 
     return NodePermission(
       allowedPeers: uniquePeers.values.toList(),
-      allowedSubnets: subnetMap.values.toList(),
+      allowedSubnets: allowedSubnets,
       allowedExitNodes: uniqueExitNodes.values.toList(),
     );
+  }
+
+  // --- NOUVEAUX HELPERS ---
+
+  bool _isIpInSubnet(String ipStr, String cidrStr) {
+    try {
+      if (!cidrStr.contains('/')) return ipStr == cidrStr;
+
+      final parts = cidrStr.split('/');
+      final subnetIpStr = parts[0];
+      final prefixLength = int.parse(parts[1]);
+
+      if (ipStr.contains('.') && subnetIpStr.contains('.')) {
+        return _isIPv4InSubnet(ipStr, subnetIpStr, prefixLength);
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  bool _isIPv4InSubnet(String ip, String subnetIp, int prefixLength) {
+    try {
+      int ipInt = _ipToInt(ip);
+      int subnetInt = _ipToInt(subnetIp);
+      int mask = (0xffffffff << (32 - prefixLength)) & 0xffffffff;
+      return (ipInt & mask) == (subnetInt & mask);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  int _ipToInt(String ip) {
+    final parts = ip.split('.');
+    if (parts.length != 4) throw FormatException('Invalid IPv4');
+    return (int.parse(parts[0]) << 24) |
+        (int.parse(parts[1]) << 16) |
+        (int.parse(parts[2]) << 8) |
+        int.parse(parts[3]);
   }
 }

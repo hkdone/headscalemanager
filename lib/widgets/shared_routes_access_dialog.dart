@@ -71,10 +71,10 @@ class _SharedRoutesAccessDialogState extends State<SharedRoutesAccessDialog> {
   List<Widget> _buildChoiceRadios(bool isFr) {
     return [
       RadioListTile<RouteAccessChoice>(
-        title: Text(isFr ? 'Aucun accès' : 'No access'),
+        title: Text(isFr ? 'Accès au nœud uniquement' : 'Node access only'),
         subtitle: Text(isFr
-            ? 'Ne pas autoriser l\'accès aux routes partagées'
-            : 'Do not allow access to shared routes'),
+            ? 'Autoriser l\'accès au nœud mais pas aux sous-réseaux partagés'
+            : 'Allow access to the node but not to shared subnets'),
         value: RouteAccessChoice.none,
         groupValue: _choice,
         onChanged: (value) => setState(() => _choice = value!),
@@ -82,8 +82,8 @@ class _SharedRoutesAccessDialogState extends State<SharedRoutesAccessDialog> {
       RadioListTile<RouteAccessChoice>(
         title: Text(isFr ? 'Accès total' : 'Full access'),
         subtitle: Text(isFr
-            ? 'Autoriser l\'accès à toutes les routes partagées'
-            : 'Allow access to all shared routes'),
+            ? 'Autoriser l\'accès au nœud et à toutes les routes partagées'
+            : 'Allow access to the node and all shared routes'),
         value: RouteAccessChoice.full,
         groupValue: _choice,
         onChanged: (value) => setState(() => _choice = value!),
@@ -118,6 +118,10 @@ class _SharedRoutesAccessDialogState extends State<SharedRoutesAccessDialog> {
 
   void _handleConfirm() {
     final isFr = Localizations.localeOf(context).languageCode == 'fr';
+    
+    // Debug: Afficher le choix sélectionné
+    debugPrint('DEBUG DIALOG: Choix sélectionné: $_choice');
+    
     if (_choice == RouteAccessChoice.custom) {
       // Validate all custom rules before popping
       for (var route in _lanRoutes) {
@@ -163,6 +167,10 @@ class _SharedRoutesAccessDialogState extends State<SharedRoutesAccessDialog> {
             'ports': value.portsController.text,
           })),
     };
+    
+    // Debug: Afficher le résultat qui va être retourné
+    debugPrint('DEBUG DIALOG: Résultat retourné: $result');
+    
     Navigator.of(context).pop(result);
   }
 

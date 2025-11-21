@@ -66,7 +66,8 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
     // Utilisation du Painter "Fibre Optique" personnalisé
     _algorithm = TidierTreeLayoutAlgorithm(
       _configuration,
-      FiberCurvedEdgePainter(_configuration, _animationController, _idToNodeMap),
+      FiberCurvedEdgePainter(
+          _configuration, _animationController, _idToNodeMap),
     );
 
     _nodeAlgorithm = TidierTreeLayoutAlgorithm(
@@ -98,6 +99,8 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
       _buildGraph();
 
       _algorithm.run(graph, 0, 0);
+
+      // C'est ici que l'on force le repositionnement des icônes sous leur parent
       _adjustNodePositions();
 
       // --- CENTRAGE ET ZOOM AUTOMATIQUE ---
@@ -152,7 +155,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
   }
 
   void _adjustNodePositions() {
-    // Centrer les "shared peers" entre leurs parents
+    // 1. Centrer les "shared peers" entre leurs parents
     final sharedPeerNodes = graph.nodes
         .where((n) => (n.key?.value as String).startsWith('shared_peer_'))
         .toList();
@@ -169,19 +172,49 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
       }
     }
 
-    // Centrer les symboles LAN et Exit sous leur machine parente
+    // 2. FORCER les symboles LAN et Exit à rester sous leur PROPRIÉTAIRE (Source)
     final symbolNodes = graph.nodes.where((n) {
       final id = n.key?.value as String;
       return id.startsWith('lan_symbol_') || id.startsWith('internet_symbol_');
     }).toList();
 
     for (var symbolNode in symbolNodes) {
-      final parentEdge = graph.edges.firstWhere(
-          (e) => e.destination == symbolNode,
-          orElse: () => Edge(Node.Id(''), Node.Id('')));
-      if (parentEdge.source.key != null) {
-        final parentNode = parentEdge.source;
-        symbolNode.x = parentNode.x;
+      final symbolId = symbolNode.key?.value as String;
+      headscale_node.Node? ownerNode;
+
+      // a) Identifier le nœud propriétaire
+      if (symbolId.startsWith('internet_symbol_')) {
+        final ownerId = symbolId.substring(16);
+        ownerNode = _idToNodeMap[ownerId];
+      } else if (symbolId.startsWith('lan_symbol_')) {
+        // Format: lan_symbol_192.168.1.0_24
+        final route = symbolId.substring(11).replaceAll('_', '/');
+
+        // On cherche dans la liste globale quel noeud possède cette route
+        try {
+          ownerNode = widget.nodes.firstWhere(
+            (n) => n.sharedRoutes.contains(route),
+          );
+        } catch (e) {
+          // Si non trouvé (rare), on ignore
+        }
+      }
+
+      // b) Appliquer la position forcée
+      if (ownerNode != null) {
+        try {
+          // Retrouver l'objet Node du graphe correspondant au propriétaire
+          final ownerGraphNode = graph.nodes
+              .firstWhere((n) => n.key?.value == 'machine_${ownerNode!.id}');
+
+          // On force la position X pour qu'elle soit identique à celle du propriétaire
+          symbolNode.x = ownerGraphNode.x;
+
+          // On force la position Y pour qu'elle soit juste en dessous (offset fixe)
+          symbolNode.y = ownerGraphNode.y + 120; // 120px plus bas
+        } catch (e) {
+          // Le noeud propriétaire n'est pas dans le graphe ?
+        }
       }
     }
   }
@@ -205,7 +238,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
     final machineNodeMap = <String, Node>{};
     final routeSymbolMap = <String, Node>{};
 
-    // --- Pass 1: Nodes ---
+    // --- Pass 1: Nodes & Structure ---
     final serverNode = Node.Id('server_headscale_server');
     graph.addNode(serverNode);
 
@@ -244,6 +277,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
           routeSymbolMap[symbolId] = routeSymbolNode;
           graph.addNode(routeSymbolNode);
         }
+        // Lien rouge structurel (Propriétaire -> Route)
         graph.addEdge(machineNode, routeSymbolNode,
             paint: Paint()
               ..color = const Color.fromARGB(255, 255, 0, 0)
@@ -258,6 +292,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
       final permissions = _parser.getPermissionsForNode(machine);
 
       for (var subnetPermission in permissions.allowedSubnets) {
+        // IMPORTANT : On utilise subnetPermission.subnet (le PARENT) pour lier graphiquement
         final trimmedRoute = subnetPermission.subnet.trim();
         final symbolId = 'lan_symbol_${trimmedRoute.replaceAll('/', '_')}';
         final routeSymbolNode = routeSymbolMap[symbolId];
@@ -486,13 +521,86 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
                 'Le trafic passe par la machine "${machine?.name ?? 'Inconnue'}" qui agit comme passerelle de sortie.',
                 style: const TextStyle(fontWeight: FontWeight.bold)));
           } else if (itemData['type'] == 'lan') {
+            // --- DÉTAILS LAN (AVEC ANALYSE DES PERMISSIONS) ---
+            final routeCidr = itemData['route'] as String;
             title = 'Réseau Local (Subnet)';
-            content.add(Text('Route : ${itemData['route']}',
+
+            content.add(Text('Route : $routeCidr',
                 style: const TextStyle(
                     fontSize: 18, fontWeight: FontWeight.bold)));
             content.add(const SizedBox(height: 10));
             content.add(const Text(
                 'Ce symbole indique qu\'une machine partage l\'accès à ce réseau local interne (Advertise Routes).'));
+
+            content.add(const Divider());
+            content.add(const Text('Accès autorisés :',
+                style: TextStyle(fontWeight: FontWeight.bold)));
+            content.add(const SizedBox(height: 8));
+
+            // Analyser qui a accès à CE symbole spécifique
+            final accessingNodes = <Widget>[];
+
+            // On parcourt tous les nœuds pour voir qui pointe vers CE subnet
+            for (var node in widget.nodes) {
+              final perms = _parser.getPermissionsForNode(node);
+
+              // On cherche les permissions qui pointent vers CE subnet parent
+              final matchingPerms = perms.allowedSubnets
+                  .where((s) => s.subnet == routeCidr)
+                  .toList();
+
+              if (matchingPerms.isNotEmpty) {
+                final List<String> accessDetails = [];
+                bool fullAccess = false;
+
+                for (var p in matchingPerms) {
+                  if (p.specificRule == p.subnet) {
+                    fullAccess = true;
+                  } else {
+                    final ports = p.ports.contains('*')
+                        ? 'Tout port'
+                        : 'Ports: ${p.ports.join(',')}';
+                    accessDetails.add('${p.specificRule} ($ports)');
+                  }
+                }
+
+                String statusText = '';
+                if (fullAccess) {
+                  statusText = 'Accès complet';
+                } else {
+                  statusText = 'Partiel : ${accessDetails.join(', ')}';
+                }
+
+                accessingNodes.add(Padding(
+                  padding: const EdgeInsets.only(bottom: 4.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2.0),
+                        child: Icon(Icons.check_circle_outline,
+                            size: 16, color: Colors.green[700]),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('${node.name} : ',
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(
+                          child: Text(statusText,
+                              style: const TextStyle(fontSize: 12))),
+                    ],
+                  ),
+                ));
+              }
+            }
+
+            if (accessingNodes.isEmpty) {
+              content.add(const Text(
+                  'Aucun accès détecté pour d\'autres machines.',
+                  style: TextStyle(
+                      fontStyle: FontStyle.italic, color: Colors.grey)));
+            } else {
+              content.addAll(accessingNodes);
+            }
           } else if (itemData['type'] == 'shared_peer') {
             final node1 = itemData['node1'] as headscale_node.Node?;
             final node2 = itemData['node2'] as headscale_node.Node?;

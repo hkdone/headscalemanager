@@ -181,7 +181,22 @@ class _AddAclRuleDialogState extends State<AddAclRuleDialog> {
       final rules = result['rules'] as Map<String, dynamic>;
 
       if (choice == RouteAccessChoice.none) {
-        return;
+        // Fallback: add rule for the node itself if subnet access is denied
+        if (_selectedDestinationNode!.ipAddresses.isNotEmpty) {
+          final destinationIp = _selectedDestinationNode!.ipAddresses.first;
+          final port = _portController.text.trim();
+          newRulesToAdd.add({
+            'src': sourceIp,
+            'dst': destinationIp,
+            'port': port.isEmpty ? '*' : port,
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(isFr ? 'Accès au sous-réseau non configuré et le nœud n\'a pas d\'IP pour une règle de base.' : 'Subnet access not configured and the node has no IP for a fallback rule.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ));
+          return;
+        }
       }
 
       if (choice == RouteAccessChoice.full) {
