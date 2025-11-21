@@ -4,6 +4,7 @@ import 'package:headscalemanager/screens/acl_screen.dart';
 import 'package:headscalemanager/screens/dashboard_screen.dart';
 import 'package:headscalemanager/screens/acl_manager_screen.dart';
 import 'package:headscalemanager/screens/network_overview_screen.dart';
+import 'package:headscalemanager/screens/ha_management_screen.dart';
 import 'package:headscalemanager/screens/settings_screen.dart';
 import 'package:headscalemanager/screens/users_screen.dart';
 import 'package:eva_icons_flutter/eva_icons_flutter.dart';
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
     AclScreen(),
     AclManagerScreen(),
     NetworkOverviewScreen(),
+    HaManagementScreen(),
   ];
 
   /// Gère le changement d'élément sélectionné dans la barre de navigation.
@@ -109,6 +111,11 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: const Icon(EvaIcons.globe2Outline),
             label: isFr ? 'Réseau' : 'Network',
+          ),
+          // Élément pour la gestion HA.
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.group_work),
+            label: 'HA',
           ),
         ],
         currentIndex: _selectedIndex, // Index de l'élément actuellement actif.

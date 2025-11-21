@@ -187,16 +187,22 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
         final ownerId = symbolId.substring(16);
         ownerNode = _idToNodeMap[ownerId];
       } else if (symbolId.startsWith('lan_symbol_')) {
-        // Format: lan_symbol_192.168.1.0_24
-        final route = symbolId.substring(11).replaceAll('_', '/');
-
-        // On cherche dans la liste globale quel noeud possède cette route
-        try {
-          ownerNode = widget.nodes.firstWhere(
-            (n) => n.sharedRoutes.contains(route),
-          );
-        } catch (e) {
-          // Si non trouvé (rare), on ignore
+        // Nouveau format: lan_symbol_nodeId_192.168.1.0_24
+        final parts = symbolId.substring(11).split('_');
+        if (parts.length >= 3) {
+          // Nouveau format avec nodeId
+          final nodeId = parts[0];
+          ownerNode = _idToNodeMap[nodeId];
+        } else {
+          // Ancien format: lan_symbol_192.168.1.0_24
+          final route = symbolId.substring(11).replaceAll('_', '/');
+          try {
+            ownerNode = widget.nodes.firstWhere(
+              (n) => n.sharedRoutes.contains(route),
+            );
+          } catch (e) {
+            // Si non trouvé (rare), on ignore
+          }
         }
       }
 
@@ -267,7 +273,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
             trimmedRoute == '0.0.0.0/0' || trimmedRoute == '::/0';
         final symbolId = isExitRoute
             ? 'internet_symbol_${machine.id}'
-            : 'lan_symbol_${trimmedRoute.replaceAll('/', '_')}';
+            : 'lan_symbol_${machine.id}_${trimmedRoute.replaceAll('/', '_')}';
 
         Node routeSymbolNode;
         if (routeSymbolMap.containsKey(symbolId)) {
@@ -294,7 +300,17 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
       for (var subnetPermission in permissions.allowedSubnets) {
         // IMPORTANT : On utilise subnetPermission.subnet (le PARENT) pour lier graphiquement
         final trimmedRoute = subnetPermission.subnet.trim();
-        final symbolId = 'lan_symbol_${trimmedRoute.replaceAll('/', '_')}';
+        // Trouver le nœud propriétaire de cette route pour construire le bon symbolId
+        String? ownerNodeId;
+        for (var node in widget.nodes) {
+          if (node.sharedRoutes.contains(trimmedRoute)) {
+            ownerNodeId = node.id;
+            break;
+          }
+        }
+        final symbolId = ownerNodeId != null 
+            ? 'lan_symbol_${ownerNodeId}_${trimmedRoute.replaceAll('/', '_')}'
+            : 'lan_symbol_${trimmedRoute.replaceAll('/', '_')}'; // Fallback
         final routeSymbolNode = routeSymbolMap[symbolId];
 
         if (routeSymbolNode != null) {
@@ -466,6 +482,20 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
       return {'type': 'internet', 'machine': machine};
     }
     if (prefixedId.startsWith('lan_symbol_')) {
+      // Nouveau format: lan_symbol_nodeId_192.168.1.0_24
+      final parts = prefixedId.substring(11).split('_');
+      if (parts.length >= 3) {
+        final nodeId = parts[0];
+        final routeParts = parts.sublist(1);
+        final route = routeParts.join('_').replaceAll('_', '/');
+        final ownerNode = _idToNodeMap[nodeId];
+        return {
+          'type': 'lan', 
+          'route': route, 
+          'owner': ownerNode
+        };
+      }
+      // Fallback pour ancien format
       final route = prefixedId.substring(11).replaceAll('_', '/');
       return {'type': 'lan', 'route': route};
     }

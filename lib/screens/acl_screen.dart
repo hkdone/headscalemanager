@@ -119,12 +119,20 @@ class _AclScreenState extends State<AclScreen> {
                 ),
               ),
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _generateNewAclPolicy(showSnackbar: true),
-        label: Text(isFr ? 'Générer la Politique' : 'Generate Policy'),
-        icon: const Icon(Icons.settings_backup_restore),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        heroTag: 'generate_policy_fab',
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            onPressed: () => _generateNewAclPolicy(showSnackbar: true),
+            label: Text(isFr
+                ? 'Générer Politique Standard'
+                : 'Generate Standard Policy'),
+            icon: const Icon(Icons.settings_backup_restore),
+            backgroundColor: Theme.of(context).colorScheme.secondary,
+            heroTag: 'generate_policy_fab',
+          ),
+          const SizedBox(height: 10),
+        ],
       ),
     );
   }
