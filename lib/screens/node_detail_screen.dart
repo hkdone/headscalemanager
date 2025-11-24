@@ -1,7 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
+import 'package:headscalemanager/services/new_acl_generator_service.dart';
+import 'package:headscalemanager/services/route_conflict_service.dart';
+import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:dart_ping/dart_ping.dart';
 import 'dart:async';
@@ -184,8 +188,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
               style: theme.textTheme.headlineSmall
                   ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text(
-              '${isFr ? 'Utilisateur' : 'User'}: ${_currentNode.user}',
+          Text('${isFr ? 'Utilisateur' : 'User'}: ${_currentNode.user}',
               style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(
@@ -202,8 +205,13 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
 
     return _SectionCard(
       child: SwitchListTile(
-        title: Text(isFr ? 'Surveiller le statut' : 'Monitor Status', style: theme.textTheme.titleMedium),
-        subtitle: Text(isFr ? 'Recevoir une notification si le nœud se connecte ou se déconnecte.' : 'Receive a notification if the node goes online or offline.', style: theme.textTheme.bodySmall),
+        title: Text(isFr ? 'Surveiller le statut' : 'Monitor Status',
+            style: theme.textTheme.titleMedium),
+        subtitle: Text(
+            isFr
+                ? 'Recevoir une notification si le nœud se connecte ou se déconnecte.'
+                : 'Receive a notification if the node goes online or offline.',
+            style: theme.textTheme.bodySmall),
         value: _isMonitoringEnabled,
         onChanged: _toggleMonitoring,
         contentPadding: EdgeInsets.zero,
@@ -358,21 +366,93 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   }
 
   Future<void> _saveRoutes() async {
-    final apiService = context.read<AppProvider>().apiService;
-    final locale = context.read<AppProvider>().locale;
-    final isFr = locale.languageCode == 'fr';
+    final appProvider = context.read<AppProvider>();
+    final apiService = appProvider.apiService;
+    final isFr = appProvider.locale.languageCode == 'fr';
+
     try {
+      // Obtenir tous les nœuds pour la validation
+      final allNodes = await apiService.getNodes();
+
+      // Vérifier les conflits pour les nouvelles routes sélectionnées
+      final newRoutes =
+          _selectedRoutes.difference(Set.from(_currentNode.sharedRoutes));
+      List<String> conflictRoutes = [];
+
+      for (var route in newRoutes) {
+        // Ignorer les routes exit node
+        if (route == '0.0.0.0/0' || route == '::/0') continue;
+
+        final validation = RouteConflictService.validateRouteApproval(
+            route, _currentNode.id, allNodes);
+
+        if (validation.isConflict) {
+          conflictRoutes.add(route);
+        }
+      }
+
+      // Si il y a des conflits, afficher un message d'erreur et empêcher la sauvegarde
+      if (conflictRoutes.isNotEmpty) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text(isFr ? 'Conflit Détecté' : 'Conflict Detected'),
+                content: Text(isFr
+                    ? 'Impossible d\'approuver les routes suivantes car elles sont déjà utilisées par d\'autres utilisateurs :\n\n• ${conflictRoutes.join('\n• ')}\n\nVeuillez décocher ces routes avant de continuer.'
+                    : 'Cannot approve the following routes as they are already used by other users:\n\n• ${conflictRoutes.join('\n• ')}\n\nPlease uncheck these routes before continuing.'),
+                actions: <Widget>[
+                  TextButton(
+                    child: Text(isFr ? 'Compris' : 'Understood'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      // Décocher automatiquement les routes en conflit
+                      setState(() {
+                        for (var route in conflictRoutes) {
+                          _selectedRoutes.remove(route);
+                        }
+                      });
+                    },
+                  ),
+                ],
+              );
+            },
+          );
+        }
+        return;
+      }
+
+      // Procéder à la sauvegarde si aucun conflit
+      showSafeSnackBar(
+          context, isFr ? 'Mise à jour des routes...' : 'Updating routes...');
       await apiService.setNodeRoutes(_currentNode.id, _selectedRoutes.toList());
+
+      // Régénérer et appliquer les ACLs
+      showSafeSnackBar(
+          context, isFr ? 'Mise à jour des ACLs...' : 'Updating ACLs...');
+      final allUsers = await apiService.getUsers();
+      final updatedNodes = await apiService.getNodes(); // Re-fetch nodes
+      final tempRules = await appProvider.storageService.getTemporaryRules();
+
+      final aclGenerator = NewAclGeneratorService();
+      final newPolicyMap = aclGenerator.generatePolicy(
+          users: allUsers, nodes: updatedNodes, temporaryRules: tempRules);
+      final newPolicyJson = jsonEncode(newPolicyMap);
+      await apiService.setAclPolicy(newPolicyJson);
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(isFr
-                  ? 'Routes mises à jour avec succès.'
-                  : 'Routes updated successfully.')),
-        );
-        final updatedNode = await apiService.getNodeDetails(_currentNode.id);
+        showSafeSnackBar(
+            context,
+            isFr
+                ? 'Routes et ACLs mises à jour avec succès !'
+                : 'Routes and ACLs updated successfully!');
+
+        // Rafraîchir l'état local
+        final freshlyUpdatedNode =
+            await apiService.getNodeDetails(_currentNode.id);
         setState(() {
-          _currentNode = updatedNode;
+          _currentNode = freshlyUpdatedNode;
           _selectedRoutes = Set<String>.from(_currentNode.sharedRoutes);
         });
       }

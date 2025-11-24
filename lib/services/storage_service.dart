@@ -78,4 +78,14 @@ class StorageService {
     }
     return [];
   }
+
+  /// Sauvegarde des données génériques avec une clé.
+  Future<void> saveData(String key, String value) async {
+    await _storage.write(key: key, value: value);
+  }
+
+  /// Récupère des données génériques avec une clé.
+  Future<String?> getData(String key) async {
+    return await _storage.read(key: key);
+  }
 }

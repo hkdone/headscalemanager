@@ -7,6 +7,7 @@ import 'package:headscalemanager/screens/network_overview_screen.dart';
 import 'package:headscalemanager/screens/ha_management_screen.dart';
 import 'package:headscalemanager/screens/settings_screen.dart';
 import 'package:headscalemanager/screens/users_screen.dart';
+import 'package:headscalemanager/screens/client_commands_screen.dart';
 import 'package:eva_icons_flutter/eva_icons_flutter.dart';
 import 'package:headscalemanager/screens/help_screen.dart';
 import 'package:provider/provider.dart'; // Import pour l'écran d'aide
@@ -56,6 +57,15 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(isFr ? 'Gestionnaire Headscale' : 'Headscale Manager'),
         actions: [
+          // Bouton commandes clients : navigue vers le glossaire des commandes.
+          IconButton(
+            icon: const Icon(Icons.terminal),
+            tooltip: isFr ? 'Commandes Clients' : 'Client Commands',
+            onPressed: () {
+              Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ClientCommandsScreen()));
+            },
+          ),
           // Bouton d'aide : navigue vers l'écran d'aide.
           IconButton(
             icon: const Icon(Icons.help_outline),

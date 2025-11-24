@@ -131,17 +131,18 @@ void callbackDispatcher() {
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
-  
+
   static const int _persistentNotificationId = 0;
   static const String _foregroundChannelId = 'headscale_foreground_channel';
 
-
   static Future<void> initialize() async {
     // Create a separate channel for the foreground service
-    const AndroidNotificationChannel foregroundChannel = AndroidNotificationChannel(
+    const AndroidNotificationChannel foregroundChannel =
+        AndroidNotificationChannel(
       _foregroundChannelId,
       'Tâches de fond', // title
-      description: 'Notifications pour les tâches de fond actives.', // description
+      description:
+          'Notifications pour les tâches de fond actives.', // description
       importance: Importance.low, // Use low importance to be less intrusive
     );
 
@@ -205,8 +206,10 @@ class NotificationService {
     );
   }
 
-  static Future<void> showPersistentNotification(String title, String body) async {
-    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+  static Future<void> showPersistentNotification(
+      String title, String body) async {
+    final AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
       _foregroundChannelId,
       'Tâches de fond',
       channelDescription: 'Notification persistante pour les tâches de fond.',
