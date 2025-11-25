@@ -4,13 +4,12 @@ import 'package:headscalemanager/screens/acl_screen.dart';
 import 'package:headscalemanager/screens/dashboard_screen.dart';
 import 'package:headscalemanager/screens/acl_manager_screen.dart';
 import 'package:headscalemanager/screens/network_overview_screen.dart';
-import 'package:headscalemanager/screens/ha_management_screen.dart';
 import 'package:headscalemanager/screens/settings_screen.dart';
 import 'package:headscalemanager/screens/users_screen.dart';
 import 'package:headscalemanager/screens/client_commands_screen.dart';
 import 'package:eva_icons_flutter/eva_icons_flutter.dart';
 import 'package:headscalemanager/screens/help_screen.dart';
-import 'package:provider/provider.dart'; // Import pour l'écran d'aide
+import 'package:provider/provider.dart';
 
 /// Écran d'accueil principal de l'application.
 ///
@@ -35,7 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
     AclScreen(),
     AclManagerScreen(),
     NetworkOverviewScreen(),
-    HaManagementScreen(),
+    ClientCommandsScreen(),
   ];
 
   /// Gère le changement d'élément sélectionné dans la barre de navigation.
@@ -57,15 +56,6 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(isFr ? 'Gestionnaire Headscale' : 'Headscale Manager'),
         actions: [
-          // Bouton commandes clients : navigue vers le glossaire des commandes.
-          IconButton(
-            icon: const Icon(Icons.terminal),
-            tooltip: isFr ? 'Commandes Clients' : 'Client Commands',
-            onPressed: () {
-              Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ClientCommandsScreen()));
-            },
-          ),
           // Bouton d'aide : navigue vers l'écran d'aide.
           IconButton(
             icon: const Icon(Icons.help_outline),
@@ -122,10 +112,10 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(EvaIcons.globe2Outline),
             label: isFr ? 'Réseau' : 'Network',
           ),
-          // Élément pour la gestion HA.
+          // Élément pour les commandes clients
           BottomNavigationBarItem(
-            icon: const Icon(Icons.group_work),
-            label: 'HA',
+            icon: const Icon(Icons.terminal),
+            label: isFr ? 'Commandes' : 'Commands',
           ),
         ],
         currentIndex: _selectedIndex, // Index de l'élément actuellement actif.

@@ -1,11 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
-import 'package:headscalemanager/models/failover_event.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/new_acl_generator_service.dart';
 import 'package:headscalemanager/services/route_conflict_service.dart';
-import 'package:headscalemanager/services/ha_failover_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/screens/node_detail_screen.dart';
@@ -20,7 +18,6 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late Future<List<Node>> _nodesFuture;
   String _filterStatus = 'all'; // 'all', 'online', 'offline'
-  List<Node>? _previousNodes;
 
   @override
   void initState() {
@@ -31,145 +28,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _refreshNodes() async {
     if (mounted) {
       setState(() {
-        _nodesFuture =
-            context.read<AppProvider>().apiService.getNodes().then((nodes) {
-          _checkForFailedNodes(nodes);
-          return nodes;
-        });
+        _nodesFuture = context.read<AppProvider>().apiService.getNodes();
       });
     }
     // Return a completed future to satisfy RefreshIndicator
     return Future.value();
-  }
-
-  void _checkForFailedNodes(List<Node> currentNodes) {
-    if (_previousNodes != null) {
-      final failedNodes =
-          HaFailoverService.detectFailedLanNodes(_previousNodes!, currentNodes);
-
-      if (failedNodes.isNotEmpty) {
-        // Traiter les pannes détectées
-        for (var failedInfo in failedNodes) {
-          _handleNodeFailure(failedInfo);
-        }
-      }
-    }
-    _previousNodes = List.from(currentNodes);
-  }
-
-  void _handleNodeFailure(FailedNodeInfo failedInfo) async {
-    final appProvider = context.read<AppProvider>();
-    final isFr = appProvider.locale.languageCode == 'fr';
-
-    try {
-      final allNodes = await appProvider.apiService.getNodes();
-
-      // Créer la map des nœuds de remplacement pour toutes les routes affectées
-      final Map<String, Node?> replacementNodes = {};
-      for (var route in failedInfo.affectedRoutes) {
-        replacementNodes[route] = HaFailoverService.getNextAvailableNode(
-            route, failedInfo.node.user, allNodes);
-      }
-
-      // Afficher le dialogue de basculement si au moins une route a un remplacement
-      if (replacementNodes.values.any((node) => node != null) && mounted) {
-        final shouldFailover = await HaFailoverService.showFailoverDialog(
-            context, failedInfo, replacementNodes, isFr);
-
-        if (shouldFailover) {
-          await _performFailover(
-              failedInfo, replacementNodes, appProvider, isFr);
-        }
-      } else if (mounted) {
-        // Aucun nœud de remplacement disponible - juste notifier
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isFr
-                ? 'Nœud "${failedInfo.node.name}" hors ligne - Aucun backup disponible pour ${failedInfo.affectedRoutes.join(", ")}'
-                : 'Node "${failedInfo.node.name}" offline - No backup available for ${failedInfo.affectedRoutes.join(", ")}'),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isFr
-                ? 'Erreur lors de la détection de panne: $e'
-                : 'Error during failure detection: $e'),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _performFailover(
-    FailedNodeInfo failedInfo,
-    Map<String, Node?> replacementNodes,
-    AppProvider appProvider,
-    bool isFr,
-  ) async {
-    showSafeSnackBar(
-        context, isFr ? 'Basculement en cours...' : 'Failover in progress...');
-
-    try {
-      // 1. Désactiver les routes sur le nœud défaillant
-      final failedNodeRoutes = List<String>.from(failedInfo.node.sharedRoutes)
-        ..removeWhere((r) => failedInfo.affectedRoutes.contains(r));
-      await appProvider.apiService
-          .setNodeRoutes(failedInfo.node.id, failedNodeRoutes);
-
-      // 2. Activer les routes sur les nœuds de remplacement
-      for (var route in failedInfo.affectedRoutes) {
-        final replacementNode = replacementNodes[route];
-        if (replacementNode != null) {
-          final newRoutes = List<String>.from(replacementNode.sharedRoutes);
-          if (!newRoutes.contains(route)) {
-            newRoutes.add(route);
-          }
-          await appProvider.apiService
-              .setNodeRoutes(replacementNode.id, newRoutes);
-
-          // Sauvegarder l'événement de basculement
-          final failoverEvent = FailoverEvent(
-            timestamp: DateTime.now(),
-            route: route,
-            user: failedInfo.node.user,
-            failedNodeName: failedInfo.node.name,
-            failedNodeId: failedInfo.node.id,
-            replacementNodeName: replacementNode.name,
-            replacementNodeId: replacementNode.id,
-            reason: isFr ? 'Nœud hors ligne détecté' : 'Node offline detected',
-          );
-          await HaFailoverService.saveFailoverHistory(failoverEvent);
-        }
-      }
-
-      // 3. Régénérer et appliquer les ACLs
-      final allUsers = await appProvider.apiService.getUsers();
-      final updatedNodes =
-          await appProvider.apiService.getNodes(); // Re-fetch nodes
-      final tempRules = await appProvider.storageService.getTemporaryRules();
-
-      final aclGenerator = NewAclGeneratorService();
-      final newPolicyMap = aclGenerator.generatePolicy(
-          users: allUsers, nodes: updatedNodes, temporaryRules: tempRules);
-      final newPolicyJson = jsonEncode(newPolicyMap);
-      await appProvider.apiService.setAclPolicy(newPolicyJson);
-
-      showSafeSnackBar(
-          context,
-          isFr
-              ? 'Basculement HA réussi et ACLs mises à jour !'
-              : 'HA failover successful and ACLs updated!');
-    } catch (e) {
-      showSafeSnackBar(
-          context, isFr ? 'Échec du basculement: $e' : 'Failover failed: $e');
-    } finally {
-      _refreshNodes();
-    }
   }
 
   @override
@@ -452,86 +315,55 @@ class _UserNodeCard extends StatelessWidget {
 
   Widget? _buildTrailingIcon(
       BuildContext context, Node node, List<Node> allNodes) {
-    final locale = context.watch<AppProvider>().locale;
-    final isFr = locale.languageCode == 'fr';
+    final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
     final List<Widget> icons = [];
 
-    // 1. Icône de basculement pour les maîtres HA
-    final masteredRoutes =
-        RouteConflictService.getHaMasteredRoutes(node, allNodes);
-    if (masteredRoutes.isNotEmpty) {
-      icons.add(
-        IconButton(
-          icon: const Icon(Icons.swap_horiz, color: Colors.purple),
-          tooltip: isFr ? 'Forcer le basculement HA' : 'Force HA Failover',
-          onPressed: () => _showHaSwapDialog(context, node, allNodes),
-        ),
-      );
-    }
-
-    // 2. Icônes pour les routes en attente
+    // 1. Logique pour les routes en attente (approbation ou conflit)
     final pendingRoutes = node.availableRoutes
         .where((r) => !node.sharedRoutes.contains(r))
         .toList();
+
     if (pendingRoutes.isNotEmpty) {
-      bool hasHaBackupRole = false;
-      for (var route in pendingRoutes) {
-        if (route != '0.0.0.0/0' && route != '::/0') {
-          final validation = RouteConflictService.validateRouteApproval(
-              route, node.id, allNodes);
-          if (validation.isHaMode) {
-            hasHaBackupRole = true;
-            break;
-          }
+      final pendingLanRoutes = pendingRoutes
+          .where((r) => r != '0.0.0.0/0' && r != '::/0')
+          .toList();
+      
+      Map<String, Node> conflicts = {};
+      List<String> approvableLanRoutes = [];
+
+      for (var route in pendingLanRoutes) {
+        final validation = RouteConflictService.validateRouteApproval(route, node.id, allNodes);
+        if (validation.isConflict) {
+          conflicts[route] = validation.conflictingNode!;
+        } else {
+          approvableLanRoutes.add(route);
         }
       }
 
-      if (hasHaBackupRole) {
+      final hasPendingExitNode = pendingRoutes.any((r) => r == '0.0.0.0/0' || r == '::/0');
+
+      if (conflicts.isNotEmpty) {
         icons.add(
           IconButton(
-            icon: Container(
-              width: 24,
-              height: 24,
-              decoration: const BoxDecoration(
-                color: Colors.green,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.backup, color: Colors.white, size: 16),
-            ),
-            tooltip: isFr
-                ? 'Ce nœud est un backup pour une route HA'
-                : 'This node is a backup for an HA route',
-            onPressed: () {
-              final pendingHaRoutes = node.availableRoutes
-                  .where((r) =>
-                      !node.sharedRoutes.contains(r) &&
-                      r != '0.0.0.0/0' &&
-                      r != '::/0')
-                  .toList();
-              final routeToDisplay =
-                  pendingHaRoutes.isNotEmpty ? pendingHaRoutes.first : '';
-
-              showSafeSnackBar(
-                context,
-                isFr
-                    ? 'Ce nœud est en attente pour la route HA : $routeToDisplay'
-                    : 'This node is on standby for HA route: $routeToDisplay',
-              );
-            },
+            icon: const Icon(Icons.help_outline, color: Colors.red),
+            tooltip: isFr ? 'Certaines routes sont en conflit' : 'Some routes are in conflict',
+            onPressed: () => _showConflictInfoDialog(context, node, conflicts),
           ),
         );
-      } else {
+      }
+      
+      if (approvableLanRoutes.isNotEmpty || hasPendingExitNode) {
         icons.add(
           IconButton(
             icon: const Icon(Icons.warning, color: Colors.amber),
             tooltip: isFr ? 'Approbation requise' : 'Approval required',
-            onPressed: () => _showApprovalDialog(context, node),
+            onPressed: () => _showApprovalDialog(context, node, allNodes),
           ),
         );
       }
     }
 
-    // 3. Icône de désynchronisation
+    // 2. Icône de désynchronisation
     final hasDesync =
         node.sharedRoutes.any((r) => !node.availableRoutes.contains(r));
     if (hasDesync) {
@@ -561,250 +393,153 @@ class _UserNodeCard extends StatelessWidget {
     return Row(mainAxisSize: MainAxisSize.min, children: icons);
   }
 
-  void _showHaSwapDialog(
-      BuildContext context, Node masterNode, List<Node> allNodes) {
-    final appProvider = context.read<AppProvider>();
-    final isFr = appProvider.locale.languageCode == 'fr';
+  void _showConflictInfoDialog(BuildContext context, Node node, Map<String, Node> conflicts) {
+    final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
+    
+    String content = isFr
+        ? 'Le nœud "${node.name}" ne peut pas partager les réseaux suivants car ils sont déjà utilisés :\n\n'
+        : 'Node "${node.name}" cannot share the following networks as they are already in use:\n\n';
 
-    final masteredRoutes =
-        RouteConflictService.getHaMasteredRoutes(masterNode, allNodes);
+    conflicts.forEach((route, conflictingNode) {
+      content += isFr
+          ? '• Le réseau $route est déjà partagé par "${conflictingNode.name}".\n'
+          : '• Network $route is already shared by "${conflictingNode.name}".\n';
+    });
 
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
-        if (masteredRoutes.isEmpty) {
-          return AlertDialog(
-            title: Text(isFr ? 'Information' : 'Information'),
-            content: Text(isFr
-                ? 'Ce nœud n\'est maître d\'aucune route HA.'
-                : 'This node is not a master for any HA route.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: Text(isFr ? 'Fermer' : 'Close'),
-              ),
-            ],
-          );
-        }
-
-        // Pour l'instant, on gère le basculement pour la première route maîtrisée
-        final routeToSwap = masteredRoutes.first;
-        final backupNodes = RouteConflictService.getBackupNodesForRoute(
-            routeToSwap, masterNode.user, allNodes);
-
-        if (backupNodes.isEmpty) {
-          return AlertDialog(
-            title:
-                Text(isFr ? 'Aucun Backup Disponible' : 'No Backup Available'),
-            content: Text(isFr
-                ? 'Aucun nœud de backup n\'est disponible pour la route $routeToSwap.'
-                : 'No backup node is available for route $routeToSwap.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: Text(isFr ? 'Fermer' : 'Close'),
-              ),
-            ],
-          );
-        }
-
-        Node? selectedBackup = backupNodes.first;
-
-        return AlertDialog(
-          title: Text(isFr ? 'Forcer le Basculement HA' : 'Force HA Failover'),
-          content: StatefulBuilder(
-            builder: (BuildContext context, StateSetter setState) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(isFr
-                      ? 'Vous allez forcer le basculement de la route $routeToSwap depuis "${masterNode.name}" vers un nœud de backup.'
-                      : 'You are about to force a failover for route $routeToSwap from "${masterNode.name}" to a backup node.'),
-                  const SizedBox(height: 20),
-                  Text(
-                      isFr
-                          ? 'Choisir le nouveau maître :'
-                          : 'Choose the new master:',
-                      style: Theme.of(context).textTheme.titleSmall),
-                  DropdownButton<Node>(
-                    value: selectedBackup,
-                    isExpanded: true,
-                    items: backupNodes.map((Node node) {
-                      return DropdownMenuItem<Node>(
-                        value: node,
-                        child: Text(node.name),
-                      );
-                    }).toList(),
-                    onChanged: (Node? newValue) {
-                      setState(() {
-                        selectedBackup = newValue;
-                      });
-                    },
-                  ),
-                ],
-              );
-            },
+      builder: (context) => AlertDialog(
+        title: Text(isFr ? 'Conflit de Routes Détecté' : 'Route Conflict Detected'),
+        content: Text(content),
+        actions: [
+          TextButton(
+            child: Text(isFr ? 'Fermer' : 'Close'),
+            onPressed: () => Navigator.of(context).pop(),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(isFr ? 'Annuler' : 'Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                if (selectedBackup == null) return;
-
-                Navigator.of(dialogContext).pop();
-                showSafeSnackBar(
-                    context,
-                    isFr
-                        ? 'Basculement en cours...'
-                        : 'Failover in progress...');
-
-                try {
-                  await HaFailoverService.performManualFailover(
-                    route: routeToSwap,
-                    newPrimaryNode: selectedBackup!,
-                    allNodes: allNodes,
-                    appProvider: appProvider,
-                  );
-
-                  showSafeSnackBar(
-                      context,
-                      isFr
-                          ? 'Basculement réussi et ACLs mises à jour !'
-                          : 'Failover successful and ACLs updated!');
-                } catch (e) {
-                  showSafeSnackBar(
-                      context,
-                      isFr
-                          ? 'Échec du basculement: $e'
-                          : 'Failover failed: $e');
-                } finally {
-                  refreshNodes();
-                }
-              },
-              child: Text(isFr ? 'Confirmer' : 'Confirm'),
-            ),
-          ],
-        );
-      },
+        ],
+      ),
     );
   }
 
-  void _showHaTakeoverDialog(
-      BuildContext context, Node backupNode, List<Node> allNodes) {
+  void _showApprovalDialog(BuildContext context, Node node, List<Node> allNodes) {
     final appProvider = context.read<AppProvider>();
     final isFr = appProvider.locale.languageCode == 'fr';
 
+    final pendingRoutes = node.availableRoutes
+        .where((r) => !node.sharedRoutes.contains(r))
+        .toList();
+    final isExitNodeRequest =
+        pendingRoutes.any((r) => r == '0.0.0.0/0' || r == '::/0');
+    final lanRoutes =
+        pendingRoutes.where((r) => r != '0.0.0.0/0' && r != '::/0').toList();
+    
+    String title = isFr ? 'Approbation Requise' : 'Approval Required';
+    String content = '';
+    
+    final approvableLanRoutes = lanRoutes.where((route) {
+      final validation = RouteConflictService.validateRouteApproval(route, node.id, allNodes);
+      return !validation.isConflict;
+    }).toList();
+
+    if (approvableLanRoutes.isEmpty && !isExitNodeRequest) {
+      // Ce cas ne devrait pas se produire car l'icône d'approbation n'est affichée
+      // que si des routes approuvables existent. C'est une sécurité.
+      return;
+    }
+
+    // Construire le message d'approbation
+    if (isExitNodeRequest) {
+      content += isFr
+          ? 'Le nœud "${node.name}" demande à devenir un Exit Node.'
+          : 'Node "${node.name}" is requesting to be an exit node.';
+    }
+
+    if (approvableLanRoutes.isNotEmpty) {
+      if (content.isNotEmpty) content += '\n\n';
+      content += isFr
+          ? 'Routes qui seront approuvées :\n• ${approvableLanRoutes.join('\n• ')}\n\n'
+          : 'Routes that will be approved:\n• ${approvableLanRoutes.join('\n• ')}\n\n';
+    }
+
+    content += isFr
+        ? 'Voulez-vous approuver cette (ces) demande(s) ?'
+        : 'Do you want to approve this (these) request(s)?';
+
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
-        final pendingHaRoutes = backupNode.availableRoutes
-            .where((r) =>
-                !backupNode.sharedRoutes.contains(r) &&
-                r != '0.0.0.0/0' &&
-                r != '::/0')
-            .toList();
-
-        if (pendingHaRoutes.isEmpty) {
-          return AlertDialog(
-            title: Text(isFr ? 'Erreur' : 'Error'),
-            content: Text(isFr
-                ? 'Aucune route HA en attente trouvée pour ce nœud.'
-                : 'No pending HA routes found for this node.'),
-            actions: [
-              TextButton(
-                child: Text(isFr ? 'Fermer' : 'Close'),
-                onPressed: () => Navigator.of(dialogContext).pop(),
-              ),
-            ],
-          );
-        }
-
-        // Pour simplifier, on ne gère que la première route en attente.
-        // La logique peut être étendue pour en gérer plusieurs.
-        final routeToTakeover = pendingHaRoutes.first;
-        final activeNode = RouteConflictService.getActiveNodeForRoute(
-            routeToTakeover, backupNode.user, allNodes);
-
-        if (activeNode == null) {
-          return AlertDialog(
-            title: Text(isFr ? 'Erreur' : 'Error'),
-            content: Text(isFr
-                ? 'Impossible de trouver le nœud actif pour la route $routeToTakeover.'
-                : 'Could not find the active node for route $routeToTakeover.'),
-            actions: [
-              TextButton(
-                child: Text(isFr ? 'Fermer' : 'Close'),
-                onPressed: () => Navigator.of(dialogContext).pop(),
-              ),
-            ],
-          );
-        }
-
+      barrierDismissible: false,
+      builder: (BuildContext context) {
         return AlertDialog(
-          title: Text(isFr ? 'Prise de Contrôle Manuelle' : 'Manual Takeover'),
-          content: Text(isFr
-              ? 'Attention, cela va remplacer le nœud "${activeNode.name}" qui partage actuellement la route $routeToTakeover.\n\nVoulez-vous continuer ?'
-              : 'Warning, this will replace node "${activeNode.name}" which is currently sharing the route $routeToTakeover.\n\nDo you want to continue?'),
+          title: Text(title),
+          content: Text(content),
           actions: <Widget>[
             TextButton(
               child: Text(isFr ? 'Non' : 'No'),
-              onPressed: () => Navigator.of(dialogContext).pop(),
+              onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
               child: Text(isFr ? 'Oui' : 'Yes'),
               onPressed: () async {
-                Navigator.of(dialogContext).pop(); // Fermer la dialog
-                showSafeSnackBar(
-                    context,
-                    isFr
-                        ? 'Prise de contrôle en cours...'
-                        : 'Takeover in progress...');
+                Navigator.of(context).pop();
+                showSafeSnackBar(context,
+                    isFr ? 'Traitement en cours...' : 'Processing...');
+
+                bool aclMode = true;
+                try {
+                  await appProvider.apiService.getAclPolicy();
+                } catch (e) {
+                  aclMode = false;
+                }
 
                 try {
-                  // 1. Désactiver la route sur le nœud A (actif)
-                  final activeNodeRoutes =
-                      List<String>.from(activeNode.sharedRoutes)
-                        ..remove(routeToTakeover);
-                  await appProvider.apiService
-                      .setNodeRoutes(activeNode.id, activeNodeRoutes);
+                  final routesToApprove = [...approvableLanRoutes];
+                  if(isExitNodeRequest) {
+                    routesToApprove.addAll(pendingRoutes.where((r) => r == '0.0.0.0/0' || r == '::/0'));
+                  }
 
-                  // 2. Activer la route sur le nœud B (backup)
-                  final backupNodeRoutes =
-                      List<String>.from(backupNode.sharedRoutes)
-                        ..add(routeToTakeover);
-                  await appProvider.apiService
-                      .setNodeRoutes(backupNode.id, backupNodeRoutes);
+                  if (aclMode) {
+                    // Full logic: Tags + Routes + ACLs
+                    final newTags = _addCapabilities(
+                      List.from(node.tags),
+                      addExitNode: isExitNodeRequest,
+                      addLanSharer: approvableLanRoutes.isNotEmpty,
+                    );
+                    await appProvider.apiService.setTags(node.id, newTags);
 
-                  // 3. Régénérer et appliquer les ACLs
-                  final allUsers = await appProvider.apiService.getUsers();
-                  final updatedNodes =
-                      await appProvider.apiService.getNodes(); // Re-fetch nodes
-                  final tempRules =
-                      await appProvider.storageService.getTemporaryRules();
+                    await appProvider.apiService
+                        .setNodeRoutes(node.id, routesToApprove);
 
-                  final aclGenerator = NewAclGeneratorService();
-                  final newPolicyMap = aclGenerator.generatePolicy(
-                      users: allUsers,
-                      nodes: updatedNodes,
-                      temporaryRules: tempRules);
-                  final newPolicyJson = jsonEncode(newPolicyMap);
-                  await appProvider.apiService.setAclPolicy(newPolicyJson);
+                    final allUsers = await appProvider.apiService.getUsers();
+                    final updatedNodes = await appProvider.apiService.getNodes();
+                    final tempRules =
+                        await appProvider.storageService.getTemporaryRules();
+                    final aclGenerator = NewAclGeneratorService();
+                    final newPolicyMap = aclGenerator.generatePolicy(
+                        users: allUsers,
+                        nodes: updatedNodes,
+                        temporaryRules: tempRules);
+                    final newPolicyJson = jsonEncode(newPolicyMap);
+                    await appProvider.apiService.setAclPolicy(newPolicyJson);
 
-                  showSafeSnackBar(
-                      context,
-                      isFr
-                          ? 'Prise de contrôle réussie !'
-                          : 'Takeover successful!');
+                    showSafeSnackBar(context, isFr
+                        ? 'Nœud approuvé et ACLs mises à jour !'
+                        : 'Node approved and ACLs updated!');
+                  } else {
+                    // Simplified logic: Routes only
+                    await appProvider.apiService
+                        .setNodeRoutes(node.id, routesToApprove);
+                    showSafeSnackBar(
+                        context,
+                        isFr
+                            ? 'Routes approuvées (ACLs non gérées).'
+                            : 'Routes approved (ACLs not managed).');
+                  }
                 } catch (e) {
                   showSafeSnackBar(
                       context,
                       isFr
-                          ? 'Échec de la prise de contrôle: $e'
-                          : 'Takeover failed: $e');
+                          ? 'Échec de lapprrobation: $e'
+                          : 'Approval failed: $e');
                 } finally {
                   refreshNodes();
                 }
@@ -814,194 +549,6 @@ class _UserNodeCard extends StatelessWidget {
         );
       },
     );
-  }
-
-  void _showApprovalDialog(BuildContext context, Node node) {
-    final appProvider = context.read<AppProvider>();
-    final isFr = appProvider.locale.languageCode == 'fr';
-
-    // Obtenir tous les nœuds pour la validation
-    appProvider.apiService.getNodes().then((allNodes) {
-      final pendingRoutes = node.availableRoutes
-          .where((r) => !node.sharedRoutes.contains(r))
-          .toList();
-      final isExitNodeRequest =
-          pendingRoutes.any((r) => r == '0.0.0.0/0' || r == '::/0');
-      final lanRoutes =
-          pendingRoutes.where((r) => r != '0.0.0.0/0' && r != '::/0').toList();
-      final isLanSharerRequest = lanRoutes.isNotEmpty;
-
-      String title = isFr ? 'Approbation Requise' : 'Approval Required';
-      String content = '';
-      bool hasConflicts = false;
-      List<String> haRoutes = [];
-      List<String> conflictRoutes = [];
-
-      // Vérifier les conflits pour chaque route LAN
-      for (var route in lanRoutes) {
-        final validation = RouteConflictService.validateRouteApproval(
-            route, node.id, allNodes);
-
-        if (validation.isConflict) {
-          conflictRoutes.add(route);
-          hasConflicts = true;
-        } else if (validation.isHaMode) {
-          haRoutes.add(route);
-        }
-      }
-
-      // Si il y a des conflits inter-utilisateurs, bloquer l'approbation
-      if (conflictRoutes.isNotEmpty) {
-        title = isFr ? 'Conflit Détecté' : 'Conflict Detected';
-        content = isFr
-            ? 'Impossible d\'approuver les routes suivantes car elles sont déjà utilisées par d\'autres utilisateurs :\n\n'
-            : 'Cannot approve the following routes as they are already used by other users:\n\n';
-        content += '• ${conflictRoutes.join('\n• ')}\n\n';
-        content += isFr
-            ? 'Veuillez résoudre ces conflits avant de continuer.'
-            : 'Please resolve these conflicts before continuing.';
-
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: Text(title),
-              content: Text(content),
-              actions: <Widget>[
-                TextButton(
-                  child: Text(isFr ? 'Compris' : 'Understood'),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            );
-          },
-        );
-        return;
-      }
-
-      // Construire le message d'approbation
-      if (isExitNodeRequest) {
-        content += isFr
-            ? 'Le nœud "${node.name}" demande à devenir un Exit Node.'
-            : 'Node "${node.name}" is requesting to be an exit node.';
-      }
-
-      if (isLanSharerRequest) {
-        if (content.isNotEmpty) content += '\n\n';
-
-        if (haRoutes.isNotEmpty) {
-          content += isFr
-              ? 'Routes qui seront placées en backup HA :\n• ${haRoutes.join('\n• ')}\n\n'
-              : 'Routes that will be placed in HA backup:\n• ${haRoutes.join('\n• ')}\n\n';
-        }
-
-        final normalRoutes =
-            lanRoutes.where((r) => !haRoutes.contains(r)).toList();
-        if (normalRoutes.isNotEmpty) {
-          content += isFr
-              ? 'Routes qui seront approuvées normalement :\n• ${normalRoutes.join('\n• ')}\n\n'
-              : 'Routes that will be approved normally:\n• ${normalRoutes.join('\n• ')}\n\n';
-        }
-      }
-
-      content += isFr
-          ? 'Voulez-vous approuver cette (ces) demande(s) ?'
-          : 'Do you want to approve this (these) request(s)?';
-
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text(title),
-            content: Text(content),
-            actions: <Widget>[
-              TextButton(
-                child: Text(isFr ? 'Non' : 'No'),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-              TextButton(
-                child: Text(isFr ? 'Oui' : 'Yes'),
-                onPressed: () async {
-                  Navigator.of(context).pop(); // Close dialog first
-                  showSafeSnackBar(context,
-                      isFr ? 'Traitement en cours...' : 'Processing...');
-
-                  bool aclMode = true;
-                  try {
-                    await appProvider.apiService.getAclPolicy();
-                  } catch (e) {
-                    aclMode = false;
-                  }
-
-                  try {
-                    if (aclMode) {
-                      // Full logic: Tags + Routes + ACLs
-                      final newTags = _addCapabilities(
-                        List.from(node.tags),
-                        addExitNode: isExitNodeRequest,
-                        addLanSharer: isLanSharerRequest,
-                      );
-                      await appProvider.apiService.setTags(node.id, newTags);
-
-                      await appProvider.apiService
-                          .setNodeRoutes(node.id, pendingRoutes);
-
-                      final allUsers = await appProvider.apiService.getUsers();
-                      final allNodes = await appProvider.apiService.getNodes();
-                      final tempRules =
-                          await appProvider.storageService.getTemporaryRules();
-                      final aclGenerator = NewAclGeneratorService();
-                      final newPolicyMap = aclGenerator.generatePolicy(
-                          users: allUsers,
-                          nodes: allNodes,
-                          temporaryRules: tempRules);
-                      final newPolicyJson = jsonEncode(newPolicyMap);
-                      await appProvider.apiService.setAclPolicy(newPolicyJson);
-
-                      String successMessage = isFr
-                          ? 'Nœud approuvé et ACLs mises à jour !'
-                          : 'Node approved and ACLs updated!';
-
-                      if (haRoutes.isNotEmpty) {
-                        successMessage += isFr
-                            ? '\n${haRoutes.length} route(s) placée(s) en backup HA.'
-                            : '\n${haRoutes.length} route(s) placed in HA backup.';
-                      }
-
-                      showSafeSnackBar(context, successMessage);
-                    } else {
-                      // Simplified logic: Routes only
-                      await appProvider.apiService
-                          .setNodeRoutes(node.id, pendingRoutes);
-                      showSafeSnackBar(
-                          context,
-                          isFr
-                              ? 'Routes approuvées (ACLs non gérées).'
-                              : 'Routes approved (ACLs not managed).');
-                    }
-                  } catch (e) {
-                    showSafeSnackBar(
-                        context,
-                        isFr
-                            ? 'Échec de l\'approbation: $e'
-                            : 'Approval failed: $e');
-                  } finally {
-                    refreshNodes();
-                  }
-                },
-              ),
-            ],
-          );
-        },
-      );
-    }).catchError((error) {
-      showSafeSnackBar(
-          context,
-          isFr
-              ? 'Erreur lors de la validation: $error'
-              : 'Validation error: $error');
-    });
   }
 
   void _showCleanupDialog(BuildContext context, Node node) {
@@ -1080,13 +627,13 @@ class _UserNodeCard extends StatelessWidget {
                         .setNodeRoutes(node.id, remainingRoutes);
 
                     final allUsers = await appProvider.apiService.getUsers();
-                    final allNodes = await appProvider.apiService.getNodes();
+                    final updatedNodes = await appProvider.apiService.getNodes();
                     final tempRules =
                         await appProvider.storageService.getTemporaryRules();
                     final aclGenerator = NewAclGeneratorService();
                     final newPolicyMap = aclGenerator.generatePolicy(
                         users: allUsers,
-                        nodes: allNodes,
+                        nodes: updatedNodes,
                         temporaryRules: tempRules);
                     final newPolicyJson = jsonEncode(newPolicyMap);
                     await appProvider.apiService.setAclPolicy(newPolicyJson);
