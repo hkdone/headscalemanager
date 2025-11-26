@@ -244,6 +244,25 @@ The ACL page has two main functions:
 
 This new page, accessible via a dedicated button, allows you to test and visualize the impact of different ACL policies without applying them directly to your Headscale server. It\'s a safe environment for experimentation.
 
+### 3.5. Network Overview
+
+This screen, accessible from the navigation bar, offers a dynamic, real-time view of your network topology from the perspective of the current device. It is particularly useful for diagnosing connections and checking which `exit node` is being used.
+
+**Main Features:**
+- **Current Node Selector:** At the top of the page, a dropdown menu allows you to select the device you consider your starting point.
+- **Path Visualization:** A simple graph shows the network path from your selected device to the Internet. If traffic passes through an `exit node` on your Headscale network, it will be displayed as an intermediary.
+- **Exit Node Detection:** The page performs a `traceroute` to a public destination (Google DNS) to map the hops. If one of the hops matches the IP address of one of your nodes, that node is identified as the exit node currently in use.
+- **Ping Status:** A list of all other nodes on your network is displayed with their status (online/offline) and average latency.
+- **Traceroute Details:** An expandable section shows you the raw `traceroute` result, listing each hop (IP address) between your device and the final destination.
+
+### 3.6. Client Commands
+
+This page provides a library of command-line interface (`CLI`) commands for the Tailscale client. It is designed to help you quickly find the command you need for various tasks, without having to memorize all the options.
+
+**Features:**
+- **Filters:** You can filter commands by platform (Windows/Linux) and by category (Connection, Routing, Troubleshooting, etc.).
+- **Dynamic Commands:** Some commands are pre-filled with information from your server (URL, existing nodes, etc.) to save you time.
+- **Configuration and Copy:** For complex commands, a dialog allows you to configure the parameters before copying the final command to your clipboard.
 ## 4. Advanced Features
 
 This section describes advanced features that simplify security management and network monitoring.

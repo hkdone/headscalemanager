@@ -501,6 +501,137 @@ class DynamicCommandGenerator {
   // Commandes statiques de base
   static List<ClientCommand> _getStaticCommands() {
     return [
+      // WEB UI
+      ClientCommand(
+        id: 'web_ui',
+        title: "Ouvrir l'interface web locale",
+        description:
+            "Ouvre l'interface web locale du client Tailscale pour voir les pairs et le statut (si supporté par le client).",
+        windowsCommand: 'tailscale web',
+        linuxCommand: 'tailscale web',
+        category: CommandCategories.monitoring,
+        tags: ['web', 'ui', 'interface', 'monitoring'],
+        notes:
+            "Cette commande peut ouvrir un navigateur directement ou afficher une URL à copier.",
+      ),
+
+      // SERVE
+      ClientCommand(
+        id: 'serve',
+        title: "Exposer un service (Serve)",
+        description:
+            "Partage un service local (ex: serveur web) sur le réseau Tailscale.",
+        windowsCommand: 'tailscale serve {protocol} /{port}',
+        linuxCommand: 'tailscale serve {protocol} /{port}',
+        category: CommandCategories.routing,
+        tags: ['serve', 'proxy', 'https', 'tcp'],
+        type: CommandType.interactive,
+        isDynamic: true,
+        parameters: [
+          CommandParameter(
+            id: 'protocol',
+            label: 'Protocole',
+            description:
+                'Protocole à utiliser (https, http, tcp). Par défaut https.',
+            type: ParameterType.text,
+            defaultValue: 'https',
+            options: ['https', 'http', 'tcp'],
+            required: false,
+          ),
+          CommandParameter(
+            id: 'port',
+            label: 'Port local du service',
+            description: 'Le port sur lequel votre service écoute en local.',
+            type: ParameterType.number,
+            placeholder: '80, 3000, 8080...',
+            required: true,
+          ),
+        ],
+      ),
+
+      // FILE
+      ClientCommand(
+        id: 'file_cp',
+        title: "Envoyer un fichier (Taildrop)",
+        description: "Envoyer un fichier à une autre de vos machines.",
+        windowsCommand: 'tailscale file cp {filepath} {target_node}:',
+        linuxCommand: 'tailscale file cp {filepath} {target_node}:',
+        category: CommandCategories.maintenance,
+        tags: ['file', 'taildrop', 'send', 'cp'],
+        type: CommandType.dynamic,
+        isDynamic: true,
+        parameters: [
+          CommandParameter(
+            id: 'filepath',
+            label: 'Chemin du fichier',
+            description: 'Chemin complet du fichier à envoyer.',
+            type: ParameterType.text,
+            placeholder: 'C:\\Users\\...\\report.pdf ou /home/.../report.pdf',
+            required: true,
+          ),
+          CommandParameter(
+            id: 'target_node',
+            label: 'Machine de destination',
+            description:
+                'Le nom ou l\'IP de la machine à qui envoyer le fichier.',
+            type: ParameterType.nodeSelect,
+            required: true,
+          ),
+        ],
+      ),
+      ClientCommand(
+        id: 'file_get',
+        title: "Recevoir des fichiers (Taildrop)",
+        description:
+            "Vérifier et recevoir les fichiers en attente de réception.",
+        windowsCommand: 'tailscale file get',
+        linuxCommand: 'tailscale file get',
+        category: CommandCategories.maintenance,
+        tags: ['file', 'taildrop', 'get', 'receive'],
+      ),
+      
+      // DEBUG
+      ClientCommand(
+        id: 'debug_derp',
+        title: "Debug: Statut des relais DERP",
+        description: "Affiche la latence des serveurs relais DERP.",
+        windowsCommand: 'tailscale debug derp',
+        linuxCommand: 'tailscale debug derp',
+        category: CommandCategories.troubleshooting,
+        tags: ['debug', 'derp', 'relay', 'latency'],
+      ),
+
+      // UP FLAGS
+      ClientCommand(
+        id: 'force_reauth',
+        title: "Forcer la ré-authentification",
+        description: "Force une nouvelle authentification du client.",
+        windowsCommand: 'tailscale up --force-reauth',
+        linuxCommand: 'sudo tailscale up --force-reauth',
+        category: CommandCategories.connection,
+        tags: ['up', 'reauth', 'login'],
+      ),
+      ClientCommand(
+        id: 'shields_up',
+        title: "Activer 'Shields Up'",
+        description:
+            "Bloque toutes les connexions entrantes, même depuis votre réseau Tailscale.",
+        windowsCommand: 'tailscale up --shields-up',
+        linuxCommand: 'sudo tailscale up --shields-up',
+        category: CommandCategories.security,
+        tags: ['up', 'firewall', 'shields', 'security'],
+      ),
+      ClientCommand(
+        id: 'exit_node_allow_lan',
+        title: "Autoriser l'accès LAN en mode Exit Node",
+        description:
+            "Permet à la machine d'accéder à son propre réseau local physique tout en utilisant un exit node.",
+        windowsCommand: 'tailscale up --exit-node-allow-lan-access=true',
+        linuxCommand: 'sudo tailscale up --exit-node-allow-lan-access=true',
+        category: CommandCategories.routing,
+        tags: ['up', 'exit-node', 'lan', 'routing'],
+      ),
+      
       // CONNEXION
       ClientCommand(
         id: 'connect_basic',

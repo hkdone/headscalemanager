@@ -260,7 +260,7 @@ Cet écran affiche les informations détaillées d'un utilisateur et liste tous 
 - **Enregistrer un nouvel appareil (bouton central) :** Ouvre un dialogue en deux étapes pour enregistrer un nouvel appareil sous cet utilisateur. La première étape fournit une commande `tailscale up` à exécuter sur l'appareil, et la seconde étape génère la commande `headscale nodes register` à exécuter sur votre serveur Headscale après avoir collé le lien web obtenu.
 - **Gestion des Nœuds (pour chaque appareil listé) :** Chaque nœud est affiché avec son statut en ligne/hors ligne. Taper sur un nœud vous mènera à son écran de détails (`Détails du Nœud`). Un menu contextuel (icône "trois points" ou "plus") offre des actions spécifiques pour chaque nœud.
 
-### 3.5. Détails du Nœud
+### 3.6. Détails du Nœud
 
 Cet écran affiche toutes les informations détaillées d'un nœud spécifique, y compris son FQDN (construit dynamiquement à partir du nom du nœud et du domaine de base de votre serveur Headscale), ses adresses IP, ses routes annoncées et ses tags.
 
@@ -278,7 +278,7 @@ Cet écran affiche toutes les informations détaillées d'un nœud spécifique, 
 **Note Importante sur les Modifications des Nœuds :**
 Toute modification apportée à un nœud (ajout, renommage, déplacement, modification des tags, activation/désactivation de routes) via cette application est enregistrée immédiatement dans la base de données de Headscale. Cependant, pour que ces changements soient réellement pris en compte par les autres nœuds du réseau et que la nouvelle configuration soit propagée, il est souvent nécessaire de redémarrer le service Headscale sur votre serveur. Headscale pousse les informations de sa base de données aux autres nœuds principalement au démarrage du service.
 
-### 3.6. Vue d'ensemble du réseau
+### 3.7. Vue d'ensemble du réseau
 
 Cet écran, accessible depuis la barre de navigation, offre une vue dynamique et en temps réel de votre topologie réseau du point de vue de l'appareil actuel. Il est particulièrement utile pour diagnostiquer les connexions et vérifier quel `exit node` est utilisé.
 
@@ -289,29 +289,29 @@ Cet écran, accessible depuis la barre de navigation, offre une vue dynamique et
 - **Statut des Pings :** Une liste de tous les autres nœuds de votre réseau s'affiche avec leur statut (en ligne/hors ligne) et la latence moyenne, vous donnant un aperçu rapide de la connectivité globale.
 - **Détails du Traceroute :** Une section dépliable vous montre le résultat brut du `traceroute`, listant chaque saut (adresse IP) entre votre appareil et la destination finale.
 
+### 3.8. Commandes Clients
 
- ### 3.7. Clés de Pré-authentification
+Cette page fournit une bibliothèque de commandes en ligne de commande (`CLI`) pour le client Tailscale. Elle est conçue pour vous aider à trouver rapidement la commande dont vous avez besoin pour diverses tâches, sans avoir à mémoriser toutes les options.
 
- Cet écran (accessible via le bouton `vpn_key` sur l'écran Utilisateurs) vous permet de visualiser, créer et expirer des clés de pré-authentification. Ces clés sont utilisées pour enregistrer
+**Fonctionnalités :**
+- **Filtres :** Vous pouvez filtrer les commandes par plateforme (Windows/Linux) et par catégorie (Connexion, Routage, Dépannage, etc.).
+- **Commandes dynamiques :** Certaines commandes sont pré-remplies avec les informations de votre serveur (URL, nœuds existants, etc.) pour vous faire gagner du temps.
+- **Configuration et Copie :** Pour les commandes complexes, une boîte de dialogue vous permet de configurer les paramètres avant de copier la commande finale dans votre presse-papiers.
+
+### 3.9. Clés de Pré-authentification
+
+Cet écran (accessible via le bouton `vpn_key` sur l'écran Utilisateurs) vous permet de visualiser, créer et expirer des clés de pré-authentification. Ces clés sont utilisées pour enregistrer
 de nouveaux appareils sans intervention manuelle sur le serveur.
 
- **Boutons et Fonctionnalités :**
+**Boutons et Fonctionnalités :**
 - **Créer Clé (icône '+' en bas à droite) :** Ouvre un dialogue pour créer une nouvelle clé de pré-authentification. Vous pouvez spécifier l'utilisateur, si elle est réutilisable, éphémère
 et sa durée d'expiration en jours. Après création, une commande `tailscale up` est affichée pour enregistrer un client.
 - **Expirer Clé (icône de poubelle à côté de chaque clé) :** Fait expirer une clé de pré-authentification existante après confirmation.
 - **Expirer toutes les clés (icône 'delete_sweep' en bas à droite) :** Fait expirer toutes les clés de pré-authentification existantes après confirmation.
 
-
-Cet écran vous permet de configurer l'application pour qu'elle se connecte à votre serveur Headscale.
-
-**Champs et Fonctionnalités :**
-- **URL du Serveur :** Entrez l'adresse publique (FQDN) de votre serveur Headscale (ex: `https://headscale.mondomaine.com`).
-- **Clé API :** Collez la clé API unique que vous avez générée depuis votre serveur Headscale. Ce champ est masqué pour des raisons de sécurité.
-- **Bouton Enregistrer :** Sauvegarde les identifiants saisis. L'application redémarrera pour appliquer les nouveaux paramètres.
-
 Pour toute question ou problème, veuillez consulter la documentation officielle de Headscale ou les ressources de la communauté.
 
-### 3.8. Paramètres
+### 3.10. Paramètres
 
 Cet écran vous permet de configurer l'application pour qu'elle se connecte à votre serveur Headscale.
 
@@ -320,7 +320,7 @@ Cet écran vous permet de configurer l'application pour qu'elle se connecte à v
 - **Clé API :** Collez la clé API unique que vous avez générée depuis votre serveur Headscale. Ce champ est masqué pour des raisons de sécurité.
 - **Bouton Enregistrer :** Sauvegarde les identifiants saisis. L'application redémarrera pour appliquer les nouveaux paramètres.
 
-### 3.9. Gestion des clés API
+### 3.11. Gestion des clés API
 
 Cet écran (accessible via le bouton `api` sur l'écran du tableau de bord) vous permet de visualiser, créer, et supprimer des clés d'API. Ces clés sont utilisées pour authentifier les requêtes à l'API de Headscale.
 

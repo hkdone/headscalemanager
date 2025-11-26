@@ -19,15 +19,21 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<ClientCommand> _allCommands = [];
   List<ClientCommand> _filteredCommands = [];
-  String _selectedCategory = 'Toutes';
+  String _selectedCategory = ''; // Will be initialized in initState
   String _selectedPlatform = 'Windows';
   bool _showOnlyElevated = false;
+  String _allCategoriesString = 'Toutes'; // Default to French
 
   @override
   void initState() {
     super.initState();
-    // Use a post-frame callback to access context safely
+    // Use a post-frame callback to access context safely for locale
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
+      setState(() {
+        _allCategoriesString = isFr ? 'Toutes' : 'All';
+        _selectedCategory = _allCategoriesString;
+      });
       _loadCommands();
     });
     _searchController.addListener(_filterCommands);
@@ -36,6 +42,7 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
   void _loadCommands() async {
     if (!mounted) return;
     final appProvider = context.read<AppProvider>();
+    final isFr = appProvider.locale.languageCode == 'fr';
 
     try {
       final serverUrl = await appProvider.storageService.getServerUrl();
@@ -55,7 +62,10 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load dynamic commands: ${e.toString()}'),
+            content: Text(isFr 
+              ? 'Échec du chargement des commandes dynamiques: ${e.toString()}'
+              : 'Failed to load dynamic commands: ${e.toString()}'
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -85,13 +95,12 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
             command.description.toLowerCase().contains(searchTerm) ||
             command.tags.any((tag) => tag.toLowerCase().contains(searchTerm));
 
-        final matchesCategory = _selectedCategory == 'Toutes' ||
+        final matchesCategory = _selectedCategory == _allCategoriesString ||
             command.category == _selectedCategory;
 
         final matchesElevation =
             !_showOnlyElevated || command.requiresElevation;
-
-        // Ajout du filtre de plateforme manquant
+        
         final isLinuxOnly = command.tags.contains('linux') &&
             command.windowsCommand.contains('Non applicable');
         final matchesPlatform =
@@ -106,9 +115,13 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
   }
 
   List<String> _getCategories() {
-    final categories = {'Toutes'};
+    final categories = {_allCategoriesString};
     categories.addAll(_allCommands.map((cmd) => cmd.category));
-    return categories.toList()..sort();
+    return categories.toList()..sort((a, b) {
+      if (a == _allCategoriesString) return -1;
+      if (b == _allCategoriesString) return 1;
+      return a.compareTo(b);
+    });
   }
 
   void _copyToClipboard(String command) {
@@ -126,15 +139,12 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
   }
 
   void _shareCommand(ClientCommand command) {
-    // This function is now only called for static commands,
-    // as the UI for dynamic commands doesn't show a share button directly.
     final platformCommand = command.getCommandForPlatform(_selectedPlatform);
     Share.share(platformCommand,
-        subject: 'Commande Tailscale: ${command.title}');
+        subject: 'Tailscale Command: ${command.title}');
   }
 
   void _showParameterDialog(ClientCommand command) {
-    // The dialog now handles its own actions (copy/share).
     showDialog(
       context: context,
       builder: (context) => ParameterConfigDialog(

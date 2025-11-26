@@ -423,6 +423,22 @@ routes:
                   '- **Traceroute Details:** An expandable section shows you the raw `traceroute` result, listing each hop (IP address) between your device and the final destination.',
                   isSmall: true,
                 ),
+                const SizedBox(height: 16),
+                _buildSubTitle(context, '3.6. Client Commands'),
+                const SizedBox(height: 8),
+                _buildBodyText(context,
+                    'This page, accessible from the navigation bar, provides a library of command-line interface (`CLI`) commands for the Tailscale client. It is designed to help you quickly find the command you need for various tasks.'),
+                const SizedBox(height: 8),
+                _buildBodyText(context, '**Features:**',
+                    isBold: true),
+                const SizedBox(height: 4),
+                _buildBodyText(
+                  context,
+                  '- **Filters:** You can filter commands by platform (Windows/Linux) and by category.\n'
+                  '- **Dynamic Commands:** Some commands are pre-filled with information from your server.\n'
+                  '- **Configuration and Copy:** For complex commands, a dialog allows you to configure the parameters before copying the final command.',
+                  isSmall: true,
+                ),
               ]),
               const SizedBox(height: 24),
 

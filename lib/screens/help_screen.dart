@@ -423,6 +423,23 @@ routes:
                   '- **Détails du Traceroute :** Une section dépliable vous montre le résultat brut du `traceroute`, listant chaque saut (adresse IP) entre votre appareil et la destination finale.',
                   isSmall: true,
                 ),
+                const SizedBox(height: 16),
+                _buildSubTitle(context, '3.6. Commandes Clients'),
+                const SizedBox(height: 8),
+                _buildBodyText(context,
+                    'Cette page, accessible depuis la barre de navigation, fournit une bibliothèque de commandes en ligne de commande (`CLI`) pour le client Tailscale. Elle est conçue pour vous aider à trouver rapidement la commande dont vous avez besoin.'),
+                const SizedBox(height: 8),
+                _buildBodyText(context, '**Fonctionnalités :**',
+                    isBold: true),
+                const SizedBox(height: 4),
+                _buildBodyText(
+                  context,
+                  '- **Filtres :** Vous pouvez filtrer les commandes par plateforme (Windows/Linux) et par catégorie.\n'
+                  '- **Commandes dynamiques :** Certaines commandes sont pré-remplies avec les informations de votre serveur.\n'
+      
+            '- **Configuration et Copie :** Pour les commandes complexes, une boîte de dialogue vous permet de configurer les paramètres avant de copier la commande finale.',
+                  isSmall: true,
+                ),
               ]),
               const SizedBox(height: 24),
 
