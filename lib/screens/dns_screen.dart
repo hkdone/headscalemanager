@@ -17,6 +17,7 @@ class _DnsScreenState extends State<DnsScreen> {
   List<Node> _filteredNodes = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  bool _isHelpCardExpanded = false;
 
   @override
   void initState() {
@@ -188,28 +189,41 @@ class _DnsScreenState extends State<DnsScreen> {
   }
 
   Widget _buildHelpCard(BuildContext context, bool isFr) {
-    return Card(
-      margin: const EdgeInsets.all(16.0),
-      color: Theme.of(context).cardColor,
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isFr ? "Noms DNS Personnalisés" : "Custom DNS Names",
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Text(
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: ExpansionTile(
+        initiallyExpanded: _isHelpCardExpanded,
+        onExpansionChanged: (bool expanded) {
+          setState(() {
+            _isHelpCardExpanded = expanded;
+          });
+        },
+        title: Text(
+          isFr ? "Noms DNS Personnalisés" : "Custom DNS Names",
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Text(
               isFr
                   ? "Pour assigner un nom DNS à un service sur votre réseau local (ex: nas.votre.domaine pointant vers 192.168.1.100), vous devez modifier la section 'dns_config.extra_records' dans votre fichier config.yaml sur le serveur Headscale et redémarrer le service. Cette action ne peut pas être effectuée depuis l'application."
                   : "To assign a DNS name to a service on your local network (e.g., nas.your.domain pointing to 192.168.1.100), you must edit the 'dns_config.extra_records' section in your config.yaml file on the Headscale server and restart the service. This action cannot be performed from the application.",
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: theme.textTheme.bodyMedium,
             ),
-          ],
+          ),
+        ],
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          side: BorderSide(color: theme.dividerColor),
         ),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          side: BorderSide(color: theme.dividerColor),
+        ),
+        backgroundColor: theme.cardColor,
+        collapsedBackgroundColor: theme.cardColor,
       ),
     );
   }

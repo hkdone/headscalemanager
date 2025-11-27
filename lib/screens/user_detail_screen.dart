@@ -44,7 +44,6 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(widget.user.name, style: theme.appBarTheme.titleTextStyle),
         backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
         iconTheme: theme.appBarTheme.iconTheme,
@@ -86,17 +85,17 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
-        color: theme.cardColor,
+        color: theme.colorScheme.primary,
         borderRadius: BorderRadius.circular(12.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('ID: ${widget.user.id}', style: theme.textTheme.bodySmall),
+          Text('ID: ${widget.user.id}', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary)),
           const SizedBox(height: 8),
           Text(
               '${isFr ? 'Créé le' : 'Created on'}: ${widget.user.createdAt?.toLocal() ?? 'N/A'}',
-              style: theme.textTheme.bodySmall),
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.7))),
         ],
       ),
     );
@@ -201,15 +200,15 @@ class _NodeCard extends StatelessWidget {
     final provider = context.read<AppProvider>();
     final locale = context.watch<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
-    final onlineColor = node.online ? Colors.green : Colors.grey.shade400;
+    final onlineColor = node.online ? Colors.green : theme.colorScheme.onPrimary.withOpacity(0.5);
     final isExitNode = node.isExitNode;
     final hasSharedRoutes = node.sharedRoutes.isNotEmpty;
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.cardColor,
+        color: theme.colorScheme.primary,
         borderRadius: BorderRadius.circular(12.0),
-        border: isExitNode ? Border.all(color: theme.colorScheme.primary, width: 2) : null,
+        border: isExitNode ? Border.all(color: theme.colorScheme.onPrimary, width: 2) : null,
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -224,19 +223,19 @@ class _NodeCard extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            Text(node.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(node.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
-            Text(node.ipAddresses.join('\n'), style: theme.textTheme.bodySmall),
+            Text(node.ipAddresses.join('\n'), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.7))),
             const Spacer(),
             if (isExitNode)
               Row(
                 children: [
                   Icon(Icons.exit_to_app,
-                      size: 14, color: theme.colorScheme.primary),
+                      size: 14, color: theme.colorScheme.onPrimary),
                   const SizedBox(width: 4),
                   Text('Exit Node',
                       style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.primary,
+                          color: theme.colorScheme.onPrimary,
                           fontWeight: FontWeight.bold)),
                 ],
               ),
@@ -245,12 +244,12 @@ class _NodeCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 4.0),
                 child: Row(
                   children: [
-                    Icon(Icons.router_outlined, size: 14, color: theme.textTheme.bodySmall?.color),
+                    Icon(Icons.router_outlined, size: 14, color: theme.colorScheme.onPrimary),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         node.sharedRoutes.join(", "),
-                        style: theme.textTheme.bodySmall,
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.7)),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -259,9 +258,9 @@ class _NodeCard extends StatelessWidget {
               ),
             const Spacer(),
             Text(isFr ? 'Dernière connexion:' : 'Last seen:',
-                style: theme.textTheme.bodySmall),
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.7))),
             Text(node.lastSeen.toLocal().toString(),
-                style: theme.textTheme.bodySmall),
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.7))),
           ],
         ),
       ),
@@ -273,7 +272,7 @@ class _NodeCard extends StatelessWidget {
     final locale = context.watch<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
     return PopupMenuButton<String>(
-      icon: Icon(Icons.more_vert, color: theme.iconTheme.color),
+      icon: Icon(Icons.more_vert, color: theme.colorScheme.onPrimary),
       onSelected: (String value) async {
         switch (value) {
           case 'rename':
@@ -338,15 +337,15 @@ class _NodeCard extends StatelessWidget {
         PopupMenuItem<String>(
             value: 'rename',
             child: Text(isFr ? 'Renommer' : 'Rename',
-                style: theme.textTheme.bodyMedium)),
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface))),
         PopupMenuItem<String>(
             value: 'move',
             child: Text(isFr ? 'Changer d\'utilisateur' : 'Change user',
-                style: theme.textTheme.bodyMedium)),
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface))),
         PopupMenuItem<String>(
             value: 'edit_tags',
             child: Text(isFr ? 'Modifier les tags' : 'Edit tags',
-                style: theme.textTheme.bodyMedium)),
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface))),
         const PopupMenuDivider(),
         PopupMenuItem<String>(
             value: 'delete_device',

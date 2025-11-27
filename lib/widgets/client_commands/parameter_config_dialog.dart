@@ -28,6 +28,7 @@ class _ParameterConfigDialogState extends State<ParameterConfigDialog> {
   final Map<String, String> _parameterValues = {};
   final Map<String, bool> _booleanValues = {};
   String? _generatedCommand;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -64,6 +65,7 @@ class _ParameterConfigDialogState extends State<ParameterConfigDialog> {
     for (var controller in _controllers.values) {
       controller.dispose();
     }
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -85,6 +87,16 @@ class _ParameterConfigDialogState extends State<ParameterConfigDialog> {
 
       setState(() {
         _generatedCommand = generated;
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
       });
     }
   }
@@ -207,6 +219,7 @@ class _ParameterConfigDialogState extends State<ParameterConfigDialog> {
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
+            controller: _scrollController,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,

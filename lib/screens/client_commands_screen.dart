@@ -171,54 +171,56 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
         elevation: 0,
         iconTheme: Theme.of(context).appBarTheme.iconTheme,
       ),
-      body: Column(
-        children: [
-          CommandFiltersSection(
-            isFr: isFr,
-            searchController: _searchController,
-            selectedPlatform: _selectedPlatform,
-            selectedCategory: _selectedCategory,
-            showOnlyElevated: _showOnlyElevated,
-            categories: _getCategories(),
-            onPlatformChanged: (value) {
-              if (value != null) {
-                setState(() {
-                  _selectedPlatform = value;
-                  _filterCommands();
-                });
-              }
-            },
-            onCategoryChanged: (value) {
-              if (value != null) {
-                setState(() {
-                  _selectedCategory = value;
-                  _filterCommands();
-                });
-              }
-            },
-            onElevationChanged: (value) {
-              if (value != null) {
-                setState(() {
-                  _showOnlyElevated = value;
-                  _filterCommands();
-                });
-              }
-            },
-            onSearchClear: () {
-              _searchController.clear();
-            },
-          ),
-          Expanded(
-            child: CommandsList(
-              filteredCommands: _filteredCommands,
+      body: SafeArea(
+        child: Column(
+          children: [
+            CommandFiltersSection(
               isFr: isFr,
+              searchController: _searchController,
               selectedPlatform: _selectedPlatform,
-              onCopy: _copyToClipboard,
-              onShare: _shareCommand,
-              onConfigure: _showParameterDialog,
+              selectedCategory: _selectedCategory,
+              showOnlyElevated: _showOnlyElevated,
+              categories: _getCategories(),
+              onPlatformChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _selectedPlatform = value;
+                    _filterCommands();
+                  });
+                }
+              },
+              onCategoryChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _selectedCategory = value;
+                    _filterCommands();
+                  });
+                }
+              },
+              onElevationChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _showOnlyElevated = value;
+                    _filterCommands();
+                  });
+                }
+              },
+              onSearchClear: () {
+                _searchController.clear();
+              },
             ),
-          ),
-        ],
+            Expanded(
+              child: CommandsList(
+                filteredCommands: _filteredCommands,
+                isFr: isFr,
+                selectedPlatform: _selectedPlatform,
+                onCopy: _copyToClipboard,
+                onShare: _shareCommand,
+                onConfigure: _showParameterDialog,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

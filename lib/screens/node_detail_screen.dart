@@ -164,7 +164,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           Row(
             children: [
               Icon(Icons.circle,
-                  color: _currentNode.online ? Colors.green : Colors.grey,
+                  color: _currentNode.online ? Colors.green : theme.colorScheme.onPrimary.withOpacity(0.5),
                   size: 16),
               const SizedBox(width: 8),
               Text(
@@ -172,28 +172,28 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                       ? (isFr ? 'En ligne' : 'Online')
                       : (isFr ? 'Hors ligne' : 'Offline'),
                   style: theme.textTheme.bodyMedium?.copyWith(
-                      color: _currentNode.online ? Colors.green : Colors.grey,
+                      color: _currentNode.online ? Colors.green : theme.colorScheme.onPrimary.withOpacity(0.5),
                       fontWeight: FontWeight.bold)),
               const Spacer(),
               if (widget.node.isExitNode)
                 Chip(
-                    label: const Text('Exit Node'),
-                    backgroundColor: theme.colorScheme.primary,
+                    label: Text('Exit Node', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary)),
+                    backgroundColor: theme.colorScheme.onPrimary,
                     labelStyle: theme.textTheme.labelSmall
-                        ?.copyWith(color: theme.colorScheme.onPrimary)),
+                        ?.copyWith(color: theme.colorScheme.primary)),
             ],
           ),
           const SizedBox(height: 16),
           Text(_currentNode.hostname,
               style: theme.textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold)),
+                  ?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),
           const SizedBox(height: 4),
           Text('${isFr ? 'Utilisateur' : 'User'}: ${_currentNode.user}',
-              style: theme.textTheme.titleMedium),
+              style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
           const SizedBox(height: 8),
           Text(
               '${isFr ? 'Dernière connexion' : 'Last seen'}: ${_currentNode.lastSeen.toLocal()}',
-              style: theme.textTheme.bodySmall),
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.7))),
         ],
       ),
     );
@@ -206,12 +206,12 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     return _SectionCard(
       child: SwitchListTile(
         title: Text(isFr ? 'Surveiller le statut' : 'Monitor Status',
-            style: theme.textTheme.titleMedium),
+            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
         subtitle: Text(
             isFr
                 ? 'Recevoir une notification si le nœud se connecte ou se déconnecte.'
                 : 'Receive a notification if the node goes online or offline.',
-            style: theme.textTheme.bodySmall),
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.7))),
         value: _isMonitoringEnabled,
         onChanged: _toggleMonitoring,
         contentPadding: EdgeInsets.zero,
@@ -229,8 +229,8 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         children: [
           Text(isFr ? 'Adresses IP' : 'IP Addresses',
               style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const Divider(height: 20),
+                  ?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),
+          Divider(height: 20, color: theme.colorScheme.onPrimary.withOpacity(0.5)),
           if (_ipv4.isNotEmpty) _DetailRowWithCopy(label: 'IPv4', value: _ipv4),
           if (_ipv6.isNotEmpty) _DetailRowWithCopy(label: 'IPv6', value: _ipv6),
         ],
@@ -248,8 +248,8 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         children: [
           Text(isFr ? 'Identifiants' : 'Identifiers',
               style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const Divider(height: 20),
+                  ?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),
+          Divider(height: 20, color: theme.colorScheme.onPrimary.withOpacity(0.5)),
           _DetailRowWithCopy(
               label: isFr ? 'ID Nœud' : 'Node ID', value: _currentNode.id),
           _DetailRowWithCopy(
@@ -279,14 +279,13 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         children: [
           Text(isFr ? 'Gestion des Routes' : 'Route Management',
               style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const Divider(height: 20),
+                  ?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),
+          Divider(height: 20, color: theme.colorScheme.onPrimary.withOpacity(0.5)),
           Text(
             isFr
                 ? 'Cochez les routes que vous souhaitez approuver pour ce nœud.'
                 : 'Check the routes you want to approve for this node.',
-            style: theme.textTheme.bodyMedium,
-          ),
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
           const SizedBox(height: 10),
           ListView.builder(
             shrinkWrap: true,
@@ -297,7 +296,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
               return CheckboxListTile(
                 title: Text(route,
                     style: theme.textTheme.bodyMedium
-                        ?.copyWith(fontFamily: 'monospace')),
+                        ?.copyWith(fontFamily: 'monospace', color: theme.colorScheme.onPrimary)),
                 value: _selectedRoutes.contains(route),
                 onChanged: (bool? value) {
                   setState(() {
@@ -310,6 +309,8 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                 },
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
+                checkColor: theme.colorScheme.primary,
+                activeColor: theme.colorScheme.onPrimary,
               );
             },
           ),
@@ -318,13 +319,13 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
             child: ElevatedButton(
               onPressed: _saveRoutes,
               style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
+                backgroundColor: theme.colorScheme.onPrimary,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               ),
               child: Text(isFr ? 'Appliquer les changements' : 'Apply Changes',
                   style: theme.textTheme.labelLarge
-                      ?.copyWith(color: theme.colorScheme.onPrimary)),
+                      ?.copyWith(color: theme.colorScheme.primary)),
             ),
           ),
         ],
@@ -342,22 +343,24 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         children: [
           Text('Tags',
               style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const Divider(height: 20),
+                  ?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),
+          Divider(height: 20, color: theme.colorScheme.onPrimary.withOpacity(0.5)),
           Text('Tags:',
               style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold)),
+                  ?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8.0,
             children: _currentNode.tags.isEmpty
                 ? [
                     Text(isFr ? 'Aucun tag' : 'No tags',
-                        style: theme.textTheme.bodyMedium)
+                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary))
                   ]
                 : _currentNode.tags
                     .map((tag) => Chip(
-                        label: Text(tag, style: theme.textTheme.labelSmall)))
+                        label: Text(tag, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary)),
+                        backgroundColor: theme.colorScheme.onPrimary,
+                        ))
                     .toList(),
           ),
         ],
@@ -470,12 +473,12 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     final isFr = locale.languageCode == 'fr';
     return Card(
       elevation: 0,
-      color: theme.cardColor,
+      color: theme.colorScheme.primary,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       child: ExpansionTile(
         title: Text(isFr ? 'Outils de diagnostic' : 'Diagnostic Tools',
             style: theme.textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.bold)),
+                ?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -484,12 +487,14 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                 Row(
                   children: [
                     Text(isFr ? "Ping en continu" : "Continuous Ping",
-                        style: theme.textTheme.bodyMedium),
+                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
                     const Spacer(),
                     Switch(
                       value: _isPingingContinuously,
                       onChanged: _toggleContinuousPing,
-                      activeColor: theme.colorScheme.primary,
+                      activeColor: theme.colorScheme.onPrimary,
+                      inactiveTrackColor: theme.colorScheme.onPrimary.withOpacity(0.3),
+                      inactiveThumbColor: theme.colorScheme.onPrimary.withOpacity(0.7),
                     ),
                   ],
                 ),
@@ -534,22 +539,20 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       children: [
         Text(
             "${isFr ? 'Latence moyenne' : 'Average latency'}: ${avgLatency.toStringAsFixed(2)} ms",
-            style: theme.textTheme.bodyMedium),
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
         Text(
             "${isFr ? 'Paquets perdus' : 'Packet loss'}: ${loss.toStringAsFixed(0)}% ($received/$transmitted ${isFr ? 'reçus' : 'received'})",
-            style: theme.textTheme.bodyMedium),
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
         const SizedBox(height: 20),
         _buildPingChart(context),
         const SizedBox(height: 20),
         Text(isFr ? "Journal du ping:" : "Ping Log:",
-            style: theme.textTheme.bodyMedium),
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
         Container(
           height: 150,
           decoration: BoxDecoration(
-            color: theme.brightness == Brightness.dark
-                ? Colors.grey[900]
-                : Colors.grey[200],
-            border: Border.all(color: theme.dividerColor),
+            color: theme.colorScheme.onPrimary.withOpacity(0.1),
+            border: Border.all(color: theme.colorScheme.onPrimary.withOpacity(0.3)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: ListView.builder(
@@ -562,7 +565,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                 return Text(
                     "${isFr ? 'Réponse de' : 'Reply from'} ${data.response!.ip}: ${isFr ? 'temps' : 'time'}=${data.response!.time?.inMilliseconds}ms",
                     style: theme.textTheme.bodySmall
-                        ?.copyWith(fontFamily: 'monospace'));
+                        ?.copyWith(fontFamily: 'monospace', color: theme.colorScheme.onPrimary));
               } else if (data.error != null) {
                 return Text(
                     "${isFr ? 'Erreur' : 'Error'}: ${data.error!.error.toString()}",
@@ -611,9 +614,9 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
               show: true,
               drawVerticalLine: true,
               getDrawingHorizontalLine: (value) => FlLine(
-                  color: theme.dividerColor.withOpacity(0.5), strokeWidth: 0.1),
+                  color: theme.colorScheme.onPrimary.withOpacity(0.5), strokeWidth: 0.1),
               getDrawingVerticalLine: (value) => FlLine(
-                  color: theme.dividerColor.withOpacity(0.5),
+                  color: theme.colorScheme.onPrimary.withOpacity(0.5),
                   strokeWidth: 0.1)),
           titlesData: const FlTitlesData(
             leftTitles: AxisTitles(
@@ -624,20 +627,20 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           ),
           borderData: FlBorderData(
               show: true,
-              border: Border.all(color: theme.dividerColor, width: 1)),
+              border: Border.all(color: theme.colorScheme.onPrimary.withOpacity(0.5), width: 1)),
           minX: spots.first.x,
           maxX: spots.last.x,
           lineBarsData: [
             LineChartBarData(
               spots: spots,
               isCurved: true,
-              color: theme.colorScheme.primary,
+              color: theme.colorScheme.secondary,
               barWidth: 3,
               isStrokeCapRound: true,
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                   show: true,
-                  color: theme.colorScheme.primary.withOpacity(0.3)),
+                  color: theme.colorScheme.secondary.withOpacity(0.3)),
             ),
           ],
         ),
@@ -652,9 +655,10 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
       elevation: 0,
-      color: Theme.of(context).cardColor,
+      color: theme.colorScheme.primary,
       margin: const EdgeInsets.symmetric(vertical: 0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       child: Padding(
@@ -685,15 +689,15 @@ class _DetailRowWithCopy extends StatelessWidget {
             width: 100,
             child: Text(label,
                 style: theme.textTheme.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.bold)),
+                    ?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),
           ),
           Expanded(
             child: SelectableText(value,
                 style: theme.textTheme.bodyMedium
-                    ?.copyWith(fontFamily: 'monospace')),
+                    ?.copyWith(fontFamily: 'monospace', color: theme.colorScheme.onPrimary)),
           ),
           IconButton(
-            icon: Icon(Icons.copy, size: 18, color: theme.iconTheme.color),
+            icon: Icon(Icons.copy, size: 18, color: theme.colorScheme.onPrimary),
             tooltip: isFr ? 'Copier' : 'Copy',
             onPressed: () {
               Clipboard.setData(ClipboardData(text: value));
@@ -704,8 +708,8 @@ class _DetailRowWithCopy extends StatelessWidget {
                             ? 'Copié dans le presse-papiers'
                             : 'Copied to clipboard',
                         style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: theme.colorScheme.onPrimary)),
-                    backgroundColor: theme.colorScheme.primary),
+                            ?.copyWith(color: theme.colorScheme.primary)),
+                    backgroundColor: theme.colorScheme.onPrimary),
               );
             },
           ),

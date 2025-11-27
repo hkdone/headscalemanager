@@ -147,7 +147,7 @@ class _UserCard extends StatelessWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: theme.cardColor,
+          color: theme.colorScheme.primary,
           borderRadius: BorderRadius.circular(12.0),
         ),
         child: Stack(
@@ -158,19 +158,19 @@ class _UserCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Icon(Icons.person, size: 48, color: theme.colorScheme.primary),
+                  Icon(Icons.person, size: 48, color: theme.colorScheme.onPrimary),
                   const SizedBox(height: 12),
                   Text(
                     user.name,
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${isFr ? 'Créé le' : 'Created on'}: ${user.createdAt?.toLocal().toString().substring(0, 10) ?? 'N/A'}',
-                    style: theme.textTheme.bodySmall,
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.7)),
                   ),
                 ],
               ),
@@ -179,7 +179,7 @@ class _UserCard extends StatelessWidget {
               top: 0,
               right: 0,
               child: PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, color: theme.iconTheme.color),
+                icon: Icon(Icons.more_vert, color: theme.colorScheme.onPrimary),
                 onSelected: (value) {
                   if (value == 'delete') {
                     showDialog(
@@ -198,7 +198,7 @@ class _UserCard extends StatelessWidget {
                           semanticLabel:
                               isFr ? 'Supprimer l\'utilisateur' : 'Delete user'),
                       title: Text(isFr ? 'Supprimer l\'utilisateur' : 'Delete user',
-                          style: theme.textTheme.bodyMedium),
+                          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface)), // Keep default onSurface for menu item
                     ),
                   ),
                 ],

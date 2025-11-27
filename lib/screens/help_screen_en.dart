@@ -15,16 +15,12 @@ class HelpScreenEn extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: Builder(
-        builder: (context) {
-          final double bottomPadding = MediaQuery
-              .of(context)
-              .padding
-              .bottom;
-          return SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-                16.0, 24.0, 16.0, 24.0 + bottomPadding),
-            child: Column(
+      body: SafeArea(
+        child: Builder(
+          builder: (context) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16.0, 24.0, 16.0, 24.0),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -554,25 +550,29 @@ routes:
             ),
           );
         }),
-    );
+    ));
   }
   
   Widget _buildCommandsCard(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      elevation: 2,
+      color: theme.colorScheme.primary,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12.0),
       ),
       margin: const EdgeInsets.symmetric(vertical: 8.0),
       child: ListTile(
-        leading: Icon(EvaIcons.hardDriveOutline, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 32),
-        title: const Text(
+        leading: Icon(EvaIcons.hardDriveOutline, color: theme.colorScheme.onPrimary, size: 32),
+        title: Text(
           'Client Command Library',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary),
         ),
-        subtitle: const Text('Find useful Tailscale CLI commands.'),
-        trailing: Icon(Icons.arrow_forward_ios, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        subtitle: Text(
+          'Find useful Tailscale CLI commands.',
+          style: TextStyle(color: theme.colorScheme.onPrimary.withOpacity(0.8)),
+        ),
+        trailing: Icon(Icons.arrow_forward_ios, color: theme.colorScheme.onPrimary),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const ClientCommandsScreen()),
