@@ -57,7 +57,6 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
   final Graph graph = Graph();
   late AclParserService _parser;
   final Map<String, headscale_node.Node> _idToNodeMap = {};
-  final Map<Node, Widget> _nodeWidgetCache = {};
   bool _graphBuilt = false;
   final TransformationController _transformationController =
       TransformationController();
@@ -66,6 +65,8 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
   late final AnimationController _animationController;
 
   final double _graphPadding = 150.0;
+  int? _tapDownPointer;
+  Offset? _tapDownPosition;
 
   @override
   void initState() {
@@ -219,7 +220,6 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
   }
 
   void _buildGraph() {
-    _nodeWidgetCache.clear();
     graph.nodes.clear();
     graph.edges.clear();
 
@@ -659,15 +659,26 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
     );
   }
 
-  Widget _getOrCreateNodeWidget(Node node) {
-    return _nodeWidgetCache.putIfAbsent(node, () {
-      final item = _getItemFromNode(node);
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: item != null ? () => _showDetailsDialog(item) : null,
-        child: _buildNodeWidget(node),
-      );
-    });
+  Widget _buildInteractiveNodeWidget(Node node) {
+    final item = _getItemFromNode(node);
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (event) {
+        _tapDownPointer = event.pointer;
+        _tapDownPosition = event.position;
+      },
+      onPointerUp: (event) {
+        if (_tapDownPointer == event.pointer) {
+          final delta = event.position - _tapDownPosition!;
+          if (delta.distanceSquared < 20 * 20) { // ~ kTouchSlop
+            if (item != null) {
+              _showDetailsDialog(item);
+            }
+          }
+        }
+      },
+      child: _buildNodeWidget(node),
+    );
   }
 
   @override
@@ -678,38 +689,14 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
       boundaryMargin: const EdgeInsets.all(1000),
       minScale: 0.001,
       maxScale: 5.0,
-      child: Stack(
-        children: [
-          AnimatedBuilder(
-            animation: _animationController,
-            builder: (context, child) {
-              return Container(
-                padding: EdgeInsets.all(_graphPadding),
-                child: GraphView(
-                  graph: graph,
-                  algorithm: _algorithm,
-                  builder: (node) {
-                    return IgnorePointer(
-                      child: Opacity(
-                        opacity: 0.0,
-                        child: _getOrCreateNodeWidget(node),
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-          Container(
-            padding: EdgeInsets.all(_graphPadding),
-            child: GraphView(
-              graph: graph,
-              algorithm: PrecomputedLayoutAlgorithm(),
-              builder: _getOrCreateNodeWidget,
-              paint: Paint()..color = Colors.transparent,
-            ),
-          ),
-        ],
+      child: Container(
+        padding: EdgeInsets.all(_graphPadding),
+        child: GraphView(
+          graph: graph,
+          algorithm: _algorithm,
+          builder: _buildInteractiveNodeWidget,
+          paint: Paint()..color = Colors.transparent,
+        ),
       ),
     );
   }

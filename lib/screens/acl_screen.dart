@@ -3,12 +3,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
+import 'package:headscalemanager/screens/acl_manager_screen.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:headscalemanager/services/new_acl_generator_service.dart';
 import 'package:headscalemanager/widgets/shared_routes_access_dialog.dart';
 import 'package:headscalemanager/utils/ip_utils.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 
 class AclScreen extends StatefulWidget {
   const AclScreen({super.key});
@@ -119,19 +121,26 @@ class _AclScreenState extends State<AclScreen> {
                 ),
               ),
             ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
+      floatingActionButton: SpeedDial(
+        animatedIcon: AnimatedIcons.menu_close,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         children: [
-          FloatingActionButton.extended(
-            onPressed: () => _generateNewAclPolicy(showSnackbar: true),
-            label: Text(isFr
-                ? 'Générer Politique Standard'
-                : 'Generate Standard Policy'),
-            icon: const Icon(Icons.settings_backup_restore),
+          SpeedDialChild(
+            child: const Icon(Icons.account_tree_outlined),
+            label: isFr ? 'Vue Graphe' : 'Graph View',
             backgroundColor: Theme.of(context).colorScheme.secondary,
-            heroTag: 'generate_policy_fab',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AclManagerScreen()),
+              );
+            },
           ),
-          const SizedBox(height: 10),
+          SpeedDialChild(
+            child: const Icon(Icons.settings_backup_restore),
+            label: isFr ? 'Générer Politique' : 'Generate Policy',
+            backgroundColor: Theme.of(context).colorScheme.secondary,
+            onTap: () => _generateNewAclPolicy(showSnackbar: true),
+          ),
         ],
       ),
     );
