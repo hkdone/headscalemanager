@@ -203,6 +203,16 @@ class _DnsScreenState extends State<DnsScreen> {
           isFr ? "Noms DNS Personnalisés" : "Custom DNS Names",
           style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          side: BorderSide(color: theme.dividerColor),
+        ),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          side: BorderSide(color: theme.dividerColor),
+        ),
+        backgroundColor: theme.cardColor,
+        collapsedBackgroundColor: theme.cardColor,
         children: <Widget>[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -214,16 +224,6 @@ class _DnsScreenState extends State<DnsScreen> {
             ),
           ),
         ],
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12.0),
-          side: BorderSide(color: theme.dividerColor),
-        ),
-        collapsedShape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12.0),
-          side: BorderSide(color: theme.dividerColor),
-        ),
-        backgroundColor: theme.cardColor,
-        collapsedBackgroundColor: theme.cardColor,
       ),
     );
   }
