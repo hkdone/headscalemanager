@@ -93,7 +93,8 @@ class Node {
     // CORRECTION LOGIQUE : Un nœud est un "exit node" si ses routes de sortie sont APPROUVÉES.
     final bool isExitNode =
         approved.contains('0.0.0.0/0') || approved.contains('::/0');
-    final bool isLanSharer = approved.any((route) => route != '0.0.0.0/0' && route != '::/0');
+    final bool isLanSharer =
+        approved.any((route) => route != '0.0.0.0/0' && route != '::/0');
 
     return Node(
       id: json['id'] ?? '',

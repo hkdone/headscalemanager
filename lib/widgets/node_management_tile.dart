@@ -24,7 +24,8 @@ class NodeManagementTile extends StatelessWidget {
   /// Fonction de rappel appelée après une mise à jour du nœud (ex: renommage, déplacement).
   final VoidCallback onNodeUpdate;
 
-  const NodeManagementTile({super.key, required this.node, required this.onNodeUpdate});
+  const NodeManagementTile(
+      {super.key, required this.node, required this.onNodeUpdate});
 
   /// Exécute une action asynchrone et affiche un SnackBar de succès ou d'erreur.
   ///
@@ -126,9 +127,7 @@ class NodeManagementTile extends StatelessWidget {
                 _runAction(
                     context,
                     () => provider.apiService.setNodeRoutes(node.id, []),
-                    isFr
-                        ? 'Nœud de sortie désactivé.'
-                        : 'Exit node disabled.');
+                    isFr ? 'Nœud de sortie désactivé.' : 'Exit node disabled.');
                 break;
               case 'share_subnet':
                 // Affiche le dialogue pour partager un sous-réseau.
@@ -169,9 +168,7 @@ class NodeManagementTile extends StatelessWidget {
                           _runAction(
                               context,
                               () => provider.apiService.deleteNode(node.id),
-                              isFr
-                                  ? 'Appareil supprimé.'
-                                  : 'Device deleted.');
+                              isFr ? 'Appareil supprimé.' : 'Device deleted.');
                         },
                       ),
                     ],
@@ -199,21 +196,26 @@ class NodeManagementTile extends StatelessWidget {
               value: 'enable_exit_node',
               child: ListTile(
                 leading: const Icon(Icons.exit_to_app),
-                title: Text(isFr ? 'Activer le nœud de sortie' : 'Enable Exit Node'),
+                title: Text(
+                    isFr ? 'Activer le nœud de sortie' : 'Enable Exit Node'),
               ),
             ),
             PopupMenuItem<String>(
               value: 'disable_exit_node',
               child: ListTile(
                 leading: const Icon(Icons.remove_circle_outline),
-                title: Text(isFr ? 'Désactiver le nœud de sortie' : 'Disable Exit Node'),
+                title: Text(isFr
+                    ? 'Désactiver le nœud de sortie'
+                    : 'Disable Exit Node'),
               ),
             ),
             PopupMenuItem<String>(
               value: 'share_subnet',
               child: ListTile(
                 leading: const Icon(Icons.router_outlined),
-                title: Text(isFr ? 'Partager le sous-réseau local' : 'Share Local Subnet'),
+                title: Text(isFr
+                    ? 'Partager le sous-réseau local'
+                    : 'Share Local Subnet'),
               ),
             ),
             PopupMenuItem<String>(
@@ -221,7 +223,9 @@ class NodeManagementTile extends StatelessWidget {
               child: ListTile(
                 leading: const Icon(Icons
                     .router_outlined), // Réutilisation de l'icône pour l'instant
-                title: Text(isFr ? 'Désactiver les routes de sous-réseau' : 'Disable Subnet Routes'),
+                title: Text(isFr
+                    ? 'Désactiver les routes de sous-réseau'
+                    : 'Disable Subnet Routes'),
               ),
             ),
             const PopupMenuDivider(),

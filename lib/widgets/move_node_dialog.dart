@@ -12,7 +12,8 @@ class MoveNodeDialog extends StatefulWidget {
   final Node node;
   final VoidCallback onNodeMoved;
 
-  const MoveNodeDialog({super.key, required this.node, required this.onNodeMoved});
+  const MoveNodeDialog(
+      {super.key, required this.node, required this.onNodeMoved});
 
   @override
   State<MoveNodeDialog> createState() => _MoveNodeDialogState();
@@ -56,8 +57,7 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
       final newUserName = normalizeUserName(_selectedUser!.name);
       final newClientTag = 'tag:$newUserName-client$capabilities';
 
-      final newTags =
-          oldTags.where((tag) => !tag.contains('-client')).toList();
+      final newTags = oldTags.where((tag) => !tag.contains('-client')).toList();
       newTags.add(newClientTag);
 
       await provider.apiService.setTags(widget.node.id, newTags);
@@ -104,8 +104,8 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
           final newPolicyJson = jsonEncode(newPolicyMap);
           await provider.apiService.setAclPolicy(newPolicyJson);
 
-          showSafeSnackBar(context,
-              isFr ? 'ACLs mises à jour !' : 'ACLs updated!');
+          showSafeSnackBar(
+              context, isFr ? 'ACLs mises à jour !' : 'ACLs updated!');
         }
       }
 

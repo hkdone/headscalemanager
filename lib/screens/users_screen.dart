@@ -52,13 +52,13 @@ class _UsersScreenState extends State<UsersScreen> {
               debugPrint(
                   'Erreur lors du chargement des utilisateurs : ${snapshot.error}');
               return Center(
-                  child: Text(
-                      '${isFr ? 'Erreur' : 'Error'}: ${snapshot.error}',
+                  child: Text('${isFr ? 'Erreur' : 'Error'}: ${snapshot.error}',
                       style: theme.textTheme.bodyMedium));
             }
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return Center(
-                  child: Text(isFr ? 'Aucun utilisateur trouvé.' : 'No users found.',
+                  child: Text(
+                      isFr ? 'Aucun utilisateur trouvé.' : 'No users found.',
                       style: theme.textTheme.bodyMedium));
             }
 
@@ -112,7 +112,11 @@ class _UsersScreenState extends State<UsersScreen> {
             if (userCreated == true) {
               _refreshUsers();
               if (mounted) {
-                showSafeSnackBar(context, isFr ? 'Utilisateur créé avec succès.' : 'User created successfully.');
+                showSafeSnackBar(
+                    context,
+                    isFr
+                        ? 'Utilisateur créé avec succès.'
+                        : 'User created successfully.');
               }
             }
           },
@@ -158,19 +162,23 @@ class _UserCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Icon(Icons.person, size: 48, color: theme.colorScheme.onPrimary),
+                  Icon(Icons.person,
+                      size: 48, color: theme.colorScheme.onPrimary),
                   const SizedBox(height: 12),
                   Text(
                     user.name,
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onPrimary),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${isFr ? 'Créé le' : 'Created on'}: ${user.createdAt?.toLocal().toString().substring(0, 10) ?? 'N/A'}',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.7)),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onPrimary.withOpacity(0.7)),
                   ),
                 ],
               ),
@@ -195,10 +203,14 @@ class _UserCard extends StatelessWidget {
                     child: ListTile(
                       leading: Icon(Icons.delete,
                           color: Colors.red,
-                          semanticLabel:
-                              isFr ? 'Supprimer l\'utilisateur' : 'Delete user'),
-                      title: Text(isFr ? 'Supprimer l\'utilisateur' : 'Delete user',
-                          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface)), // Keep default onSurface for menu item
+                          semanticLabel: isFr
+                              ? 'Supprimer l\'utilisateur'
+                              : 'Delete user'),
+                      title: Text(
+                          isFr ? 'Supprimer l\'utilisateur' : 'Delete user',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme
+                                  .onSurface)), // Keep default onSurface for menu item
                     ),
                   ),
                 ],

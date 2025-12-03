@@ -52,7 +52,8 @@ class DeleteUserDialog extends StatelessWidget {
                       ? 'Utilisateur ${user.name} supprimé.'
                       : 'User ${user.name} deleted.');
             } catch (e) {
-              debugPrint('Erreur lors de la suppression de l\'utilisateur : $e');
+              debugPrint(
+                  'Erreur lors de la suppression de l\'utilisateur : $e');
               Navigator.of(context).pop();
               showSafeSnackBar(
                   context,

@@ -54,7 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
       Icon(EvaIcons.layout, size: 30, color: theme.colorScheme.onPrimary),
       Icon(EvaIcons.people, size: 30, color: theme.colorScheme.onPrimary),
       Icon(EvaIcons.shield, size: 30, color: theme.colorScheme.onPrimary),
-      Icon(EvaIcons.globe2Outline, size: 30, color: theme.colorScheme.onPrimary),
+      Icon(EvaIcons.globe2Outline,
+          size: 30, color: theme.colorScheme.onPrimary),
       Icon(Icons.dns_rounded, size: 30, color: theme.colorScheme.onPrimary),
     ];
 
@@ -66,14 +67,15 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.help_outline, color: theme.colorScheme.primary),
             onPressed: () {
               Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => isFr ? const HelpScreen() : const HelpScreenEn()));
+                  builder: (_) =>
+                      isFr ? const HelpScreen() : const HelpScreenEn()));
             },
           ),
           IconButton(
             icon: Icon(EvaIcons.settings, color: theme.colorScheme.primary),
             onPressed: () {
-              Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+              Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()));
             },
           ),
         ],

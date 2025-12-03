@@ -26,7 +26,8 @@ class ExitNodeCommandDialog extends StatefulWidget {
   State<ExitNodeCommandDialog> createState() => _ExitNodeCommandDialogState();
 }
 
-class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog> with SingleTickerProviderStateMixin {
+class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -61,8 +62,9 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog> with Sing
               'Erreur lors de la récupération de l\'URL du serveur : ${snapshot.error}');
           return AlertDialog(
             title: Text(isFr ? 'Erreur' : 'Error'),
-            content: Text(
-                isFr ? 'URL du serveur non configurée.' : 'Server URL not configured.'),
+            content: Text(isFr
+                ? 'URL du serveur non configurée.'
+                : 'Server URL not configured.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -81,8 +83,9 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog> with Sing
 
         return AlertDialog(
           // Changed from SubnetCommandDialog to AlertDialog
-          title:
-              Text(isFr ? 'Étape 1 : Configurer le nœud de sortie' : 'Step 1: Configure Exit Node'),
+          title: Text(isFr
+              ? 'Étape 1 : Configurer le nœud de sortie'
+              : 'Step 1: Configure Exit Node'),
           content: SizedBox(
             width: double.maxFinite,
             child: Column(
@@ -166,7 +169,9 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog> with Sing
               onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-              child: Text(isFr ? 'Copier la commande Tailscale' : 'Copy Tailscale Command'),
+              child: Text(isFr
+                  ? 'Copier la commande Tailscale'
+                  : 'Copy Tailscale Command'),
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: tailscaleCommand));
                 showSafeSnackBar(
@@ -177,7 +182,9 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog> with Sing
               },
             ),
             ElevatedButton(
-              child: Text(isFr ? 'Procéder à la confirmation' : 'Proceed to Confirmation'),
+              child: Text(isFr
+                  ? 'Procéder à la confirmation'
+                  : 'Proceed to Confirmation'),
               onPressed: () async {
                 Navigator.of(context)
                     .pop(); // Fermer la boîte de dialogue actuelle
@@ -192,9 +199,10 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog> with Sing
                 try {
                   await appProvider.apiService
                       .setNodeRoutes(widget.node.id, combinedRoutes);
-                  showSafeSnackBar(
-                      context, isFr ? 'Nœud de sortie activé.' : 'Exit node enabled.');
-                  widget.onExitNodeEnabled(); // Appelle le callback pour rafraîchir
+                  showSafeSnackBar(context,
+                      isFr ? 'Nœud de sortie activé.' : 'Exit node enabled.');
+                  widget
+                      .onExitNodeEnabled(); // Appelle le callback pour rafraîchir
                 } catch (e) {
                   debugPrint(
                       'Erreur lors de l\'activation du nœud de sortie : $e');

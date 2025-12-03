@@ -39,7 +39,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
   final Map<Node, Widget> _nodeWidgetCache = {};
   bool _graphBuilt = false;
   final TransformationController _transformationController =
-  TransformationController();
+      TransformationController();
   late final BuchheimWalkerConfiguration _configuration;
   late final TidierTreeLayoutAlgorithm _algorithm;
   late final TidierTreeLayoutAlgorithm _nodeAlgorithm;
@@ -162,7 +162,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
 
     for (var sharedNode in sharedPeerNodes) {
       final parentEdges =
-      graph.edges.where((e) => e.destination == sharedNode).toList();
+          graph.edges.where((e) => e.destination == sharedNode).toList();
       if (parentEdges.length == 2) {
         final parent1 = parentEdges[0].source;
         final parent2 = parentEdges[1].source;
@@ -198,7 +198,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
           final route = symbolId.substring(11).replaceAll('_', '/');
           try {
             ownerNode = widget.nodes.firstWhere(
-                  (n) => n.sharedRoutes.contains(route),
+              (n) => n.sharedRoutes.contains(route),
             );
           } catch (e) {
             // Si non trouvé (rare), on ignore
@@ -232,9 +232,9 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final Color intraUserColor =
-    isDarkMode ? Colors.cyanAccent[200]! : Colors.blue[800]!;
+        isDarkMode ? Colors.cyanAccent[200]! : Colors.blue[800]!;
     final Color interUserColor =
-    isDarkMode ? Colors.amberAccent[200]! : Colors.purple[800]!;
+        isDarkMode ? Colors.amberAccent[200]! : Colors.purple[800]!;
     final Color exitNodeLinkColor = isDarkMode
         ? Colors.greenAccent[400]!
         : const Color.fromARGB(255, 0, 128, 6);
@@ -315,13 +315,13 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
 
         if (routeSymbolNode != null) {
           if (graph.edges.any((e) =>
-          e.source == sourceMachineNode &&
+              e.source == sourceMachineNode &&
               e.destination == routeSymbolNode)) {
             continue;
           }
           final permissionSourceNode = subnetPermission.sourceNode;
           final color = (permissionSourceNode != null &&
-              machine.user == permissionSourceNode.user)
+                  machine.user == permissionSourceNode.user)
               ? intraUserColor
               : interUserColor;
 
@@ -342,7 +342,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
 
         if (routeSymbolNode != null) {
           if (graph.edges.any((e) =>
-          e.source == sourceMachineNode &&
+              e.source == sourceMachineNode &&
               e.destination == routeSymbolNode)) {
             continue;
           }
@@ -376,14 +376,14 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
           final symbolId = 'shared_peer_${ids[0]}_${ids[1]}';
 
           var sharedPeerSymbolNode = graph.nodes.firstWhere(
-                  (n) => n.key?.value == symbolId,
+              (n) => n.key?.value == symbolId,
               orElse: () => Node.Id(symbolId));
 
           if (!graph.nodes.contains(sharedPeerSymbolNode)) {
             graph.addNode(sharedPeerSymbolNode);
           }
           if (!graph.edges.any((e) =>
-          e.source == sourceMachineNode &&
+              e.source == sourceMachineNode &&
               e.destination == sharedPeerSymbolNode)) {
             graph.addEdge(sourceMachineNode, sharedPeerSymbolNode,
                 paint: Paint()
@@ -391,7 +391,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
                   ..strokeWidth = 2.0);
           }
           if (!graph.edges.any((e) =>
-          e.source == destMachineNode &&
+              e.source == destMachineNode &&
               e.destination == sharedPeerSymbolNode)) {
             graph.addEdge(destMachineNode, sharedPeerSymbolNode,
                 paint: Paint()
@@ -424,7 +424,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
 
         if (routeSymbolNode != null) {
           if (graph.edges.any((e) =>
-          e.source == sourceMachineNode &&
+              e.source == sourceMachineNode &&
               e.destination == routeSymbolNode)) {
             continue;
           }
@@ -489,11 +489,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
         final routeParts = parts.sublist(1);
         final route = routeParts.join('_').replaceAll('_', '/');
         final ownerNode = _idToNodeMap[nodeId];
-        return {
-          'type': 'lan',
-          'route': route,
-          'owner': ownerNode
-        };
+        return {'type': 'lan', 'route': route, 'owner': ownerNode};
       }
       // Fallback pour ancien format
       final route = prefixedId.substring(11).replaceAll('_', '/');
@@ -743,28 +739,28 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
         color: nodeColor,
         boxShadow: isOnline
             ? [
-          // Halo effect for online nodes
-          BoxShadow(
-            color: isDarkMode ? Colors.greenAccent[400]! : Colors.green,
-            spreadRadius: 3,
-            blurRadius: 15,
-            offset: const Offset(0, 0),
-          ),
-          BoxShadow(
-            color: nodeColor.withOpacity(0.7),
-            spreadRadius: 1,
-            blurRadius: 3,
-          )
-        ]
+                // Halo effect for online nodes
+                BoxShadow(
+                  color: isDarkMode ? Colors.greenAccent[400]! : Colors.green,
+                  spreadRadius: 3,
+                  blurRadius: 15,
+                  offset: const Offset(0, 0),
+                ),
+                BoxShadow(
+                  color: nodeColor.withOpacity(0.7),
+                  spreadRadius: 1,
+                  blurRadius: 3,
+                )
+              ]
             : [
-          // Subtle shadow for offline nodes
-          BoxShadow(
-            color: Colors.black.withOpacity(0.4),
-            spreadRadius: 1,
-            blurRadius: 2,
-            offset: const Offset(1, 1),
-          )
-        ],
+                // Subtle shadow for offline nodes
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.4),
+                  spreadRadius: 1,
+                  blurRadius: 2,
+                  offset: const Offset(1, 1),
+                )
+              ],
       ),
       child: Center(
         child: Text(
@@ -850,7 +846,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
       transformationController: _transformationController,
       constrained: false, // Important pour laisser le graphe s'étendre
       boundaryMargin:
-      const EdgeInsets.all(1000), // Marge énorme pour dézoomer librement
+          const EdgeInsets.all(1000), // Marge énorme pour dézoomer librement
       minScale: 0.001, // Dézoom quasi-infini
       maxScale: 5.0,
       child: Stack(

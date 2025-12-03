@@ -589,7 +589,7 @@ class DynamicCommandGenerator {
         category: CommandCategories.maintenance,
         tags: ['file', 'taildrop', 'get', 'receive'],
       ),
-      
+
       // DEBUG
       ClientCommand(
         id: 'debug_derp',
@@ -631,7 +631,7 @@ class DynamicCommandGenerator {
         category: CommandCategories.routing,
         tags: ['up', 'exit-node', 'lan', 'routing'],
       ),
-      
+
       // CONNEXION
       ClientCommand(
         id: 'connect_basic',

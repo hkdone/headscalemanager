@@ -4,6 +4,7 @@ import 'package:headscalemanager/screens/home_screen.dart';
 import 'package:headscalemanager/screens/help_screen.dart';
 import 'package:headscalemanager/screens/help_screen_en.dart';
 import 'package:headscalemanager/screens/api_keys_screen.dart';
+import 'package:headscalemanager/screens/security_settings_screen.dart';
 import 'package:headscalemanager/services/notification_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -136,8 +137,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const Divider(height: 32),
                 SwitchListTile(
-                  title: Text(isFr ? 'Notifications en arrière-plan' : 'Background Notifications', style: theme.textTheme.titleMedium),
-                  subtitle: Text(isFr ? 'Vérifie périodiquement les nouvelles demandes d\'approbation.' : 'Periodically check for new approval requests.', style: theme.textTheme.bodySmall),
+                  title: Text(
+                      isFr
+                          ? 'Notifications en arrière-plan'
+                          : 'Background Notifications',
+                      style: theme.textTheme.titleMedium),
+                  subtitle: Text(
+                      isFr
+                          ? 'Vérifie périodiquement les nouvelles demandes d\'approbation.'
+                          : 'Periodically check for new approval requests.',
+                      style: theme.textTheme.bodySmall),
                   value: _notificationsEnabled,
                   onChanged: (bool value) async {
                     setState(() {
@@ -146,6 +155,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.setBool('notificationsEnabled', value);
                     await NotificationService.enableBackgroundTask(value);
+                  },
+                ),
+                const Divider(height: 32),
+                ListTile(
+                  title: Text(isFr ? 'Sécurité' : 'Security',
+                      style: theme.textTheme.titleMedium),
+                  subtitle: Text(
+                      isFr
+                          ? 'Configurer le verrouillage de l\'application'
+                          : 'Configure app lock',
+                      style: theme.textTheme.bodySmall),
+                  leading: const Icon(Icons.security),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const SecuritySettingsScreen()),
+                    );
                   },
                 ),
                 const Divider(height: 32),
@@ -196,15 +222,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  InputDecoration _buildInputDecoration(BuildContext context, String label, String hint) {
+  InputDecoration _buildInputDecoration(
+      BuildContext context, String label, String hint) {
     final theme = Theme.of(context);
     return InputDecoration(
       labelText: label,
       hintText: hint,
       filled: true,
-      fillColor: theme.inputDecorationTheme.fillColor ?? (theme.brightness == Brightness.dark ? Colors.grey[800] : Colors.white),
-      labelStyle: theme.inputDecorationTheme.labelStyle ?? theme.textTheme.titleMedium,
-      hintStyle: theme.inputDecorationTheme.hintStyle ?? theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+      fillColor: theme.inputDecorationTheme.fillColor ??
+          (theme.brightness == Brightness.dark
+              ? Colors.grey[800]
+              : Colors.white),
+      labelStyle:
+          theme.inputDecorationTheme.labelStyle ?? theme.textTheme.titleMedium,
+      hintStyle: theme.inputDecorationTheme.hintStyle ??
+          theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12.0),
         borderSide: BorderSide.none,
@@ -235,7 +267,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: isSelected
-                ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
+                ? Border.all(
+                    color: Theme.of(context).colorScheme.primary, width: 2)
                 : null,
           ),
           child: Text(

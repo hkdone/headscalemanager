@@ -62,10 +62,9 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isFr 
-              ? 'Échec du chargement des commandes dynamiques: ${e.toString()}'
-              : 'Failed to load dynamic commands: ${e.toString()}'
-            ),
+            content: Text(isFr
+                ? 'Échec du chargement des commandes dynamiques: ${e.toString()}'
+                : 'Failed to load dynamic commands: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -100,7 +99,7 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
 
         final matchesElevation =
             !_showOnlyElevated || command.requiresElevation;
-        
+
         final isLinuxOnly = command.tags.contains('linux') &&
             command.windowsCommand.contains('Non applicable');
         final matchesPlatform =
@@ -117,11 +116,12 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
   List<String> _getCategories() {
     final categories = {_allCategoriesString};
     categories.addAll(_allCommands.map((cmd) => cmd.category));
-    return categories.toList()..sort((a, b) {
-      if (a == _allCategoriesString) return -1;
-      if (b == _allCategoriesString) return 1;
-      return a.compareTo(b);
-    });
+    return categories.toList()
+      ..sort((a, b) {
+        if (a == _allCategoriesString) return -1;
+        if (b == _allCategoriesString) return 1;
+        return a.compareTo(b);
+      });
   }
 
   void _copyToClipboard(String command) {

@@ -267,7 +267,8 @@ class _ParameterConfigDialogState extends State<ParameterConfigDialog> {
                     padding: const EdgeInsets.all(12),
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: SelectableText(

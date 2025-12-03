@@ -17,9 +17,11 @@ void showSafeSnackBar(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        behavior: SnackBarBehavior.floating, // Le SnackBar flotte au-dessus du contenu.
+        behavior: SnackBarBehavior
+            .floating, // Le SnackBar flotte au-dessus du contenu.
         margin: const EdgeInsets.all(12), // Marge autour du SnackBar.
-        shape: RoundedRectangleBorder( // Forme du SnackBar avec des bords arrondis.
+        shape: RoundedRectangleBorder(
+          // Forme du SnackBar avec des bords arrondis.
           borderRadius: BorderRadius.circular(8),
         ),
       ),

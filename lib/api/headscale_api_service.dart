@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:http/http.dart' as http;
@@ -26,7 +25,9 @@ class HeadscaleApiService {
       throw Exception('L\'URL du serveur n\'est pas configurée.');
     }
     // Retourne l'URL telle quelle, en s'assurant qu'elle n'a pas de slash à la fin.
-    return urlString.endsWith('/') ? urlString.substring(0, urlString.length - 1) : urlString;
+    return urlString.endsWith('/')
+        ? urlString.substring(0, urlString.length - 1)
+        : urlString;
   }
 
   String _handleError(String functionName, http.Response response) {
@@ -36,7 +37,8 @@ class HeadscaleApiService {
   Future<List<Node>> getNodes() async {
     final baseUrl = await _getBaseUrl();
     final serverUrl = await _storageService.getServerUrl();
-    final String baseDomain = serverUrl?.extractBaseDomain() ?? 'headscale.local';
+    final String baseDomain =
+        serverUrl?.extractBaseDomain() ?? 'headscale.local';
 
     final response = await http.get(
       Uri.parse('$baseUrl/api/v1/node'),
@@ -47,7 +49,8 @@ class HeadscaleApiService {
       final data = json.decode(response.body);
       final List<dynamic> nodesJson = data['nodes'];
       return nodesJson
-          .map((nodeJson) => Node.fromJson(nodeJson as Map<String, dynamic>, baseDomain))
+          .map((nodeJson) =>
+              Node.fromJson(nodeJson as Map<String, dynamic>, baseDomain))
           .toList();
     } else {
       throw Exception(_handleError('charger les nœuds', response));
@@ -57,7 +60,8 @@ class HeadscaleApiService {
   Future<Node> getNodeDetails(String nodeId) async {
     final baseUrl = await _getBaseUrl();
     final serverUrl = await _storageService.getServerUrl();
-    final String baseDomain = serverUrl?.extractBaseDomain() ?? 'headscale.local';
+    final String baseDomain =
+        serverUrl?.extractBaseDomain() ?? 'headscale.local';
 
     final response = await http.get(
       Uri.parse('$baseUrl/api/v1/node/$nodeId'),
@@ -74,7 +78,8 @@ class HeadscaleApiService {
   Future<Node> registerMachine(String machineKey, String userName) async {
     final baseUrl = await _getBaseUrl();
     final serverUrl = await _storageService.getServerUrl();
-    final String baseDomain = serverUrl?.extractBaseDomain() ?? 'headscale.local';
+    final String baseDomain =
+        serverUrl?.extractBaseDomain() ?? 'headscale.local';
 
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/node/register?user=$userName&key=$machineKey'),
@@ -120,7 +125,9 @@ class HeadscaleApiService {
     }
   }
 
-  Future<PreAuthKey> createPreAuthKey(String userId, bool reusable, bool ephemeral, {DateTime? expiration, List<String>? aclTags}) async {
+  Future<PreAuthKey> createPreAuthKey(
+      String userId, bool reusable, bool ephemeral,
+      {DateTime? expiration, List<String>? aclTags}) async {
     final baseUrl = await _getBaseUrl();
     final body = {
       'user': userId,
@@ -147,7 +154,8 @@ class HeadscaleApiService {
       final preAuthKeyJson = data['preAuthKey'];
       return PreAuthKey.fromJson(preAuthKeyJson);
     } else {
-      throw Exception(_handleError('créer une clé de pré-authentification', response));
+      throw Exception(
+          _handleError('créer une clé de pré-authentification', response));
     }
   }
 
@@ -250,26 +258,20 @@ class HeadscaleApiService {
 
   Future<List<PreAuthKey>> getPreAuthKeys() async {
     final baseUrl = await _getBaseUrl();
-    final List<PreAuthKey> allPreAuthKeys = [];
 
-    final users = await getUsers();
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/v1/preauthkey'),
+      headers: await _getHeaders(),
+    );
 
-    for (final user in users) {
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/v1/preauthkey?user=${user.id}'),
-        headers: await _getHeaders(),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List<dynamic> keysJson = data['preAuthKeys'];
-        allPreAuthKeys.addAll(keysJson.map((json) => PreAuthKey.fromJson(json)).toList());
-      } else {
-        print(_handleError('charger les clés de pré-authentification pour l\'utilisateur ${user.name}', response));
-      }
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final List<dynamic> keysJson = data['preAuthKeys'];
+      return keysJson.map((json) => PreAuthKey.fromJson(json)).toList();
+    } else {
+      throw Exception(
+          _handleError('charger les clés de pré-authentification', response));
     }
-
-    return allPreAuthKeys;
   }
 
   Future<void> expirePreAuthKey(String userId, String key) async {
@@ -283,7 +285,8 @@ class HeadscaleApiService {
       }),
     );
     if (response.statusCode != 200) {
-      throw Exception(_handleError('expirer la clé de pré-authentification', response));
+      throw Exception(
+          _handleError('expirer la clé de pré-authentification', response));
     }
   }
 
@@ -352,7 +355,8 @@ class HeadscaleApiService {
   Future<Node> setTags(String nodeId, List<String> tags) async {
     final baseUrl = await _getBaseUrl();
     final serverUrl = await _storageService.getServerUrl();
-    final String baseDomain = serverUrl?.extractBaseDomain() ?? 'headscale.local';
+    final String baseDomain =
+        serverUrl?.extractBaseDomain() ?? 'headscale.local';
 
     final response = await http.post(
       Uri.parse('$baseUrl/api/v1/node/$nodeId/tags'),

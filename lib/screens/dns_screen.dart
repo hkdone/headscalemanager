@@ -27,7 +27,8 @@ class _DnsScreenState extends State<DnsScreen> {
 
   Future<void> _fetchData() async {
     try {
-      final apiService = Provider.of<AppProvider>(context, listen: false).apiService;
+      final apiService =
+          Provider.of<AppProvider>(context, listen: false).apiService;
       final nodes = await apiService.getNodes();
       if (mounted) {
         setState(() {
@@ -44,7 +45,8 @@ class _DnsScreenState extends State<DnsScreen> {
         final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${isFr ? 'Erreur lors de la récupération' : 'Error fetching data'}: $e'),
+            content: Text(
+                '${isFr ? 'Erreur lors de la récupération' : 'Error fetching data'}: $e'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -61,15 +63,17 @@ class _DnsScreenState extends State<DnsScreen> {
         _filteredNodes = _nodes.where((node) {
           final queryLower = query.toLowerCase();
           return node.name.toLowerCase().contains(queryLower) ||
-                 node.fqdn.toLowerCase().contains(queryLower) ||
-                 node.ipAddresses.any((ip) => ip.contains(queryLower));
+              node.fqdn.toLowerCase().contains(queryLower) ||
+              node.ipAddresses.any((ip) => ip.contains(queryLower));
         }).toList();
       }
     });
   }
-  
-  String _getIpv4(Node node) => node.ipAddresses.firstWhere((ip) => !ip.contains(':'), orElse: () => '');
-  String _getIpv6(Node node) => node.ipAddresses.firstWhere((ip) => ip.contains(':'), orElse: () => '');
+
+  String _getIpv4(Node node) =>
+      node.ipAddresses.firstWhere((ip) => !ip.contains(':'), orElse: () => '');
+  String _getIpv6(Node node) =>
+      node.ipAddresses.firstWhere((ip) => ip.contains(':'), orElse: () => '');
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +94,9 @@ class _DnsScreenState extends State<DnsScreen> {
                     padding: const EdgeInsets.all(16.0),
                     child: TextField(
                       decoration: InputDecoration(
-                        labelText: isFr ? 'Rechercher par nom, FQDN ou IP' : 'Search by name, FQDN, or IP',
+                        labelText: isFr
+                            ? 'Rechercher par nom, FQDN ou IP'
+                            : 'Search by name, FQDN, or IP',
                         prefixIcon: const Icon(Icons.search),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -103,7 +109,9 @@ class _DnsScreenState extends State<DnsScreen> {
                   ),
                   Expanded(
                     child: _filteredNodes.isEmpty && !_isLoading
-                        ? Center(child: Text(isFr ? 'Aucun nœud trouvé' : 'No nodes found'))
+                        ? Center(
+                            child: Text(
+                                isFr ? 'Aucun nœud trouvé' : 'No nodes found'))
                         : ListView.builder(
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             itemCount: _filteredNodes.length,
@@ -114,23 +122,35 @@ class _DnsScreenState extends State<DnsScreen> {
 
                               return Card(
                                 elevation: 0,
-                                margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                                margin: const EdgeInsets.symmetric(
+                                    vertical: 6, horizontal: 8),
                                 color: theme.cardColor,
                                 child: ListTile(
                                   isThreeLine: true,
-                                  title: Text(node.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  title: Text(node.name,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16)),
                                   subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                       Text(node.fqdn, style: const TextStyle(fontFamily: 'monospace')),
-                                       const SizedBox(height: 8),
-                                       Wrap(
+                                      Text(node.fqdn,
+                                          style: const TextStyle(
+                                              fontFamily: 'monospace')),
+                                      const SizedBox(height: 8),
+                                      Wrap(
                                         spacing: 8.0,
                                         runSpacing: 8.0,
                                         children: [
-                                          _buildActionButton(context, isFr, 'DNS', node.fqdn),
-                                          if (ipv4.isNotEmpty) _buildActionButton(context, isFr, 'IPv4', ipv4),
-                                          if (ipv6.isNotEmpty) _buildActionButton(context, isFr, 'IPv6', ipv6),
+                                          _buildActionButton(
+                                              context, isFr, 'DNS', node.fqdn),
+                                          if (ipv4.isNotEmpty)
+                                            _buildActionButton(
+                                                context, isFr, 'IPv4', ipv4),
+                                          if (ipv6.isNotEmpty)
+                                            _buildActionButton(
+                                                context, isFr, 'IPv6', ipv6),
                                         ],
                                       ),
                                     ],
@@ -147,13 +167,15 @@ class _DnsScreenState extends State<DnsScreen> {
     );
   }
 
-  Widget _buildActionButton(BuildContext context, bool isFr, String label, String value) {
+  Widget _buildActionButton(
+      BuildContext context, bool isFr, String label, String value) {
     final theme = Theme.of(context);
     return PopupMenuButton<String>(
       onSelected: (choice) {
         if (choice == 'copy') {
           Clipboard.setData(ClipboardData(text: value));
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label ${isFr ? 'copié' : 'copied'}!')));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('$label ${isFr ? 'copié' : 'copied'}!')));
         } else if (choice == 'share') {
           Share.share(value);
         }
@@ -182,7 +204,8 @@ class _DnsScreenState extends State<DnsScreen> {
         ),
         child: Text(
           label,
-          style: TextStyle(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: theme.colorScheme.onPrimary, fontWeight: FontWeight.bold),
         ),
       ),
     );
@@ -201,7 +224,8 @@ class _DnsScreenState extends State<DnsScreen> {
         },
         title: Text(
           isFr ? "Noms DNS Personnalisés" : "Custom DNS Names",
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          style: theme.textTheme.titleMedium
+              ?.copyWith(fontWeight: FontWeight.bold),
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12.0),
@@ -215,7 +239,8 @@ class _DnsScreenState extends State<DnsScreen> {
         collapsedBackgroundColor: theme.cardColor,
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Text(
               isFr
                   ? "Pour assigner un nom DNS à un service sur votre réseau local (ex: nas.votre.domaine pointant vers 192.168.1.100), vous devez modifier la section 'dns_config.extra_records' dans votre fichier config.yaml sur le serveur Headscale et redémarrer le service. Cette action ne peut pas être effectuée depuis l'application."

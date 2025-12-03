@@ -35,7 +35,9 @@ Future<void> showTailscaleUpCommandDialog(
       return DefaultTabController(
         length: 2,
         child: AlertDialog(
-          title: Text(isFr ? 'Étape 1 : Connecter l\'appareil' : 'Step 1: Connect Device'),
+          title: Text(isFr
+              ? 'Étape 1 : Connecter l\'appareil'
+              : 'Step 1: Connect Device'),
           content: SizedBox(
             width: double.maxFinite,
             child: Column(
@@ -75,8 +77,11 @@ Future<void> showTailscaleUpCommandDialog(
                                   onPressed: () async {
                                     await Clipboard.setData(
                                         ClipboardData(text: command));
-                                    showSafeSnackBar(context,
-                                        isFr ? 'Commande copiée !' : 'Command copied!');
+                                    showSafeSnackBar(
+                                        context,
+                                        isFr
+                                            ? 'Commande copiée !'
+                                            : 'Command copied!');
                                   },
                                 ),
                                 const SizedBox(width: 8),
@@ -118,7 +123,10 @@ Future<void> showTailscaleUpCommandDialog(
                                       await Clipboard.setData(
                                           ClipboardData(text: loginServer));
                                       showSafeSnackBar(
-                                          context, isFr ? 'URL copiée !' : 'URL copied!');
+                                          context,
+                                          isFr
+                                              ? 'URL copiée !'
+                                              : 'URL copied!');
                                     },
                                   ),
                                   const SizedBox(width: 8),
@@ -175,7 +183,9 @@ Future<void> showHeadscaleRegisterCommandDialog(
       final locale = context.watch<AppProvider>().locale;
       final isFr = locale.languageCode == 'fr';
       return AlertDialog(
-        title: Text(isFr ? 'Étape 2 : Enregistrer l\'appareil' : 'Step 2: Register Device'),
+        title: Text(isFr
+            ? 'Étape 2 : Enregistrer l\'appareil'
+            : 'Step 2: Register Device'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -188,7 +198,9 @@ Future<void> showHeadscaleRegisterCommandDialog(
               TextField(
                 controller: urlController,
                 decoration: InputDecoration(
-                  labelText: isFr ? 'Coller l\'URL du client ici' : 'Paste client URL here',
+                  labelText: isFr
+                      ? 'Coller l\'URL du client ici'
+                      : 'Paste client URL here',
                   border: const OutlineInputBorder(),
                 ),
                 onChanged: (value) {
@@ -220,7 +232,8 @@ Future<void> showHeadscaleRegisterCommandDialog(
             builder: (ctx, key, child) {
               return ElevatedButton.icon(
                 icon: const Icon(Icons.save),
-                label: Text(isFr ? 'Enregistrer sur le serveur' : 'Register on Server'),
+                label: Text(
+                    isFr ? 'Enregistrer sur le serveur' : 'Register on Server'),
                 onPressed: key.isEmpty
                     ? null
                     : () async {
@@ -236,7 +249,11 @@ Future<void> showHeadscaleRegisterCommandDialog(
                               isFr
                                   ? 'Appareil enregistré avec succès.'
                                   : 'Device registered successfully.');
-                          showSafeSnackBar(context, isFr ? 'Un redémarrage du serveur Headscale est recommandé.' : 'A Headscale server restart is recommended.');
+                          showSafeSnackBar(
+                              context,
+                              isFr
+                                  ? 'Un redémarrage du serveur Headscale est recommandé.'
+                                  : 'A Headscale server restart is recommended.');
                           // Show the new dialog to add ACL tags
                           _showAddTagsDialog(context, newNode);
                         } catch (e) {
@@ -270,12 +287,15 @@ Future<void> _showAddTagsDialog(BuildContext context, Node node) async {
       return StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            title: Text(isFr ? 'Étape 3 : Ajouter des Tags ACL' : 'Step 3: Add ACL Tags'),
+            title: Text(isFr
+                ? 'Étape 3 : Ajouter des Tags ACL'
+                : 'Step 3: Add ACL Tags'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${isFr ? 'Configurez les capacités de' : 'Configure capabilities for'} "${node.name}".'),
+                Text(
+                    '${isFr ? 'Configurez les capacités de' : 'Configure capabilities for'} "${node.name}".'),
                 const SizedBox(height: 16),
                 CheckboxListTile(
                   title: const Text('Exit Node'),

@@ -299,7 +299,9 @@ class CommandCard extends StatelessWidget {
                     child: ElevatedButton.icon(
                       onPressed: () => onConfigure(command),
                       icon: const Icon(Icons.settings, size: 16),
-                      label: Text(isFr ? 'Configurer et voir la commande' : 'Configure & View Command'),
+                      label: Text(isFr
+                          ? 'Configurer et voir la commande'
+                          : 'Configure & View Command'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Colors.white,
@@ -330,10 +332,10 @@ class CommandCard extends StatelessWidget {
                               isLinuxSpecific ? null : () => onShare(command),
                           icon: const Icon(Icons.share, size: 16),
                           label: Text(isFr ? 'Partager' : 'Share'),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
               ],
             ),
           ),

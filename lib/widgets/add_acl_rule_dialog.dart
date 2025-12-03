@@ -68,7 +68,9 @@ class _AddAclRuleDialogState extends State<AddAclRuleDialog> {
                     }
                   });
                 },
-                isFr ? 'Veuillez sélectionner un nœud source' : 'Please select a source node',
+                isFr
+                    ? 'Veuillez sélectionner un nœud source'
+                    : 'Please select a source node',
               ),
               const SizedBox(height: 16),
               _buildNodeDropdown(
@@ -76,13 +78,16 @@ class _AddAclRuleDialogState extends State<AddAclRuleDialog> {
                 _selectedDestinationNode,
                 _destinationNodes,
                 (node) => setState(() => _selectedDestinationNode = node),
-                isFr ? 'Veuillez sélectionner un nœud destination' : 'Please select a destination node',
+                isFr
+                    ? 'Veuillez sélectionner un nœud destination'
+                    : 'Please select a destination node',
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _portController,
                 keyboardType: TextInputType.text,
-                decoration: _buildInputDecoration(isFr ? 'Port(s)' : 'Port(s)', 'ex: 443, 8080-8089, *'),
+                decoration: _buildInputDecoration(
+                    isFr ? 'Port(s)' : 'Port(s)', 'ex: 443, 8080-8089, *'),
               ),
             ],
           ),
@@ -113,7 +118,8 @@ class _AddAclRuleDialogState extends State<AddAclRuleDialog> {
 
     return DropdownButtonFormField<Node>(
       value: selectedNode,
-      decoration: _buildInputDecoration(label, isFr ? 'Choisir un nœud' : 'Choose a node'),
+      decoration: _buildInputDecoration(
+          label, isFr ? 'Choisir un nœud' : 'Choose a node'),
       items: nodes.map((Node node) {
         return DropdownMenuItem<Node>(
           value: node,
@@ -136,7 +142,8 @@ class _AddAclRuleDialogState extends State<AddAclRuleDialog> {
       labelText: label,
       hintText: hint,
       filled: true,
-      fillColor: Theme.of(context).inputDecorationTheme.fillColor ?? Theme.of(context).colorScheme.surface,
+      fillColor: Theme.of(context).inputDecorationTheme.fillColor ??
+          Theme.of(context).colorScheme.surface,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8.0),
         borderSide: BorderSide.none,
@@ -154,7 +161,9 @@ class _AddAclRuleDialogState extends State<AddAclRuleDialog> {
 
     if (_selectedSourceNode!.ipAddresses.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(isFr ? 'Le nœud source doit avoir au moins une adresse IP.' : 'Source node must have at least one IP address.'),
+          content: Text(isFr
+              ? 'Le nœud source doit avoir au moins une adresse IP.'
+              : 'Source node must have at least one IP address.'),
           backgroundColor: Theme.of(context).colorScheme.error));
       return;
     }
@@ -192,7 +201,9 @@ class _AddAclRuleDialogState extends State<AddAclRuleDialog> {
           });
         } else {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(isFr ? 'Accès au sous-réseau non configuré et le nœud n\'a pas d\'IP pour une règle de base.' : 'Subnet access not configured and the node has no IP for a fallback rule.'),
+            content: Text(isFr
+                ? 'Accès au sous-réseau non configuré et le nœud n\'a pas d\'IP pour une règle de base.'
+                : 'Subnet access not configured and the node has no IP for a fallback rule.'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ));
           return;
@@ -235,7 +246,9 @@ class _AddAclRuleDialogState extends State<AddAclRuleDialog> {
     } else {
       if (_selectedDestinationNode!.ipAddresses.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(isFr ? 'Le nœud destination doit avoir au moins une adresse IP.' : 'Destination node must have at least one IP address.'),
+            content: Text(isFr
+                ? 'Le nœud destination doit avoir au moins une adresse IP.'
+                : 'Destination node must have at least one IP address.'),
             backgroundColor: Theme.of(context).colorScheme.error));
         return;
       }

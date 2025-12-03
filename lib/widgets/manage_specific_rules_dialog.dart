@@ -117,7 +117,8 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(message ?? (isFr ? 'Politique mise à jour.' : 'Policy updated.')),
+              content: Text(message ??
+                  (isFr ? 'Politique mise à jour.' : 'Policy updated.')),
               backgroundColor: Colors.green),
         );
       }
@@ -125,7 +126,8 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('${isFr ? "Erreur lors de la mise à jour de la politique" : "Error updating policy"}: $e'),
+              content: Text(
+                  '${isFr ? "Erreur lors de la mise à jour de la politique" : "Error updating policy"}: $e'),
               backgroundColor: Colors.red),
         );
       }
@@ -142,13 +144,17 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
     final isFr = locale.languageCode == 'fr';
 
     return AlertDialog(
-      title: Text(isFr ? 'Règles Spécifiques Actives' : 'Active Specific Rules'),
+      title:
+          Text(isFr ? 'Règles Spécifiques Actives' : 'Active Specific Rules'),
       content: SizedBox(
         width: double.maxFinite,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _temporaryRules.isEmpty
-                ? Center(child: Text(isFr ? 'Aucune règle spécifique active.' : 'No active specific rules.'))
+                ? Center(
+                    child: Text(isFr
+                        ? 'Aucune règle spécifique active.'
+                        : 'No active specific rules.'))
                 : ListView.builder(
                     shrinkWrap: true,
                     itemCount: _temporaryRules.length,
@@ -161,10 +167,12 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
                       final srcNodeName = _getNodeNameFromIpOrSubnet(src);
                       final dstNodeName = _getNodeNameFromIpOrSubnet(dst);
 
-                      final label = '$srcNodeName -> $dstNodeName:${port != null && port.isNotEmpty ? port : '*'}';
+                      final label =
+                          '$srcNodeName -> $dstNodeName:${port != null && port.isNotEmpty ? port : '*'}';
 
                       return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+                        margin: const EdgeInsets.symmetric(
+                            vertical: 4.0, horizontal: 8.0),
                         child: ListTile(
                           title: Text(label, overflow: TextOverflow.ellipsis),
                           trailing: IconButton(
@@ -197,12 +205,15 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
     Node? srcNode;
     Node? dstNode;
     try {
-      srcNode = widget.allNodes.firstWhere((n) => n.ipAddresses.contains(srcIp));
+      srcNode =
+          widget.allNodes.firstWhere((n) => n.ipAddresses.contains(srcIp));
     } catch (e) {
       // Node not found
     }
     try {
-      dstNode = widget.allNodes.firstWhere((n) => n.ipAddresses.contains(dstIpOrSubnet) || n.sharedRoutes.contains(dstIpOrSubnet));
+      dstNode = widget.allNodes.firstWhere((n) =>
+          n.ipAddresses.contains(dstIpOrSubnet) ||
+          n.sharedRoutes.contains(dstIpOrSubnet));
     } catch (e) {
       // Node not found
     }
@@ -214,16 +225,23 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
         content: SingleChildScrollView(
           child: ListBody(
             children: <Widget>[
-              _buildDetailRow(isFr ? 'Source' : 'Source', srcNode?.name ?? (isFr ? 'Inconnu' : 'Unknown')),
+              _buildDetailRow(isFr ? 'Source' : 'Source',
+                  srcNode?.name ?? (isFr ? 'Inconnu' : 'Unknown')),
               _buildDetailRow('IP Source', srcIp),
-              if (srcNode != null) _buildDetailRow('IPs Source', srcNode.ipAddresses.join(', ')),
+              if (srcNode != null)
+                _buildDetailRow('IPs Source', srcNode.ipAddresses.join(', ')),
               const Divider(),
-              _buildDetailRow(isFr ? 'Destination' : 'Destination', dstNode?.name ?? dstIpOrSubnet),
+              _buildDetailRow(isFr ? 'Destination' : 'Destination',
+                  dstNode?.name ?? dstIpOrSubnet),
               _buildDetailRow('IP/Subnet Dest.', dstIpOrSubnet),
-              if (dstNode != null) _buildDetailRow('IPs Dest.', dstNode.ipAddresses.join(', ')),
-              if (dstNode != null && dstNode.sharedRoutes.isNotEmpty) _buildDetailRow('Routes Partagées', dstNode.sharedRoutes.join(', ')),
+              if (dstNode != null)
+                _buildDetailRow('IPs Dest.', dstNode.ipAddresses.join(', ')),
+              if (dstNode != null && dstNode.sharedRoutes.isNotEmpty)
+                _buildDetailRow(
+                    'Routes Partagées', dstNode.sharedRoutes.join(', ')),
               const Divider(),
-              _buildDetailRow('Port(s)', port != null && port.isNotEmpty ? port : '*'),
+              _buildDetailRow(
+                  'Port(s)', port != null && port.isNotEmpty ? port : '*'),
             ],
           ),
         ),

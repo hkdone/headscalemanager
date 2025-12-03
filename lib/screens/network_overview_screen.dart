@@ -361,8 +361,8 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
                 if (_exitNodeInUse != null) ...[
                   Icon(Icons.arrow_forward,
                       color: Theme.of(context).textTheme.bodyMedium?.color),
-                  _buildVisualizerNode(context, 'Exit Node', Icons.router,
-                      _exitNodeInUse!.name),
+                  _buildVisualizerNode(
+                      context, 'Exit Node', Icons.router, _exitNodeInUse!.name),
                 ],
                 Icon(Icons.arrow_forward,
                     color: Theme.of(context).textTheme.bodyMedium?.color),
@@ -374,7 +374,8 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
               const SizedBox(height: 10),
               CircularProgressIndicator(
                   color: Theme.of(context).colorScheme.primary),
-              Text(isFr ? 'Traceroute en cours...' : 'Traceroute in progress...',
+              Text(
+                  isFr ? 'Traceroute en cours...' : 'Traceroute in progress...',
                   style: Theme.of(context).textTheme.bodyMedium),
             ],
             if (_traceRouteHops.isNotEmpty) ...[
@@ -407,11 +408,16 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
     );
   }
 
-  Widget _buildVisualizerNode(BuildContext context, String title, IconData icon, String subtitle) {
+  Widget _buildVisualizerNode(
+      BuildContext context, String title, IconData icon, String subtitle) {
     return Column(
       children: [
         Icon(icon, size: 40, color: Theme.of(context).colorScheme.primary),
-        Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+        Text(title,
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(fontWeight: FontWeight.bold)),
         Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
@@ -435,7 +441,8 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
         items: _nodes.map<DropdownMenuItem<Node>>((Node node) {
           return DropdownMenuItem<Node>(
             value: node,
-            child: Text(node.name, style: Theme.of(context).textTheme.bodyMedium),
+            child:
+                Text(node.name, style: Theme.of(context).textTheme.bodyMedium),
           );
         }).toList(),
       ),

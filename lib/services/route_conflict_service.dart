@@ -8,7 +8,8 @@ class RouteConflictService {
   /// [route] - La route à vérifier (ex: "192.168.1.0/24").
   /// [excludeNodeId] - L'ID du nœud qui fait la demande, à exclure de la recherche.
   /// [allNodes] - La liste de tous les nœuds du système.
-  static Node? getConflictingNode(String route, String excludeNodeId, List<Node> allNodes) {
+  static Node? getConflictingNode(
+      String route, String excludeNodeId, List<Node> allNodes) {
     // MODIFICATION: Les routes d'exit node (0.0.0.0/0 et ::/0) sont exemptées
     // de la règle de non-duplication et ne déclenchent pas de conflit strict.
     if (route == '0.0.0.0/0' || route == '::/0') {
@@ -16,9 +17,8 @@ class RouteConflictService {
     }
 
     try {
-      return allNodes.firstWhere(
-        (node) => node.id != excludeNodeId && node.sharedRoutes.contains(route)
-      );
+      return allNodes.firstWhere((node) =>
+          node.id != excludeNodeId && node.sharedRoutes.contains(route));
     } catch (e) {
       return null;
     }
@@ -30,8 +30,10 @@ class RouteConflictService {
   /// [route] - La route à valider.
   /// [requestingNodeId] - L'ID du nœud qui demande la route.
   /// [allNodes] - La liste de tous les nœuds du système.
-  static RouteValidationResult validateRouteApproval(String route, String requestingNodeId, List<Node> allNodes) {
-    final conflictingNode = getConflictingNode(route, requestingNodeId, allNodes);
+  static RouteValidationResult validateRouteApproval(
+      String route, String requestingNodeId, List<Node> allNodes) {
+    final conflictingNode =
+        getConflictingNode(route, requestingNodeId, allNodes);
 
     if (conflictingNode != null) {
       return RouteValidationResult.conflict(
@@ -60,7 +62,8 @@ class RouteValidationResult {
 
   /// Conflit : la route est déjà utilisée.
   factory RouteValidationResult.conflict(String message, Node conflictingNode) {
-    return RouteValidationResult._(RouteValidationType.conflict, message, conflictingNode);
+    return RouteValidationResult._(
+        RouteValidationType.conflict, message, conflictingNode);
   }
 
   bool get isApproved => type == RouteValidationType.approved;
@@ -69,6 +72,6 @@ class RouteValidationResult {
 
 /// Types de validation de route.
 enum RouteValidationType {
-  approved,  // La route peut être approuvée normalement.
-  conflict,  // Conflit : la route est déjà utilisée.
+  approved, // La route peut être approuvée normalement.
+  conflict, // Conflit : la route est déjà utilisée.
 }

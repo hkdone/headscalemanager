@@ -324,15 +324,15 @@ class _UserNodeCard extends StatelessWidget {
         .toList();
 
     if (pendingRoutes.isNotEmpty) {
-      final pendingLanRoutes = pendingRoutes
-          .where((r) => r != '0.0.0.0/0' && r != '::/0')
-          .toList();
-      
+      final pendingLanRoutes =
+          pendingRoutes.where((r) => r != '0.0.0.0/0' && r != '::/0').toList();
+
       Map<String, Node> conflicts = {};
       List<String> approvableLanRoutes = [];
 
       for (var route in pendingLanRoutes) {
-        final validation = RouteConflictService.validateRouteApproval(route, node.id, allNodes);
+        final validation = RouteConflictService.validateRouteApproval(
+            route, node.id, allNodes);
         if (validation.isConflict) {
           conflicts[route] = validation.conflictingNode!;
         } else {
@@ -340,18 +340,21 @@ class _UserNodeCard extends StatelessWidget {
         }
       }
 
-      final hasPendingExitNode = pendingRoutes.any((r) => r == '0.0.0.0/0' || r == '::/0');
+      final hasPendingExitNode =
+          pendingRoutes.any((r) => r == '0.0.0.0/0' || r == '::/0');
 
       if (conflicts.isNotEmpty) {
         icons.add(
           IconButton(
             icon: const Icon(Icons.help_outline, color: Colors.red),
-            tooltip: isFr ? 'Certaines routes sont en conflit' : 'Some routes are in conflict',
+            tooltip: isFr
+                ? 'Certaines routes sont en conflit'
+                : 'Some routes are in conflict',
             onPressed: () => _showConflictInfoDialog(context, node, conflicts),
           ),
         );
       }
-      
+
       if (approvableLanRoutes.isNotEmpty || hasPendingExitNode) {
         icons.add(
           IconButton(
@@ -393,9 +396,10 @@ class _UserNodeCard extends StatelessWidget {
     return Row(mainAxisSize: MainAxisSize.min, children: icons);
   }
 
-  void _showConflictInfoDialog(BuildContext context, Node node, Map<String, Node> conflicts) {
+  void _showConflictInfoDialog(
+      BuildContext context, Node node, Map<String, Node> conflicts) {
     final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
-    
+
     String content = isFr
         ? 'Le nœud "${node.name}" ne peut pas partager les réseaux suivants car ils sont déjà utilisés :\n\n'
         : 'Node "${node.name}" cannot share the following networks as they are already in use:\n\n';
@@ -409,7 +413,8 @@ class _UserNodeCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isFr ? 'Conflit de Routes Détecté' : 'Route Conflict Detected'),
+        title: Text(
+            isFr ? 'Conflit de Routes Détecté' : 'Route Conflict Detected'),
         content: Text(content),
         actions: [
           TextButton(
@@ -421,7 +426,8 @@ class _UserNodeCard extends StatelessWidget {
     );
   }
 
-  void _showApprovalDialog(BuildContext context, Node node, List<Node> allNodes) {
+  void _showApprovalDialog(
+      BuildContext context, Node node, List<Node> allNodes) {
     final appProvider = context.read<AppProvider>();
     final isFr = appProvider.locale.languageCode == 'fr';
 
@@ -432,12 +438,13 @@ class _UserNodeCard extends StatelessWidget {
         pendingRoutes.any((r) => r == '0.0.0.0/0' || r == '::/0');
     final lanRoutes =
         pendingRoutes.where((r) => r != '0.0.0.0/0' && r != '::/0').toList();
-    
+
     String title = isFr ? 'Approbation Requise' : 'Approval Required';
     String content = '';
-    
+
     final approvableLanRoutes = lanRoutes.where((route) {
-      final validation = RouteConflictService.validateRouteApproval(route, node.id, allNodes);
+      final validation =
+          RouteConflictService.validateRouteApproval(route, node.id, allNodes);
       return !validation.isConflict;
     }).toList();
 
@@ -481,8 +488,8 @@ class _UserNodeCard extends StatelessWidget {
               child: Text(isFr ? 'Oui' : 'Yes'),
               onPressed: () async {
                 Navigator.of(context).pop();
-                showSafeSnackBar(context,
-                    isFr ? 'Traitement en cours...' : 'Processing...');
+                showSafeSnackBar(
+                    context, isFr ? 'Traitement en cours...' : 'Processing...');
 
                 bool aclMode = true;
                 try {
@@ -493,8 +500,9 @@ class _UserNodeCard extends StatelessWidget {
 
                 try {
                   final routesToApprove = [...approvableLanRoutes];
-                  if(isExitNodeRequest) {
-                    routesToApprove.addAll(pendingRoutes.where((r) => r == '0.0.0.0/0' || r == '::/0'));
+                  if (isExitNodeRequest) {
+                    routesToApprove.addAll(pendingRoutes
+                        .where((r) => r == '0.0.0.0/0' || r == '::/0'));
                   }
 
                   if (aclMode) {
@@ -510,7 +518,8 @@ class _UserNodeCard extends StatelessWidget {
                         .setNodeRoutes(node.id, routesToApprove);
 
                     final allUsers = await appProvider.apiService.getUsers();
-                    final updatedNodes = await appProvider.apiService.getNodes();
+                    final updatedNodes =
+                        await appProvider.apiService.getNodes();
                     final tempRules =
                         await appProvider.storageService.getTemporaryRules();
                     final aclGenerator = NewAclGeneratorService();
@@ -521,9 +530,11 @@ class _UserNodeCard extends StatelessWidget {
                     final newPolicyJson = jsonEncode(newPolicyMap);
                     await appProvider.apiService.setAclPolicy(newPolicyJson);
 
-                    showSafeSnackBar(context, isFr
-                        ? 'Nœud approuvé et ACLs mises à jour !'
-                        : 'Node approved and ACLs updated!');
+                    showSafeSnackBar(
+                        context,
+                        isFr
+                            ? 'Nœud approuvé et ACLs mises à jour !'
+                            : 'Node approved and ACLs updated!');
                   } else {
                     // Simplified logic: Routes only
                     await appProvider.apiService
@@ -627,7 +638,8 @@ class _UserNodeCard extends StatelessWidget {
                         .setNodeRoutes(node.id, remainingRoutes);
 
                     final allUsers = await appProvider.apiService.getUsers();
-                    final updatedNodes = await appProvider.apiService.getNodes();
+                    final updatedNodes =
+                        await appProvider.apiService.getNodes();
                     final tempRules =
                         await appProvider.storageService.getTemporaryRules();
                     final aclGenerator = NewAclGeneratorService();

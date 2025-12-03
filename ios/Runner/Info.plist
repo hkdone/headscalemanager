@@ -41,6 +41,8 @@
 			<string>UIInterfaceOrientationLandscapeLeft</string>
 			<string>UIInterfaceOrientationLandscapeRight</string>
 		</array>
+		<key>NSFaceIDUsageDescription</key>
+		<string>L'application nécessite l'accès à Face ID pour vous permettre de déverrouiller l'application de manière sécurisée.</string>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>

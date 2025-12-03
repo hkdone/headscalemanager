@@ -52,7 +52,8 @@ class IpUtils {
       final end = InternetAddress(endIp);
 
       if (start.type != end.type) {
-        throw ArgumentError('Start and end IP addresses must be of the same type.');
+        throw ArgumentError(
+            'Start and end IP addresses must be of the same type.');
       }
 
       final startBytes = start.rawAddress;

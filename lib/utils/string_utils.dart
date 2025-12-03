@@ -12,7 +12,8 @@ extension StringUtils on String {
       final host = uri.host;
 
       // Handle IP addresses or localhost
-      if (host.contains(RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')) || host == 'localhost') {
+      if (host.contains(RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')) ||
+          host == 'localhost') {
         return host;
       }
 

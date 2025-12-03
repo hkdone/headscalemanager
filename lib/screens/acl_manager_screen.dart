@@ -118,14 +118,14 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
       final apiService = context.read<AppProvider>().apiService;
 
       final existingRules = await storage.getTemporaryRules();
-      
+
       int addedCount = 0;
       for (var newRule in newRules) {
-        final ruleExists = existingRules.any((rule) => 
-          rule['src'] == newRule['src'] && 
-          rule['dst'] == newRule['dst'] && 
-          (rule['port'] ?? '*') == (newRule['port'] ?? '*'));
-        
+        final ruleExists = existingRules.any((rule) =>
+            rule['src'] == newRule['src'] &&
+            rule['dst'] == newRule['dst'] &&
+            (rule['port'] ?? '*') == (newRule['port'] ?? '*'));
+
         if (!ruleExists) {
           existingRules.add(newRule);
           addedCount++;
@@ -134,7 +134,9 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
 
       if (addedCount == 0) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(isFr ? 'Aucune nouvelle règle à ajouter. Les règles existent déjà.' : 'No new rules to add. The rules already exist.'),
+          content: Text(isFr
+              ? 'Aucune nouvelle règle à ajouter. Les règles existent déjà.'
+              : 'No new rules to add. The rules already exist.'),
         ));
         setState(() => _isLoading = false);
         return;
@@ -155,15 +157,17 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
       await apiService.setAclPolicy(policyString);
 
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(isFr ? '$addedCount règle(s) ajoutée(s) et politique appliquée avec succès.' : '$addedCount rule(s) added and policy applied successfully.'),
+        content: Text(isFr
+            ? '$addedCount règle(s) ajoutée(s) et politique appliquée avec succès.'
+            : '$addedCount rule(s) added and policy applied successfully.'),
         backgroundColor: Colors.green,
       ));
 
       await _loadData(showLoading: false);
-
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('${isFr ? "Erreur lors de l'application des règles" : "Error applying rules"}: $e'),
+        content: Text(
+            '${isFr ? "Erreur lors de l'application des règles" : "Error applying rules"}: $e'),
         backgroundColor: Colors.red,
       ));
     } finally {
@@ -181,8 +185,8 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('View',
-            style: Theme.of(context).appBarTheme.titleTextStyle),
+        title:
+            Text('View', style: Theme.of(context).appBarTheme.titleTextStyle),
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
         iconTheme: Theme.of(context).appBarTheme.iconTheme,
@@ -209,7 +213,8 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
         children: [
           FloatingActionButton(
             onPressed: _isLoading ? null : _showManageRulesDialog,
-            tooltip: isFr ? 'Gérer les règles spécifiques' : 'Manage specific rules',
+            tooltip:
+                isFr ? 'Gérer les règles spécifiques' : 'Manage specific rules',
             heroTag: 'manage_rules_fab',
             child: const Icon(Icons.rule_folder),
           ),
@@ -267,17 +272,22 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
         itemCount: _users.length,
         itemBuilder: (context, index) {
           final user = _users[index];
-          final userNodes = _nodes.where((node) => node.user == user.name).toList();
+          final userNodes =
+              _nodes.where((node) => node.user == user.name).toList();
 
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             elevation: 0,
             color: Theme.of(context).cardColor,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.0)),
             child: ExpansionTile(
               initiallyExpanded: true,
-              title: Text(user.name, style: Theme.of(context).textTheme.titleLarge),
-              children: userNodes.map((node) => _buildNodePermissionTile(node, parser, isFr)).toList(),
+              title: Text(user.name,
+                  style: Theme.of(context).textTheme.titleLarge),
+              children: userNodes
+                  .map((node) => _buildNodePermissionTile(node, parser, isFr))
+                  .toList(),
             ),
           );
         },
@@ -285,13 +295,15 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
     }
   }
 
-  Widget _buildNodePermissionTile(Node node, AclParserService parser, bool isFr) {
+  Widget _buildNodePermissionTile(
+      Node node, AclParserService parser, bool isFr) {
     final permissions = parser.getPermissionsForNode(node);
 
     return ExpansionTile(
       title: Row(
         children: [
-          Icon(Icons.computer, color: Theme.of(context).colorScheme.primary, size: 20),
+          Icon(Icons.computer,
+              color: Theme.of(context).colorScheme.primary, size: 20),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
@@ -307,7 +319,8 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
             ),
         ],
       ),
-      subtitle: Text(node.ipAddresses.join(', '), style: Theme.of(context).textTheme.bodySmall),
+      subtitle: Text(node.ipAddresses.join(', '),
+          style: Theme.of(context).textTheme.bodySmall),
       childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       children: _buildPermissionSections(permissions, isFr),
     );
@@ -343,7 +356,9 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
           padding: const EdgeInsets.all(8.0),
           child: Center(
             child: Text(
-              isFr ? 'Aucune permission spécifique trouvée.' : 'No specific permissions found.',
+              isFr
+                  ? 'Aucune permission spécifique trouvée.'
+                  : 'No specific permissions found.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
@@ -357,10 +372,18 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
         child: DataTable(
           columnSpacing: 16,
           columns: [
-            DataColumn(label: Text(isFr ? 'Destination' : 'Destination', style: Theme.of(context).textTheme.titleSmall)),
-            DataColumn(label: Text(isFr ? 'Type' : 'Type', style: Theme.of(context).textTheme.titleSmall)),
-            DataColumn(label: Text(isFr ? 'Ports' : 'Ports', style: Theme.of(context).textTheme.titleSmall)),
-            DataColumn(label: Text(isFr ? 'Source' : 'Source', style: Theme.of(context).textTheme.titleSmall)),
+            DataColumn(
+                label: Text(isFr ? 'Destination' : 'Destination',
+                    style: Theme.of(context).textTheme.titleSmall)),
+            DataColumn(
+                label: Text(isFr ? 'Type' : 'Type',
+                    style: Theme.of(context).textTheme.titleSmall)),
+            DataColumn(
+                label: Text(isFr ? 'Ports' : 'Ports',
+                    style: Theme.of(context).textTheme.titleSmall)),
+            DataColumn(
+                label: Text(isFr ? 'Source' : 'Source',
+                    style: Theme.of(context).textTheme.titleSmall)),
           ],
           rows: rows.map((rowData) {
             return DataRow(cells: [

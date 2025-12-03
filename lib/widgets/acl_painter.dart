@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/services/acl_parser_service.dart';
@@ -29,7 +28,6 @@ class AclPainter extends CustomPainter {
     final bodyRenderBox = context.findRenderObject() as RenderBox?;
     if (bodyRenderBox == null) return;
 
-
     for (var sourceNode in nodes) {
       final sourcePermissions = allPermissions[sourceNode.id];
       if (sourcePermissions == null) continue;
@@ -56,12 +54,15 @@ class AclPainter extends CustomPainter {
         final destGlobalOffset = destRenderBox.localToGlobal(Offset.zero);
 
         // Convert global position to local position within the CustomPaint canvas
-        final sourceLocalOffset = bodyRenderBox.globalToLocal(sourceGlobalOffset);
+        final sourceLocalOffset =
+            bodyRenderBox.globalToLocal(sourceGlobalOffset);
         final destLocalOffset = bodyRenderBox.globalToLocal(destGlobalOffset);
 
         // Calculate the connection points (center-right of the widget)
         final sourcePoint = Offset(
-          sourceLocalOffset.dx + sourceRenderBox.size.width - 24, // Adjust to be on the side of the expansion tile
+          sourceLocalOffset.dx +
+              sourceRenderBox.size.width -
+              24, // Adjust to be on the side of the expansion tile
           sourceLocalOffset.dy + sourceRenderBox.size.height / 2,
         );
         final destPoint = Offset(

@@ -36,8 +36,9 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
     final isFr = locale.languageCode == 'fr';
 
     return AlertDialog(
-      title: Text(
-          isFr ? 'Créer une clé de pré-authentification' : 'Create Pre-Auth Key'),
+      title: Text(isFr
+          ? 'Créer une clé de pré-authentification'
+          : 'Create Pre-Auth Key'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -51,8 +52,8 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
                 }
                 final users = snapshot.data!;
                 if (_selectedUser == null && users.isNotEmpty) {
-                  _selectedUser =
-                      users.first; // Sélectionne le premier utilisateur par défaut
+                  _selectedUser = users
+                      .first; // Sélectionne le premier utilisateur par défaut
                 }
                 return DropdownButtonFormField<User>(
                   isExpanded: true,
@@ -69,7 +70,8 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
                     });
                   },
                   decoration: InputDecoration(
-                    labelText: isFr ? 'Sélectionner un utilisateur' : 'Select a user',
+                    labelText:
+                        isFr ? 'Sélectionner un utilisateur' : 'Select a user',
                     border: const OutlineInputBorder(),
                   ),
                 );
@@ -99,8 +101,9 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
             TextFormField(
               controller: _expirationController,
               decoration: InputDecoration(
-                labelText:
-                    isFr ? 'Expiration en jours (facultatif)' : 'Expiration in days (optional)',
+                labelText: isFr
+                    ? 'Expiration en jours (facultatif)'
+                    : 'Expiration in days (optional)',
               ),
               keyboardType: TextInputType.number,
             ),

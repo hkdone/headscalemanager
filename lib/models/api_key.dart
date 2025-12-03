@@ -13,12 +13,16 @@ class ApiKey {
     required this.createdAt,
   });
 
-    factory ApiKey.fromJson(Map<String, dynamic> json) {
+  factory ApiKey.fromJson(Map<String, dynamic> json) {
     return ApiKey(
       id: json['id'],
       prefix: json['prefix'],
-      expiration: json['expiration'] != null && json['expiration'] is String ? DateTime.parse(json['expiration']) : null,
-      lastSeen: json['lastSeen'] != null && json['lastSeen'] is String ? DateTime.parse(json['lastSeen']) : null,
+      expiration: json['expiration'] != null && json['expiration'] is String
+          ? DateTime.parse(json['expiration'])
+          : null,
+      lastSeen: json['lastSeen'] != null && json['lastSeen'] is String
+          ? DateTime.parse(json['lastSeen'])
+          : null,
       createdAt: DateTime.parse(json['createdAt']),
     );
   }

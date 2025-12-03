@@ -17,7 +17,8 @@ class ShareSubnetDialog extends StatefulWidget {
   /// Fonction de rappel appelée après la confirmation du partage du sous-réseau.
   final VoidCallback onSubnetShared;
 
-  const ShareSubnetDialog({super.key, required this.node, required this.onSubnetShared});
+  const ShareSubnetDialog(
+      {super.key, required this.node, required this.onSubnetShared});
 
   @override
   State<ShareSubnetDialog> createState() => _ShareSubnetDialogState();
@@ -25,7 +26,8 @@ class ShareSubnetDialog extends StatefulWidget {
 
 class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _subnetController = TextEditingController(text: '192.168.1.0/24');
+  final TextEditingController _subnetController =
+      TextEditingController(text: '192.168.1.0/24');
 
   @override
   void dispose() {
@@ -40,7 +42,8 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
     final isFr = locale.languageCode == 'fr';
 
     return AlertDialog(
-      title: Text(isFr ? 'Partager le sous-réseau local' : 'Share Local Subnet'),
+      title:
+          Text(isFr ? 'Partager le sous-réseau local' : 'Share Local Subnet'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,

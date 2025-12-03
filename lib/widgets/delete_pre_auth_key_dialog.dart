@@ -47,8 +47,11 @@ class DeletePreAuthKeyDialog extends StatelessWidget {
                   .expirePreAuthKey(preAuthKey.user!.id, preAuthKey.key);
               Navigator.of(context).pop(); // Ferme le dialogue de confirmation
               onKeyDeleted(); // Appelle le callback pour rafraîchir la liste
-              showSafeSnackBar(context,
-                  isFr ? 'Clé expirée avec succès.' : 'Key expired successfully.');
+              showSafeSnackBar(
+                  context,
+                  isFr
+                      ? 'Clé expirée avec succès.'
+                      : 'Key expired successfully.');
             } catch (e) {
               debugPrint('Erreur lors de l\'expiration de la clé : $e');
               Navigator.of(context).pop();

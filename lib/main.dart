@@ -8,7 +8,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // We don't want to initialize notifications here anymore
   // as it requires settings to be loaded first.
-  // await NotificationService.initialize(); 
+  // await NotificationService.initialize();
   runApp(const MyApp());
 }
 

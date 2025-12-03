@@ -35,9 +35,7 @@ class _SharedRoutesAccessDialogState extends State<SharedRoutesAccessDialog> {
     final isFr = Localizations.localeOf(context).languageCode == 'fr';
 
     return AlertDialog(
-      title: Text(isFr
-          ? 'Accès aux routes partagées'
-          : 'Shared Routes Access'),
+      title: Text(isFr ? 'Accès aux routes partagées' : 'Shared Routes Access'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -118,10 +116,10 @@ class _SharedRoutesAccessDialogState extends State<SharedRoutesAccessDialog> {
 
   void _handleConfirm() {
     final isFr = Localizations.localeOf(context).languageCode == 'fr';
-    
+
     // Debug: Afficher le choix sélectionné
     debugPrint('DEBUG DIALOG: Choix sélectionné: $_choice');
-    
+
     if (_choice == RouteAccessChoice.custom) {
       // Validate all custom rules before popping
       for (var route in _lanRoutes) {
@@ -167,10 +165,10 @@ class _SharedRoutesAccessDialogState extends State<SharedRoutesAccessDialog> {
             'ports': value.portsController.text,
           })),
     };
-    
+
     // Debug: Afficher le résultat qui va être retourné
     debugPrint('DEBUG DIALOG: Résultat retourné: $result');
-    
+
     Navigator.of(context).pop(result);
   }
 
@@ -222,7 +220,8 @@ class _SubnetRuleCard extends StatelessWidget {
               controller: rule.portsController,
               decoration: InputDecoration(
                 labelText: isFr ? 'Ports (optionnel)' : 'Ports (optional)',
-                hintText: isFr ? 'Ex: 80, 443, 1024-2048' : 'E.g. 80, 443, 1024-2048',
+                hintText:
+                    isFr ? 'Ex: 80, 443, 1024-2048' : 'E.g. 80, 443, 1024-2048',
               ),
             ),
           ],

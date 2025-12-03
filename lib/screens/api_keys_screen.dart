@@ -47,12 +47,12 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
           }
           if (snapshot.hasError) {
             return Center(
-                child: Text(
-                    '${isFr ? 'Erreur' : 'Error'}: ${snapshot.error}'));
+                child: Text('${isFr ? 'Erreur' : 'Error'}: ${snapshot.error}'));
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return Center(
-                child: Text(isFr ? 'Aucune clé API trouvée.' : 'No API key found.'));
+                child: Text(
+                    isFr ? 'Aucune clé API trouvée.' : 'No API key found.'));
           }
 
           final apiKeys = snapshot.data!;

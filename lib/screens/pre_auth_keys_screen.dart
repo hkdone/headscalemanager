@@ -27,7 +27,8 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
 
   void _refreshData() {
     setState(() {
-      _preAuthKeysFuture = context.read<AppProvider>().apiService.getPreAuthKeys();
+      _preAuthKeysFuture =
+          context.read<AppProvider>().apiService.getPreAuthKeys();
       _usersFuture = context.read<AppProvider>().apiService.getUsers();
     });
   }
@@ -53,8 +54,8 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(
-                child:
-                    CircularProgressIndicator(color: theme.colorScheme.primary));
+                child: CircularProgressIndicator(
+                    color: theme.colorScheme.primary));
           }
           if (snapshot.hasError) {
             return Center(
@@ -111,8 +112,6 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
     );
   }
 
-  
-
   Future<void> _createNewKey() async {
     final locale = context.read<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
@@ -129,7 +128,9 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
               : 'Pre-authentication key created.');
       final appProvider = context.read<AppProvider>();
       final serverUrl = await appProvider.storageService.getServerUrl();
-      final String loginServer = serverUrl?.endsWith('/') == true ? serverUrl!.substring(0, serverUrl.length - 1) : serverUrl ?? '';
+      final String loginServer = serverUrl?.endsWith('/') == true
+          ? serverUrl!.substring(0, serverUrl.length - 1)
+          : serverUrl ?? '';
       _showTailscaleUpCommandDialog(context, result, loginServer);
     }
   }
@@ -144,7 +145,8 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isFr ? 'Commande d\'enregistrement' : 'Registration Command',
+        title: Text(
+            isFr ? 'Commande d\'enregistrement' : 'Registration Command',
             style: theme.textTheme.titleLarge),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -177,8 +179,7 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
                         ? 'Clé expirée avec succès.'
                         : 'Key expired successfully.');
               } catch (e) {
-                showSafeSnackBar(
-                    context,
+                showSafeSnackBar(context,
                     '${isFr ? 'Erreur lors de l\'expiration de la clé' : 'Error expiring key'}: $e');
               }
             },
@@ -193,8 +194,8 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
               _showQrCodeDialog(
                   context, fullCommand); // Ouvre le dialogue QR Code
             },
-            style:
-                ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.primary),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary),
           ),
           ElevatedButton.icon(
             icon: Icon(Icons.copy, color: theme.colorScheme.onPrimary),
@@ -209,8 +210,8 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
                       ? 'Commande copiée dans le presse-papiers !'
                       : 'Command copied to clipboard!');
             },
-            style:
-                ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.primary),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary),
           ),
         ],
       ),
@@ -291,8 +292,8 @@ class _PreAuthKeyCard extends StatelessWidget {
         leading: const Icon(Icons.check_circle, color: Colors.green),
         title: Text(
             '${isFr ? 'Clé' : 'Key'}: ...${apiKey.key.substring(apiKey.key.length - 6)}',
-            style: theme.textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w500, fontFamily: 'monospace')),
+            style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w500, fontFamily: 'monospace')),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -348,8 +349,8 @@ class _PreAuthKeyCard extends StatelessWidget {
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
                 child: Text(isFr ? 'Expirer' : 'Expire',
-                    style:
-                        theme.textTheme.labelLarge?.copyWith(color: Colors.red)),
+                    style: theme.textTheme.labelLarge
+                        ?.copyWith(color: Colors.red)),
               ),
             ],
           ),
@@ -362,15 +363,11 @@ class _PreAuthKeyCard extends StatelessWidget {
             .read<AppProvider>()
             .apiService
             .expirePreAuthKey(apiKey.user!.id, apiKey.key);
-        showSafeSnackBar(
-            context,
-            isFr
-                ? 'Clé expirée avec succès.'
-                : 'Key expired successfully.');
+        showSafeSnackBar(context,
+            isFr ? 'Clé expirée avec succès.' : 'Key expired successfully.');
         onAction(); // This will trigger the refresh
       } catch (e) {
-        showSafeSnackBar(
-            context,
+        showSafeSnackBar(context,
             '${isFr ? 'Erreur lors de l\'expiration de la clé' : 'Error expiring key'}: $e');
       }
     }
@@ -391,7 +388,8 @@ class _PreAuthKeyCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isFr ? 'Commande d\'enregistrement' : 'Registration Command',
+        title: Text(
+            isFr ? 'Commande d\'enregistrement' : 'Registration Command',
             style: theme.textTheme.titleLarge),
         content: SelectableText(fullCommand,
             style:
@@ -406,8 +404,8 @@ class _PreAuthKeyCard extends StatelessWidget {
               Navigator.of(context).pop(); // Ferme le dialogue actuel
               onShowQrCode(context, fullCommand); // Utilise le callback
             },
-            style:
-                ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.primary),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary),
           ),
           ElevatedButton.icon(
             icon: Icon(Icons.copy, color: theme.colorScheme.onPrimary),
@@ -419,8 +417,8 @@ class _PreAuthKeyCard extends StatelessWidget {
               showSafeSnackBar(
                   context, isFr ? 'Commande copiée !' : 'Command copied!');
             },
-            style:
-                ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.primary),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

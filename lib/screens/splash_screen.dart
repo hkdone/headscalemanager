@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/home_screen.dart';
+import 'package:headscalemanager/screens/lock_screen.dart';
 import 'package:headscalemanager/screens/settings_screen.dart';
+import 'package:headscalemanager/services/security_service.dart';
 import 'package:headscalemanager/services/storage_service.dart';
 import 'package:provider/provider.dart';
 
@@ -31,10 +33,13 @@ class _SplashScreenState extends State<SplashScreen> {
   /// Navigue vers l'écran d'accueil si les identifiants sont présents,
   /// sinon vers l'écran des paramètres pour la configuration initiale.
   Future<void> _checkCredentials() async {
-    // Instancie le service de stockage pour accéder aux identifiants.
+    // Instancie les services nécessaires.
     final storage = StorageService();
+    final security = SecurityService();
+
     // Vérifie si des identifiants sont déjà sauvegardés.
     final hasCreds = await storage.hasCredentials();
+    final isPinConfigured = await security.isPinConfigured();
 
     // Introduit un délai pour que l'écran de démarrage soit visible.
     await Future.delayed(const Duration(seconds: 1));
@@ -43,8 +48,12 @@ class _SplashScreenState extends State<SplashScreen> {
     if (mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (context) =>
-              hasCreds ? const HomeScreen() : const SettingsScreen(),
+          builder: (context) {
+            if (!hasCreds) {
+              return const SettingsScreen();
+            }
+            return isPinConfigured ? const LockScreen() : const HomeScreen();
+          },
         ),
       );
     }
