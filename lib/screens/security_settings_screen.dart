@@ -5,7 +5,7 @@ import 'package:headscalemanager/screens/setup_pin_screen.dart';
 import 'package:provider/provider.dart';
 
 class SecuritySettingsScreen extends StatefulWidget {
-  const SecuritySettingsScreen({Key? key}) : super(key: key);
+  const SecuritySettingsScreen({super.key});
 
   @override
   _SecuritySettingsScreenState createState() => _SecuritySettingsScreenState();

@@ -5,10 +5,10 @@ class NumpadWidget extends StatelessWidget {
   final VoidCallback onDeletePressed;
 
   const NumpadWidget({
-    Key? key,
+    super.key,
     required this.onNumberPressed,
     required this.onDeletePressed,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

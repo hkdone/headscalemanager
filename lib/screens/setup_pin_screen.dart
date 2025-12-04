@@ -5,7 +5,7 @@ import 'package:headscalemanager/widgets/numpad_widget.dart';
 import 'package:provider/provider.dart';
 
 class SetupPinScreen extends StatefulWidget {
-  const SetupPinScreen({Key? key}) : super(key: key);
+  const SetupPinScreen({super.key});
 
   @override
   _SetupPinScreenState createState() => _SetupPinScreenState();

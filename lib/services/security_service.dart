@@ -64,10 +64,8 @@ class SecurityService {
     try {
       return await _localAuth.authenticate(
         localizedReason: localizedReason,
-        options: const AuthenticationOptions(
-          stickyAuth: true, // Use system dialog
-          biometricOnly: false, // Allow PIN/Pattern as fallback
-        ),
+        persistAcrossBackgrounding: true,
+        biometricOnly: false,
       );
     } on PlatformException catch (e) {
       print("Authentication error: $e");

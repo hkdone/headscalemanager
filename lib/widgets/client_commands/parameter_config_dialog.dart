@@ -145,7 +145,7 @@ class _ParameterConfigDialogState extends State<ParameterConfigDialog> {
               hintText: param.placeholder,
               border: const OutlineInputBorder(),
             ),
-            value: _controllers[param.id]?.text.isNotEmpty == true
+            initialValue: _controllers[param.id]?.text.isNotEmpty == true
                 ? _controllers[param.id]?.text
                 : null,
             items: param.options!.map((option) {

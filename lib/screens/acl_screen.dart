@@ -357,7 +357,7 @@ class _AclScreenState extends State<AclScreen> {
     final isFr = locale.languageCode == 'fr';
 
     return DropdownButtonFormField<Node>(
-      value: selectedNode,
+      initialValue: selectedNode,
       decoration: _buildInputDecoration(
           label, isFr ? 'Choisir un nœud' : 'Choose a node'),
       items: nodes.map((Node node) {

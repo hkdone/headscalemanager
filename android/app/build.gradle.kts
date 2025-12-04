@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "com.dkstudio.headscalemanager"
-    compileSdk = 35 // Updated as required by plugins
+    compileSdk = 36 // Updated as required by plugins
     ndkVersion = "27.0.12077973"
 
     val keystoreProperties = Properties()
@@ -31,7 +31,7 @@ android {
 
     defaultConfig {
         applicationId = "com.dkstudio.headscalemanager"
-        minSdk = 21
+        minSdk = flutter.minSdkVersion
         targetSdk = 35 // It is best practice to keep targetSdk a bit behind compileSdk
         versionCode = flutter.versionCode
         versionName = flutter.versionName

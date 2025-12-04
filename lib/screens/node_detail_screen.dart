@@ -519,7 +519,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                     Switch(
                       value: _isPingingContinuously,
                       onChanged: _toggleContinuousPing,
-                      activeColor: theme.colorScheme.onPrimary,
+                      activeThumbColor: theme.colorScheme.onPrimary,
                       inactiveTrackColor:
                           theme.colorScheme.onPrimary.withOpacity(0.3),
                       inactiveThumbColor:

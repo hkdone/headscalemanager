@@ -57,7 +57,7 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
                 }
                 return DropdownButtonFormField<User>(
                   isExpanded: true,
-                  value: _selectedUser,
+                  initialValue: _selectedUser,
                   items: users.map((user) {
                     return DropdownMenuItem<User>(
                       value: user,

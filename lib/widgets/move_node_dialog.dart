@@ -156,7 +156,7 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
           _selectedUser ??= otherUsers.first;
 
           return DropdownButtonFormField<User>(
-            value: _selectedUser,
+            initialValue: _selectedUser,
             isExpanded: true,
             items: otherUsers.map((user) {
               return DropdownMenuItem<User>(

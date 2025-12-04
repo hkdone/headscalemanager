@@ -70,7 +70,7 @@ class CommandFiltersSection extends StatelessWidget {
               // Sélecteur de plateforme
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: selectedPlatform,
+                  initialValue: selectedPlatform,
                   decoration: InputDecoration(
                     labelText: isFr ? 'Plateforme' : 'Platform',
                     border: OutlineInputBorder(
@@ -104,7 +104,7 @@ class CommandFiltersSection extends StatelessWidget {
               // Sélecteur de catégorie
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: selectedCategory,
+                  initialValue: selectedCategory,
                   decoration: InputDecoration(
                     labelText: isFr ? 'Catégorie' : 'Category',
                     border: OutlineInputBorder(

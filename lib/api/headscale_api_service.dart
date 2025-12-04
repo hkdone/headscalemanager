@@ -258,20 +258,27 @@ class HeadscaleApiService {
 
   Future<List<PreAuthKey>> getPreAuthKeys() async {
     final baseUrl = await _getBaseUrl();
+    final List<PreAuthKey> allPreAuthKeys = [];
 
-    final response = await http.get(
-      Uri.parse('$baseUrl/api/v1/preauthkey'),
-      headers: await _getHeaders(),
-    );
+    final users = await getUsers();
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final List<dynamic> keysJson = data['preAuthKeys'];
-      return keysJson.map((json) => PreAuthKey.fromJson(json)).toList();
-    } else {
-      throw Exception(
-          _handleError('charger les clés de pré-authentification', response));
+    for (final user in users) {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/v1/preauthkey?user=${user.id}'),
+        headers: await _getHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<dynamic> keysJson = data['preAuthKeys'];
+        allPreAuthKeys.addAll(keysJson.map((json) => PreAuthKey.fromJson(json)).toList());
+      } else {
+        // Log error but continue with other users
+
+      }
     }
+
+    return allPreAuthKeys;
   }
 
   Future<void> expirePreAuthKey(String userId, String key) async {
