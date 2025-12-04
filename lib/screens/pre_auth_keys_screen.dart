@@ -127,7 +127,7 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
               ? 'Clé de pré-authentification créée.'
               : 'Pre-authentication key created.');
       final appProvider = context.read<AppProvider>();
-      final serverUrl = await appProvider.storageService.getServerUrl();
+      final serverUrl = appProvider.activeServer?.url;
       final String loginServer = serverUrl?.endsWith('/') == true
           ? serverUrl!.substring(0, serverUrl.length - 1)
           : serverUrl ?? '';
@@ -378,7 +378,7 @@ class _PreAuthKeyCard extends StatelessWidget {
     final locale = context.read<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
     final appProvider = context.read<AppProvider>();
-    final serverUrl = await appProvider.storageService.getServerUrl();
+    final serverUrl = appProvider.activeServer?.url;
     final String loginServer = serverUrl?.endsWith('/') == true
         ? serverUrl!.substring(0, serverUrl.length - 1)
         : serverUrl ?? '';

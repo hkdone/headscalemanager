@@ -1,90 +1,95 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:headscalemanager/models/server.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Service de stockage sécurisé pour les identifiants et les configurations de l'application.
 class StorageService {
   final _storage = const FlutterSecureStorage();
 
-  static const _apiKey = 'HEADSCALE_API_KEY';
-  static const _serverUrl = 'HEADSCALE_SERVER_URL';
+  static const _oldApiKey = 'HEADSCALE_API_KEY';
+  static const _oldServerUrl = 'HEADSCALE_SERVER_URL';
+  static const _serversKey = 'SERVERS_LIST';
+  static const _activeServerIdKey = 'ACTIVE_SERVER_ID';
+
   static const _temporaryAclRules = 'TEMPORARY_ACL_RULES';
   static const _languageKey = 'APP_LANGUAGE';
 
-  /// Sauvegarde la langue sélectionnée dans SharedPreferences.
+  Future<void> init() async {
+    await _migrateToServerList();
+  }
+
+  Future<void> _migrateToServerList() async {
+    final oldApiKey = await _storage.read(key: _oldApiKey);
+    final oldServerUrl = await _storage.read(key: _oldServerUrl);
+
+    if (oldApiKey != null && oldServerUrl != null) {
+      final server = Server(
+        name: 'Default Server',
+        url: oldServerUrl,
+        apiKey: oldApiKey,
+      );
+      await saveServers([server]);
+      await setActiveServerId(server.id);
+
+      await _storage.delete(key: _oldApiKey);
+      await _storage.delete(key: _oldServerUrl);
+    }
+  }
+
+  Future<List<Server>> getServers() async {
+    final serversJson = await _storage.read(key: _serversKey);
+    if (serversJson == null) {
+      return [];
+    }
+    final List<dynamic> serversList = json.decode(serversJson);
+    return serversList.map((json) => Server.fromJson(json)).toList();
+  }
+
+  Future<void> saveServers(List<Server> servers) async {
+    final serversJson = json.encode(servers.map((s) => s.toJson()).toList());
+    await _storage.write(key: _serversKey, value: serversJson);
+  }
+
+  Future<String?> getActiveServerId() async {
+    return await _storage.read(key: _activeServerIdKey);
+  }
+
+  Future<void> setActiveServerId(String serverId) async {
+    await _storage.write(key: _activeServerIdKey, value: serverId);
+  }
+
   Future<void> saveLanguage(String languageCode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_languageKey, languageCode);
   }
 
-  /// Récupère la langue sélectionnée depuis SharedPreferences.
   Future<String?> getLanguage() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_languageKey);
   }
 
-  /// Sauvegarde les identifiants de connexion.
-  Future<void> saveCredentials(
-      {required String apiKey, required String serverUrl}) async {
-    await _storage.write(key: _apiKey, value: apiKey);
-    await _storage.write(key: _serverUrl, value: serverUrl);
-  }
-
-  /// Récupère la clé API Headscale stockée.
-  Future<String?> getApiKey() async {
-    return await _storage.read(key: _apiKey);
-  }
-
-  /// Récupère l'URL du serveur Headscale stockée.
-  Future<String?> getServerUrl() async {
-    return await _storage.read(key: _serverUrl);
-  }
-
-  /// Vérifie si les identifiants de connexion sont présents.
-  Future<bool> hasCredentials() async {
-    final apiKey = await getApiKey();
-    final serverUrl = await getServerUrl();
-    return apiKey != null &&
-        serverUrl != null &&
-        apiKey.isNotEmpty &&
-        serverUrl.isNotEmpty;
-  }
-
-  /// Efface tous les identifiants de connexion stockés.
-  Future<void> clearCredentials() async {
-    await _storage.delete(key: _apiKey);
-    await _storage.delete(key: _serverUrl);
-  }
-
-  /// Sauvegarde les règles ACL temporaires.
   Future<void> saveTemporaryRules(List<Map<String, dynamic>> rules) async {
     final String rulesJson = json.encode(rules);
     await _storage.write(key: _temporaryAclRules, value: rulesJson);
   }
 
-  /// Récupère les règles ACL temporaires.
   Future<List<Map<String, dynamic>>> getTemporaryRules() async {
     final String? rulesJson = await _storage.read(key: _temporaryAclRules);
     if (rulesJson != null && rulesJson.isNotEmpty) {
       try {
         final List<dynamic> decodedList = json.decode(rulesJson);
-        return decodedList
-            .map((item) => Map<String, dynamic>.from(item))
-            .toList();
+        return decodedList.map((item) => Map<String, dynamic>.from(item)).toList();
       } catch (e) {
-        // En cas d'erreur de décodage, retourne une liste vide.
         return [];
       }
     }
     return [];
   }
 
-  /// Sauvegarde des données génériques avec une clé.
   Future<void> saveData(String key, String value) async {
     await _storage.write(key: key, value: value);
   }
 
-  /// Récupère des données génériques avec une clé.
   Future<String?> getData(String key) async {
     return await _storage.read(key: key);
   }

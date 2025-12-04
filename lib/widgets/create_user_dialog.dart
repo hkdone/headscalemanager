@@ -52,7 +52,7 @@ class _CreateUserDialogState extends State<CreateUserDialog> {
               return;
             }
 
-            final serverUrl = await appProvider.storageService.getServerUrl();
+            final serverUrl = appProvider.activeServer?.url;
             final String? baseDomain = serverUrl?.extractBaseDomain();
 
             String suffix = '';

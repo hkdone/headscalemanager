@@ -111,7 +111,7 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
 
                 // Afficher le dialogue de commande Tailscale pour le sous-réseau.
                 final serverUrl =
-                    await appProvider.storageService.getServerUrl();
+                    appProvider.activeServer?.url;
                 final String loginServer = serverUrl?.endsWith('/') == true
                     ? serverUrl!.substring(0, serverUrl.length - 1)
                     : serverUrl ?? '';

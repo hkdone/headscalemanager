@@ -33,23 +33,21 @@ class _SplashScreenState extends State<SplashScreen> {
   /// Navigue vers l'écran d'accueil si les identifiants sont présents,
   /// sinon vers l'écran des paramètres pour la configuration initiale.
   Future<void> _checkCredentials() async {
-    // Instancie les services nécessaires.
-    final storage = StorageService();
+    final appProvider = context.read<AppProvider>();
     final security = SecurityService();
 
-    // Vérifie si des identifiants sont déjà sauvegardés.
-    final hasCreds = await storage.hasCredentials();
+    await appProvider.isInitialized;
+
+    final hasServers = appProvider.servers.isNotEmpty;
     final isPinConfigured = await security.isPinConfigured();
 
-    // Introduit un délai pour que l'écran de démarrage soit visible.
     await Future.delayed(const Duration(seconds: 1));
 
-    // S'assure que le widget est toujours monté avant d'effectuer la navigation.
     if (mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (context) {
-            if (!hasCreds) {
+            if (!hasServers) {
               return const SettingsScreen();
             }
             return isPinConfigured ? const LockScreen() : const HomeScreen();

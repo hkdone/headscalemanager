@@ -57,13 +57,11 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
     try {
       final appProvider = context.read<AppProvider>();
       final apiService = appProvider.apiService;
-      final storageService = appProvider.storageService;
 
       final results = await Future.wait([
         apiService.getUsers(),
         apiService.getNodes(),
         apiService.getAclPolicy().then((p) => jsonDecode(p)),
-        storageService.getServerUrl(),
       ]);
 
       if (mounted) {
@@ -71,7 +69,7 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
           _users = results[0] as List<User>;
           _nodes = results[1] as List<Node>;
           _aclPolicy = results[2] as Map<String, dynamic>;
-          _serverUrl = results[3] as String? ?? '';
+          _serverUrl = appProvider.activeServer?.url ?? '';
           _graphKey = UniqueKey(); // Force graph widget to rebuild
           _isLoading = false;
         });

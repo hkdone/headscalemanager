@@ -38,7 +38,7 @@ class _ParameterConfigDialogState extends State<ParameterConfigDialog> {
 
   void _initializeParameters() async {
     final appProvider = context.read<AppProvider>();
-    final serverUrl = await appProvider.storageService.getServerUrl() ?? '';
+    final serverUrl = appProvider.activeServer?.url ?? '';
 
     if (widget.command.parameters == null) return;
 

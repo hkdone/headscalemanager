@@ -16,7 +16,7 @@ import 'package:provider/provider.dart';
 Future<void> showTailscaleUpCommandDialog(
     BuildContext context, User user) async {
   final appProvider = context.read<AppProvider>();
-  final serverUrl = await appProvider.storageService.getServerUrl();
+  final serverUrl = appProvider.activeServer?.url;
   if (serverUrl == null) {
     showSafeSnackBar(context, 'Erreur : URL du serveur non configurée.');
     return;

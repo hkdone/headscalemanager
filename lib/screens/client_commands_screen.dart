@@ -45,7 +45,7 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
     final isFr = appProvider.locale.languageCode == 'fr';
 
     try {
-      final serverUrl = await appProvider.storageService.getServerUrl();
+      final serverUrl = appProvider.activeServer?.url;
       final nodes = await appProvider.apiService.getNodes();
       final authKeys = await appProvider.apiService.getPreAuthKeys();
       final users = await appProvider.apiService.getUsers();
