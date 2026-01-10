@@ -68,13 +68,13 @@ class StorageService {
     return prefs.getString(_languageKey);
   }
 
-  Future<void> saveTemporaryRules(List<Map<String, dynamic>> rules) async {
+  Future<void> saveTemporaryRules(String serverId, List<Map<String, dynamic>> rules) async {
     final String rulesJson = json.encode(rules);
-    await _storage.write(key: _temporaryAclRules, value: rulesJson);
+    await _storage.write(key: '$_temporaryAclRules\_$serverId', value: rulesJson);
   }
 
-  Future<List<Map<String, dynamic>>> getTemporaryRules() async {
-    final String? rulesJson = await _storage.read(key: _temporaryAclRules);
+  Future<List<Map<String, dynamic>>> getTemporaryRules(String serverId) async {
+    final String? rulesJson = await _storage.read(key: '$_temporaryAclRules\_$serverId');
     if (rulesJson != null && rulesJson.isNotEmpty) {
       try {
         final List<dynamic> decodedList = json.decode(rulesJson);

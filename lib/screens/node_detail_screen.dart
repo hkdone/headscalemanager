@@ -461,7 +461,12 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           context, isFr ? 'Mise à jour des ACLs...' : 'Updating ACLs...');
       final allUsers = await apiService.getUsers();
       final updatedNodes = await apiService.getNodes(); // Re-fetch nodes
-      final tempRules = await appProvider.storageService.getTemporaryRules();
+      final serverId = appProvider.activeServer?.id;
+      if (serverId == null) {
+        showSafeSnackBar(context, isFr ? 'Aucun serveur actif sélectionné.' : 'No active server selected.');
+        return;
+      }
+      final tempRules = await appProvider.storageService.getTemporaryRules(serverId);
 
       final aclGenerator = NewAclGeneratorService();
       final newPolicyMap = aclGenerator.generatePolicy(

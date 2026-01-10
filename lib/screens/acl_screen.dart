@@ -32,6 +32,7 @@ class _AclScreenState extends State<AclScreen> {
   Node? _selectedDestinationNode;
   final _portController = TextEditingController();
   final List<Map<String, dynamic>> _temporaryRules = [];
+  String? _activeServerId;
 
   @override
   void initState() {
@@ -39,14 +40,35 @@ class _AclScreenState extends State<AclScreen> {
     _loadInitialData();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final appProvider = context.watch<AppProvider>();
+    if (_activeServerId != appProvider.activeServer?.id) {
+      _activeServerId = appProvider.activeServer?.id;
+      _loadInitialData();
+    }
+  }
+
   Future<void> _loadInitialData() async {
     setState(() => _isLoading = true);
-    // No need for listen: false here as it's in initState
-    final storage = context.read<AppProvider>().storageService;
+    final appProvider = context.read<AppProvider>();
+    final storage = appProvider.storageService;
+    final serverId = appProvider.activeServer?.id;
+
+    if (serverId == null) {
+      setState(() {
+        _isLoading = false;
+        // Handle error: no active server
+      });
+      return;
+    }
+
     await _fetchNodes();
-    final loadedRules = await storage.getTemporaryRules();
+    final loadedRules = await storage.getTemporaryRules(serverId);
     if (mounted) {
       setState(() {
+        _temporaryRules.clear();
         _temporaryRules.addAll(loadedRules);
       });
       await _generateNewAclPolicy(showSnackbar: false);
@@ -574,8 +596,12 @@ class _AclScreenState extends State<AclScreen> {
     debugPrint('DEBUG: Nombre de règles ajoutées: $addedCount');
 
     if (addedCount > 0) {
-      final storage = context.read<AppProvider>().storageService;
-      await storage.saveTemporaryRules(_temporaryRules);
+      final appProvider = context.read<AppProvider>();
+      final storage = appProvider.storageService;
+      final serverId = appProvider.activeServer?.id;
+      if (serverId != null) {
+        await storage.saveTemporaryRules(serverId, _temporaryRules);
+      }
       await _generateAndExportPolicy(
           message: isFr
               ? '$addedCount règle(s) ajoutée(s) et politique appliquée.'
@@ -696,8 +722,12 @@ class _AclScreenState extends State<AclScreen> {
       _temporaryRules.removeAt(index);
     });
 
-    final storage = context.read<AppProvider>().storageService;
-    await storage.saveTemporaryRules(_temporaryRules);
+    final appProvider = context.read<AppProvider>();
+    final storage = appProvider.storageService;
+    final serverId = appProvider.activeServer?.id;
+    if (serverId != null) {
+      await storage.saveTemporaryRules(serverId, _temporaryRules);
+    }
     await _generateAndExportPolicy(
         message: isFr
             ? 'Règle supprimée et politique mise à jour.'
@@ -734,8 +764,12 @@ class _AclScreenState extends State<AclScreen> {
     setState(() {
       _temporaryRules.clear();
     });
-    final storage = context.read<AppProvider>().storageService;
-    await storage.saveTemporaryRules(_temporaryRules);
+    final appProvider = context.read<AppProvider>();
+    final storage = appProvider.storageService;
+    final serverId = appProvider.activeServer?.id;
+    if (serverId != null) {
+      await storage.saveTemporaryRules(serverId, _temporaryRules);
+    }
     await _generateAndExportPolicy(
         message: isFr
             ? 'Toutes les règles ont été supprimées et la politique a été mise à jour.'
@@ -966,8 +1000,22 @@ class _AclScreenState extends State<AclScreen> {
     setState(() {
       _temporaryRules.clear();
     });
-    final storage = context.read<AppProvider>().storageService;
-    await storage.saveTemporaryRules(_temporaryRules);
+    final appProvider = context.read<AppProvider>();
+    final storage = appProvider.storageService;
+    final serverId = appProvider.activeServer?.id;
+    if (serverId == null) {
+      // Handle no active server error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isFr ? 'Aucun serveur actif sélectionné.' : 'No active server selected.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+    await storage.saveTemporaryRules(serverId, _temporaryRules);
 
     await _exportAclPolicyToServer(
         showConfirmation: false,

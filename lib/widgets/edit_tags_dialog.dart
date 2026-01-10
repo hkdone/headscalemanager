@@ -166,12 +166,15 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
         if (updateAcls == true && mounted) {
           showSafeSnackBar(
               context, isFr ? 'Mise à jour des ACLs...' : 'Updating ACLs...');
+          final appProvider = context.read<AppProvider>();
           final allUsers = await apiService.getUsers();
           final allNodes = await apiService.getNodes();
-          final tempRules = await context
-              .read<AppProvider>()
-              .storageService
-              .getTemporaryRules();
+          final serverId = appProvider.activeServer?.id;
+          if (serverId == null) {
+            showSafeSnackBar(context, isFr ? 'Aucun serveur actif sélectionné.' : 'No active server selected.');
+            return;
+          }
+          final tempRules = await appProvider.storageService.getTemporaryRules(serverId);
           final aclGenerator = NewAclGeneratorService();
           final newPolicyMap = aclGenerator.generatePolicy(
               users: allUsers, nodes: allNodes, temporaryRules: tempRules);

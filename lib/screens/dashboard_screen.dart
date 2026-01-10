@@ -520,8 +520,13 @@ class _UserNodeCard extends StatelessWidget {
                     final allUsers = await appProvider.apiService.getUsers();
                     final updatedNodes =
                         await appProvider.apiService.getNodes();
+                    final serverId = appProvider.activeServer?.id;
+                    if (serverId == null) {
+                      showSafeSnackBar(context, isFr ? 'Aucun serveur actif sélectionné.' : 'No active server selected.');
+                      return;
+                    }
                     final tempRules =
-                        await appProvider.storageService.getTemporaryRules();
+                        await appProvider.storageService.getTemporaryRules(serverId);
                     final aclGenerator = NewAclGeneratorService();
                     final newPolicyMap = aclGenerator.generatePolicy(
                         users: allUsers,
@@ -640,8 +645,13 @@ class _UserNodeCard extends StatelessWidget {
                     final allUsers = await appProvider.apiService.getUsers();
                     final updatedNodes =
                         await appProvider.apiService.getNodes();
+                    final serverId = appProvider.activeServer?.id;
+                    if (serverId == null) {
+                      showSafeSnackBar(context, isFr ? 'Aucun serveur actif sélectionné.' : 'No active server selected.');
+                      return;
+                    }
                     final tempRules =
-                        await appProvider.storageService.getTemporaryRules();
+                        await appProvider.storageService.getTemporaryRules(serverId);
                     final aclGenerator = NewAclGeneratorService();
                     final newPolicyMap = aclGenerator.generatePolicy(
                         users: allUsers,

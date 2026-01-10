@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/help_screen.dart';
 import 'package:headscalemanager/screens/help_screen_en.dart';
-import 'package:headscalemanager/screens/api_keys_screen.dart';
 import 'package:headscalemanager/screens/security_settings_screen.dart';
 import 'package:headscalemanager/services/notification_service.dart';
 import 'package:provider/provider.dart';
@@ -78,32 +78,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   await NotificationService.enableBackgroundTask(value);
                 },
               ),
-              const Divider(height: 32),
-              ListTile(
-                title: Text(isFr ? 'Sécurité' : 'Security',
-                    style: theme.textTheme.titleMedium),
-                subtitle: Text(
-                    isFr
-                        ? 'Configurer le verrouillage de l\'application'
-                        : 'Configure app lock',
-                    style: theme.textTheme.bodySmall),
-                leading: const Icon(Icons.security),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const SecuritySettingsScreen()),
-                  );
-                },
-              ),
-              const Divider(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildLanguageButton(context, 'fr'),
-                  const SizedBox(width: 16),
-                  _buildLanguageButton(context, 'en'),
-                ],
-              ),
               const Spacer(),
               TextButton(
                 onPressed: () {
@@ -139,13 +113,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const AddEditServerScreen()),
-          );
-        },
-        child: const Icon(Icons.add),
+      floatingActionButton: SpeedDial(
+        icon: Icons.menu,
+        activeIcon: Icons.close,
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        children: [
+          SpeedDialChild(
+            child: const Icon(Icons.add),
+            label: isFr ? 'Ajouter un serveur' : 'Add Server',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AddEditServerScreen()),
+              );
+            },
+          ),
+          SpeedDialChild(
+            child: const Icon(Icons.security),
+            label: isFr ? 'Sécurité' : 'Security',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const SecuritySettingsScreen()),
+              );
+            },
+          ),
+          SpeedDialChild(
+            child: Text(isFr ? 'EN' : 'FR'),
+            label: isFr ? 'Switch to English' : 'Passer en Français',
+            onTap: () {
+              final newLocale =
+                  isFr ? const Locale('en') : const Locale('fr');
+              appProvider.setLocale(newLocale);
+            },
+          ),
+        ],
       ),
     );
   }
@@ -170,34 +172,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final server = servers[index];
         return ServerListTile(server: server);
       },
-    );
-  }
-
-  Widget _buildLanguageButton(BuildContext context, String languageCode) {
-    final appProvider = Provider.of<AppProvider>(context);
-    final isSelected = appProvider.locale.languageCode == languageCode;
-
-    return GestureDetector(
-      onTap: () {
-        appProvider.setLocale(Locale(languageCode));
-      },
-      child: Opacity(
-        opacity: isSelected ? 1.0 : 0.5,
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: isSelected
-                ? Border.all(
-                    color: Theme.of(context).colorScheme.primary, width: 2)
-                : null,
-          ),
-          child: Text(
-            languageCode.toUpperCase(),
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ),
     );
   }
 }

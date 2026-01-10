@@ -28,8 +28,17 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
 
   Future<void> _loadRules() async {
     setState(() => _isLoading = true);
-    final storage = context.read<AppProvider>().storageService;
-    final loadedRules = await storage.getTemporaryRules();
+    final appProvider = context.read<AppProvider>();
+    final storage = appProvider.storageService;
+    final serverId = appProvider.activeServer?.id;
+    if (serverId == null) {
+      setState(() {
+        _isLoading = false;
+        // Handle error: no active server
+      });
+      return;
+    }
+    final loadedRules = await storage.getTemporaryRules(serverId);
     if (mounted) {
       setState(() {
         _temporaryRules = loadedRules;
@@ -82,8 +91,12 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
       _rulesChanged = true;
     });
 
-    final storage = context.read<AppProvider>().storageService;
-    await storage.saveTemporaryRules(_temporaryRules);
+    final appProvider = context.read<AppProvider>();
+    final storage = appProvider.storageService;
+    final serverId = appProvider.activeServer?.id;
+    if (serverId != null) {
+      await storage.saveTemporaryRules(serverId, _temporaryRules);
+    }
     await _generateAndExportPolicy(
         message: isFr
             ? 'Règle supprimée et politique mise à jour.'

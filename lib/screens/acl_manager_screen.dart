@@ -3,9 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
-import 'package:headscalemanager/services/new_acl_generator_service.dart';
-import 'package:headscalemanager/widgets/add_acl_rule_dialog.dart';
-import 'package:headscalemanager/widgets/manage_specific_rules_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/services/acl_parser_service.dart';
 import 'package:headscalemanager/widgets/acl_graph_widget.dart';
@@ -84,97 +81,6 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
     }
   }
 
-  Future<void> _showAddRuleDialog() async {
-    final newRules = await showDialog<List<Map<String, dynamic>>>(
-      context: context,
-      builder: (context) => AddAclRuleDialog(allNodes: _nodes),
-    );
-
-    if (newRules != null && newRules.isNotEmpty && mounted) {
-      await _applyNewRules(newRules);
-    }
-  }
-
-  Future<void> _showManageRulesDialog() async {
-    final rulesChanged = await showDialog<bool>(
-      context: context,
-      builder: (context) => ManageSpecificRulesDialog(allNodes: _nodes),
-    );
-
-    if (rulesChanged == true && mounted) {
-      await _loadData();
-    }
-  }
-
-  Future<void> _applyNewRules(List<Map<String, dynamic>> newRules) async {
-    setState(() => _isLoading = true);
-    final locale = context.read<AppProvider>().locale;
-    final isFr = locale.languageCode == 'fr';
-
-    try {
-      final storage = context.read<AppProvider>().storageService;
-      final apiService = context.read<AppProvider>().apiService;
-
-      final existingRules = await storage.getTemporaryRules();
-
-      int addedCount = 0;
-      for (var newRule in newRules) {
-        final ruleExists = existingRules.any((rule) =>
-            rule['src'] == newRule['src'] &&
-            rule['dst'] == newRule['dst'] &&
-            (rule['port'] ?? '*') == (newRule['port'] ?? '*'));
-
-        if (!ruleExists) {
-          existingRules.add(newRule);
-          addedCount++;
-        }
-      }
-
-      if (addedCount == 0) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(isFr
-              ? 'Aucune nouvelle règle à ajouter. Les règles existent déjà.'
-              : 'No new rules to add. The rules already exist.'),
-        ));
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      await storage.saveTemporaryRules(existingRules);
-
-      final generator = NewAclGeneratorService();
-      final newPolicy = generator.generatePolicy(
-        users: _users,
-        nodes: _nodes,
-        temporaryRules: existingRules,
-      );
-
-      const encoder = JsonEncoder.withIndent('  ');
-      final policyString = encoder.convert(newPolicy);
-
-      await apiService.setAclPolicy(policyString);
-
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(isFr
-            ? '$addedCount règle(s) ajoutée(s) et politique appliquée avec succès.'
-            : '$addedCount rule(s) added and policy applied successfully.'),
-        backgroundColor: Colors.green,
-      ));
-
-      await _loadData(showLoading: false);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-            '${isFr ? "Erreur lors de l'application des règles" : "Error applying rules"}: $e'),
-        backgroundColor: Colors.red,
-      ));
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final locale = context.watch<AppProvider>().locale;
@@ -205,25 +111,6 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
       body: RefreshIndicator(
         onRefresh: _loadData,
         child: _buildBody(isFr),
-      ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            onPressed: _isLoading ? null : _showManageRulesDialog,
-            tooltip:
-                isFr ? 'Gérer les règles spécifiques' : 'Manage specific rules',
-            heroTag: 'manage_rules_fab',
-            child: const Icon(Icons.rule_folder),
-          ),
-          const SizedBox(height: 16),
-          FloatingActionButton(
-            onPressed: _isLoading ? null : _showAddRuleDialog,
-            tooltip: isFr ? 'Ajouter une règle' : 'Add rule',
-            heroTag: 'add_rule_fab',
-            child: const Icon(Icons.add),
-          ),
-        ],
       ),
     );
   }

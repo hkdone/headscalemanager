@@ -97,7 +97,12 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
 
           final allUsers = await provider.apiService.getUsers();
           final allNodes = await provider.apiService.getNodes();
-          final tempRules = await provider.storageService.getTemporaryRules();
+          final serverId = provider.activeServer?.id;
+          if (serverId == null) {
+            showSafeSnackBar(context, isFr ? 'Aucun serveur actif sélectionné.' : 'No active server selected.');
+            return;
+          }
+          final tempRules = await provider.storageService.getTemporaryRules(serverId);
           final aclGenerator = NewAclGeneratorService();
           final newPolicyMap = aclGenerator.generatePolicy(
               users: allUsers, nodes: allNodes, temporaryRules: tempRules);
