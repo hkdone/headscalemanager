@@ -55,10 +55,11 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
         nodes: nodes,
         authKeys: authKeys,
         users: users,
+        isFr: isFr,
       );
     } catch (e) {
       // Fallback to static commands in case of an API error
-      _allCommands = DynamicCommandGenerator.generateAllCommands();
+      _allCommands = DynamicCommandGenerator.generateAllCommands(isFr: isFr);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

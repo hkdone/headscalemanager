@@ -190,22 +190,50 @@ class CommandCategories {
   static const String security = 'Sécurité';
   static const String maintenance = 'Maintenance';
   static const String serverSpecific = 'Spécifique Serveur';
+
+  static String get(String category, bool isFr) {
+    if (isFr) return category;
+    switch (category) {
+      case connection:
+        return 'Connection';
+      case routing:
+        return 'Routing';
+      case troubleshooting:
+        return 'Troubleshooting';
+      case configuration:
+        return 'Configuration';
+      case monitoring:
+        return 'Monitoring';
+      case security:
+        return 'Security';
+      case maintenance:
+        return 'Maintenance';
+      case serverSpecific:
+        return 'Server Specific';
+      default:
+        return category;
+    }
+  }
 }
 
 // Générateur de commandes dynamiques
 class DynamicCommandGenerator {
   // Générer des commandes basées sur le serveur actuel
-  static List<ClientCommand> generateServerBasedCommands(String serverUrl) {
+  static List<ClientCommand> generateServerBasedCommands(String serverUrl,
+      {bool isFr = true}) {
     return [
       // Connexion avec serveur personnalisé
       ClientCommand(
         id: 'connect_to_server',
-        title: 'Connexion au serveur configuré',
-        description:
-            'Se connecter au serveur Headscale configuré dans l\'application',
+        title: isFr
+            ? 'Connexion au serveur configuré'
+            : 'Connect to configured server',
+        description: isFr
+            ? 'Se connecter au serveur Headscale configuré dans l\'application'
+            : 'Connect to the Headscale server configured in the application',
         windowsCommand: 'tailscale up --login-server=$serverUrl',
         linuxCommand: 'sudo tailscale up --login-server=$serverUrl',
-        category: CommandCategories.connection,
+        category: CommandCategories.get(CommandCategories.connection, isFr),
         tags: ['connexion', 'serveur', 'up'],
         type: CommandType.serverBased,
         isDynamic: false,
@@ -214,22 +242,27 @@ class DynamicCommandGenerator {
       // Connexion avec clé d'auth personnalisée
       ClientCommand(
         id: 'connect_with_custom_key',
-        title: 'Connexion avec clé pré-authentifiée',
-        description:
-            'Se connecter avec une clé pré-authentifiée (à saisir manuellement)',
+        title: isFr
+            ? 'Connexion avec clé pré-authentifiée'
+            : 'Connect with pre-auth key',
+        description: isFr
+            ? 'Se connecter avec une clé pré-authentifiée (à saisir manuellement)'
+            : 'Connect with a pre-authentication key (enter manually)',
         windowsCommand:
             'tailscale up --login-server=$serverUrl --authkey={authkey}',
         linuxCommand:
             'sudo tailscale up --login-server=$serverUrl --authkey={authkey}',
-        category: CommandCategories.connection,
+        category: CommandCategories.get(CommandCategories.connection, isFr),
         tags: ['connexion', 'authkey', 'up'],
         type: CommandType.dynamic,
         isDynamic: true,
         parameters: [
           CommandParameter(
             id: 'authkey',
-            label: 'Clé d\'authentification',
-            description: 'Entrez votre clé pré-authentifiée',
+            label: isFr ? 'Clé d\'authentification' : 'Authentication key',
+            description: isFr
+                ? 'Entrez votre clé pré-authentifiée'
+                : 'Enter your pre-auth key',
             type: ParameterType.text,
             placeholder: 'nodekey-xxxxx ou tskey-xxxxx',
           ),
@@ -239,7 +272,8 @@ class DynamicCommandGenerator {
   }
 
   // Générer des commandes basées sur les nœuds existants
-  static List<ClientCommand> generateNodeBasedCommands(List<Node> nodes) {
+  static List<ClientCommand> generateNodeBasedCommands(List<Node> nodes,
+      {bool isFr = true}) {
     List<ClientCommand> commands = [];
 
     // Commandes pour utiliser des nœuds de sortie existants
@@ -248,29 +282,37 @@ class DynamicCommandGenerator {
       commands.add(
         ClientCommand(
           id: 'use_specific_exit_node',
-          title: 'Utiliser un nœud de sortie spécifique',
-          description: 'Router le trafic via un nœud de sortie disponible',
+          title: isFr
+              ? 'Utiliser un nœud de sortie spécifique'
+              : 'Use a specific exit node',
+          description: isFr
+              ? 'Router le trafic via un nœud de sortie disponible'
+              : 'Route traffic through an available exit node',
           windowsCommand:
               'tailscale up --login-server={server_url} --exit-node={node_name}',
           linuxCommand:
               'sudo tailscale up --login-server={server_url} --exit-node={node_name}',
-          category: CommandCategories.routing,
+          category: CommandCategories.get(CommandCategories.routing, isFr),
           tags: ['exit-node', 'routing', 'spécifique', 'serveur'],
           type: CommandType.dynamic,
           isDynamic: true,
           parameters: [
             CommandParameter(
               id: 'server_url',
-              label: 'URL du serveur Headscale',
-              description: 'URL de votre serveur Headscale',
+              label: isFr ? 'URL du serveur Headscale' : 'Headscale server URL',
+              description: isFr
+                  ? 'URL de votre serveur Headscale'
+                  : 'Your Headscale server URL',
               type: ParameterType.text,
               placeholder: 'https://headscale.example.com',
               required: true,
             ),
             CommandParameter(
               id: 'node_name',
-              label: 'Nœud de sortie',
-              description: 'Sélectionnez un nœud de sortie disponible',
+              label: isFr ? 'Nœud de sortie' : 'Exit node',
+              description: isFr
+                  ? 'Sélectionnez un nœud de sortie disponible'
+                  : 'Select an available exit node',
               type: ParameterType.nodeSelect,
               options: exitNodes.map((n) => n.name).toList(),
             ),
@@ -284,19 +326,24 @@ class DynamicCommandGenerator {
       commands.add(
         ClientCommand(
           id: 'ping_specific_node',
-          title: 'Ping vers un nœud spécifique',
-          description: 'Tester la connectivité vers un nœud du réseau',
+          title: isFr ? 'Ping vers un nœud spécifique' : 'Ping a specific node',
+          description: isFr
+              ? 'Tester la connectivité vers un nœud du réseau'
+              : 'Test connectivity to a network node',
           windowsCommand: 'tailscale ping {node_ip}',
           linuxCommand: 'tailscale ping {node_ip}',
-          category: CommandCategories.troubleshooting,
+          category:
+              CommandCategories.get(CommandCategories.troubleshooting, isFr),
           tags: ['ping', 'test', 'spécifique'],
           type: CommandType.dynamic,
           isDynamic: true,
           parameters: [
             CommandParameter(
               id: 'node_ip',
-              label: 'Nœud cible',
-              description: 'Sélectionnez un nœud à tester',
+              label: isFr ? 'Nœud cible' : 'Target node',
+              description: isFr
+                  ? 'Sélectionnez un nœud à tester'
+                  : 'Select a node to test',
               type: ParameterType.nodeSelect,
               options: nodes
                   .map((n) => n.ipAddresses.first.isNotEmpty
@@ -313,7 +360,8 @@ class DynamicCommandGenerator {
   }
 
   // Générer des commandes basées sur les routes existantes
-  static List<ClientCommand> generateRouteBasedCommands(List<Node> nodes) {
+  static List<ClientCommand> generateRouteBasedCommands(List<Node> nodes,
+      {bool isFr = true}) {
     List<ClientCommand> commands = [];
 
     // Collecter toutes les routes partagées
@@ -327,30 +375,37 @@ class DynamicCommandGenerator {
       commands.add(
         ClientCommand(
           id: 'advertise_specific_routes',
-          title: 'Annoncer des routes spécifiques',
-          description: 'Annoncer des routes de sous-réseau personnalisées',
+          title: isFr
+              ? 'Annoncer des routes spécifiques'
+              : 'Advertise specific routes',
+          description: isFr
+              ? 'Annoncer des routes de sous-réseau personnalisées'
+              : 'Advertise custom subnet routes',
           windowsCommand:
               'tailscale up --login-server={server_url} --advertise-routes={routes}',
           linuxCommand:
               'sudo tailscale up --login-server={server_url} --advertise-routes={routes}',
-          category: CommandCategories.routing,
+          category: CommandCategories.get(CommandCategories.routing, isFr),
           tags: ['routes', 'subnet', 'personnalisé', 'serveur'],
           type: CommandType.dynamic,
           isDynamic: true,
           parameters: [
             CommandParameter(
               id: 'server_url',
-              label: 'URL du serveur Headscale',
-              description: 'URL de votre serveur Headscale',
+              label: isFr ? 'URL du serveur Headscale' : 'Headscale server URL',
+              description: isFr
+                  ? 'URL de votre serveur Headscale'
+                  : 'Your Headscale server URL',
               type: ParameterType.text,
               placeholder: 'https://headscale.example.com',
               required: true,
             ),
             CommandParameter(
               id: 'routes',
-              label: 'Routes à annoncer',
-              description:
-                  'Entrez les routes séparées par des virgules (ex: 192.168.1.0/24,10.0.0.0/8)',
+              label: isFr ? 'Routes à annoncer' : 'Routes to advertise',
+              description: isFr
+                  ? 'Entrez les routes séparées par des virgules (ex: 192.168.1.0/24,10.0.0.0/8)'
+                  : 'Enter routes separated by commas (e.g. 192.168.1.0/24,10.0.0.0/8)',
               type: ParameterType.text,
               placeholder: '192.168.1.0/24,10.0.0.0/8',
               validation:
@@ -365,55 +420,67 @@ class DynamicCommandGenerator {
   }
 
   // Générer des commandes interactives
-  static List<ClientCommand> generateInteractiveCommands() {
+  static List<ClientCommand> generateInteractiveCommands({bool isFr = true}) {
     return [
       // Configuration personnalisée complète
       ClientCommand(
         id: 'custom_setup',
-        title: 'Configuration personnalisée',
-        description: 'Configuration complète avec paramètres personnalisés',
+        title: isFr ? 'Configuration personnalisée' : 'Custom Setup',
+        description: isFr
+            ? 'Configuration complète avec paramètres personnalisés'
+            : 'Full setup with custom parameters',
         windowsCommand:
             'tailscale up --login-server={server_url} --hostname={hostname} {additional_params}',
         linuxCommand:
             'sudo tailscale up --login-server={server_url} --hostname={hostname} {additional_params}',
-        category: CommandCategories.configuration,
+        category: CommandCategories.get(CommandCategories.configuration, isFr),
         tags: ['configuration', 'personnalisé', 'complet'],
         type: CommandType.interactive,
         isDynamic: true,
         parameters: [
           CommandParameter(
             id: 'server_url',
-            label: 'URL du serveur',
-            description: 'URL de votre serveur Headscale',
+            label: isFr ? 'URL du serveur' : 'Server URL',
+            description: isFr
+                ? 'URL de votre serveur Headscale'
+                : 'Your Headscale server URL',
             type: ParameterType.text,
             placeholder: 'https://headscale.example.com',
           ),
           CommandParameter(
             id: 'hostname',
-            label: 'Nom d\'hôte',
-            description: 'Nom personnalisé pour ce nœud',
+            label: isFr ? 'Nom d\'hôte' : 'Hostname',
+            description: isFr
+                ? 'Nom personnalisé pour ce nœud'
+                : 'Custom name for this node',
             type: ParameterType.text,
             placeholder: 'mon-ordinateur',
             required: false,
           ),
           CommandParameter(
             id: 'accept_routes',
-            label: 'Accepter les routes',
-            description: 'Accepter les routes annoncées par d\'autres nœuds',
+            label: isFr ? 'Accepter les routes' : 'Accept routes',
+            description: isFr
+                ? 'Accepter les routes annoncées par d\'autres nœuds'
+                : 'Accept routes advertised by other nodes',
             type: ParameterType.boolean,
             defaultValue: 'false',
           ),
           CommandParameter(
             id: 'advertise_exit_node',
-            label: 'Devenir nœud de sortie',
-            description: 'Configurer ce nœud comme point de sortie Internet',
+            label: isFr ? 'Devenir nœud de sortie' : 'Become exit node',
+            description: isFr
+                ? 'Configurer ce nœud comme point de sortie Internet'
+                : 'Configure this node as an Internet exit point',
             type: ParameterType.boolean,
             defaultValue: 'false',
           ),
           CommandParameter(
             id: 'enable_ssh',
-            label: 'Activer SSH',
-            description: 'Activer l\'accès SSH via Tailscale',
+            label: isFr ? 'Activer SSH' : 'Enable SSH',
+            description: isFr
+                ? 'Activer l\'accès SSH via Tailscale'
+                : 'Enable SSH access via Tailscale',
             type: ParameterType.boolean,
             defaultValue: 'false',
           ),
@@ -423,44 +490,56 @@ class DynamicCommandGenerator {
       // Commande de routage avancé
       ClientCommand(
         id: 'advanced_routing',
-        title: 'Configuration de routage avancée',
-        description: 'Configuration avancée des routes et du routage',
+        title: isFr
+            ? 'Configuration de routage avancée'
+            : 'Advanced routing configuration',
+        description: isFr
+            ? 'Configuration avancée des routes et du routage'
+            : 'Advanced route and routing configuration',
         windowsCommand:
             'tailscale up --login-server={server_url} --advertise-routes={routes} {exit_node_param} {accept_routes_param}',
         linuxCommand:
             'sudo tailscale up --login-server={server_url} --advertise-routes={routes} {exit_node_param} {accept_routes_param}',
-        category: CommandCategories.routing,
+        category: CommandCategories.get(CommandCategories.routing, isFr),
         tags: ['routing', 'avancé', 'personnalisé', 'serveur'],
         type: CommandType.interactive,
         isDynamic: true,
         parameters: [
           CommandParameter(
             id: 'server_url',
-            label: 'URL du serveur Headscale',
-            description: 'URL de votre serveur Headscale',
+            label: isFr ? 'URL du serveur Headscale' : 'Headscale server URL',
+            description: isFr
+                ? 'URL de votre serveur Headscale'
+                : 'Your Headscale server URL',
             type: ParameterType.text,
             placeholder: 'https://headscale.example.com',
             required: true,
           ),
           CommandParameter(
             id: 'routes',
-            label: 'Routes à annoncer',
-            description: 'Routes de sous-réseau à partager',
+            label: isFr ? 'Routes à annoncer' : 'Routes to advertise',
+            description: isFr
+                ? 'Routes de sous-réseau à partager'
+                : 'Subnet routes to share',
             type: ParameterType.text,
             placeholder: '192.168.1.0/24,10.0.0.0/8',
             required: false,
           ),
           CommandParameter(
             id: 'use_exit_node',
-            label: 'Utiliser comme nœud de sortie',
-            description: 'Configurer ce nœud pour router le trafic Internet',
+            label: isFr ? 'Utiliser comme nœud de sortie' : 'Use as exit node',
+            description: isFr
+                ? 'Configurer ce nœud pour router le trafic Internet'
+                : 'Configure this node to route Internet traffic',
             type: ParameterType.boolean,
             defaultValue: 'false',
           ),
           CommandParameter(
             id: 'accept_routes',
-            label: 'Accepter les routes',
-            description: 'Accepter les routes des autres nœuds',
+            label: isFr ? 'Accepter les routes' : 'Accept routes',
+            description: isFr
+                ? 'Accepter les routes des autres nœuds'
+                : 'Accept routes from other nodes',
             type: ParameterType.boolean,
             defaultValue: 'true',
           ),
@@ -475,64 +554,70 @@ class DynamicCommandGenerator {
     List<Node>? nodes,
     List<PreAuthKey>? authKeys,
     List<User>? users,
+    bool isFr = true,
   }) {
     List<ClientCommand> allCommands = [];
 
     // Commandes statiques de base
-    allCommands.addAll(_getStaticCommands());
+    allCommands.addAll(_getStaticCommands(isFr: isFr));
 
     // Commandes basées sur le serveur
     if (serverUrl != null) {
-      allCommands.addAll(generateServerBasedCommands(serverUrl));
+      allCommands.addAll(generateServerBasedCommands(serverUrl, isFr: isFr));
     }
 
     // Commandes basées sur les nœuds
     if (nodes != null && nodes.isNotEmpty) {
-      allCommands.addAll(generateNodeBasedCommands(nodes));
-      allCommands.addAll(generateRouteBasedCommands(nodes));
+      allCommands.addAll(generateNodeBasedCommands(nodes, isFr: isFr));
+      allCommands.addAll(generateRouteBasedCommands(nodes, isFr: isFr));
     }
 
     // Commandes interactives
-    allCommands.addAll(generateInteractiveCommands());
+    allCommands.addAll(generateInteractiveCommands(isFr: isFr));
 
     return allCommands;
   }
 
   // Commandes statiques de base
-  static List<ClientCommand> _getStaticCommands() {
+  static List<ClientCommand> _getStaticCommands({bool isFr = true}) {
     return [
       // WEB UI
       ClientCommand(
         id: 'web_ui',
-        title: "Ouvrir l'interface web locale",
-        description:
-            "Ouvre l'interface web locale du client Tailscale pour voir les pairs et le statut (si supporté par le client).",
+        title:
+            isFr ? "Ouvrir l'interface web locale" : "Open local web interface",
+        description: isFr
+            ? "Ouvre l'interface web locale du client Tailscale pour voir les pairs et le statut (si supporté par le client)."
+            : "Opens the local Tailscale client web interface to view peers and status (if supported by the client).",
         windowsCommand: 'tailscale web',
         linuxCommand: 'tailscale web',
-        category: CommandCategories.monitoring,
+        category: CommandCategories.get(CommandCategories.monitoring, isFr),
         tags: ['web', 'ui', 'interface', 'monitoring'],
-        notes:
-            "Cette commande peut ouvrir un navigateur directement ou afficher une URL à copier.",
+        notes: isFr
+            ? "Cette commande peut ouvrir un navigateur directement ou afficher une URL à copier."
+            : "This command may open a browser directly or display a URL to copy.",
       ),
 
       // SERVE
       ClientCommand(
         id: 'serve',
-        title: "Exposer un service (Serve)",
-        description:
-            "Partage un service local (ex: serveur web) sur le réseau Tailscale.",
+        title: isFr ? "Exposer un service (Serve)" : "Expose a service (Serve)",
+        description: isFr
+            ? "Partage un service local (ex: serveur web) sur le réseau Tailscale."
+            : "Shares a local service (e.g., web server) on the Tailscale network.",
         windowsCommand: 'tailscale serve {protocol} /{port}',
         linuxCommand: 'tailscale serve {protocol} /{port}',
-        category: CommandCategories.routing,
+        category: CommandCategories.get(CommandCategories.routing, isFr),
         tags: ['serve', 'proxy', 'https', 'tcp'],
         type: CommandType.interactive,
         isDynamic: true,
         parameters: [
           CommandParameter(
             id: 'protocol',
-            label: 'Protocole',
-            description:
-                'Protocole à utiliser (https, http, tcp). Par défaut https.',
+            label: isFr ? 'Protocole' : 'Protocol',
+            description: isFr
+                ? 'Protocole à utiliser (https, http, tcp). Par défaut https.'
+                : 'Protocol to use (https, http, tcp). Default is https.',
             type: ParameterType.text,
             defaultValue: 'https',
             options: ['https', 'http', 'tcp'],
@@ -540,8 +625,10 @@ class DynamicCommandGenerator {
           ),
           CommandParameter(
             id: 'port',
-            label: 'Port local du service',
-            description: 'Le port sur lequel votre service écoute en local.',
+            label: isFr ? 'Port local du service' : 'Local service port',
+            description: isFr
+                ? 'Le port sur lequel votre service écoute en local.'
+                : 'The port your service is listening on locally.',
             type: ParameterType.number,
             placeholder: '80, 3000, 8080...',
             required: true,
@@ -552,28 +639,34 @@ class DynamicCommandGenerator {
       // FILE
       ClientCommand(
         id: 'file_cp',
-        title: "Envoyer un fichier (Taildrop)",
-        description: "Envoyer un fichier à une autre de vos machines.",
+        title:
+            isFr ? "Envoyer un fichier (Taildrop)" : "Send a file (Taildrop)",
+        description: isFr
+            ? "Envoyer un fichier à une autre de vos machines."
+            : "Send a file to another of your machines.",
         windowsCommand: 'tailscale file cp {filepath} {target_node}:',
         linuxCommand: 'tailscale file cp {filepath} {target_node}:',
-        category: CommandCategories.maintenance,
+        category: CommandCategories.get(CommandCategories.maintenance, isFr),
         tags: ['file', 'taildrop', 'send', 'cp'],
         type: CommandType.dynamic,
         isDynamic: true,
         parameters: [
           CommandParameter(
             id: 'filepath',
-            label: 'Chemin du fichier',
-            description: 'Chemin complet du fichier à envoyer.',
+            label: isFr ? 'Chemin du fichier' : 'File path',
+            description: isFr
+                ? 'Chemin complet du fichier à envoyer.'
+                : 'Full path of the file to send.',
             type: ParameterType.text,
             placeholder: 'C:\\Users\\...\\report.pdf ou /home/.../report.pdf',
             required: true,
           ),
           CommandParameter(
             id: 'target_node',
-            label: 'Machine de destination',
-            description:
-                'Le nom ou l\'IP de la machine à qui envoyer le fichier.',
+            label: isFr ? 'Machine de destination' : 'Target machine',
+            description: isFr
+                ? 'Le nom ou l\'IP de la machine à qui envoyer le fichier.'
+                : 'The name or IP of the machine to send the file to.',
             type: ParameterType.nodeSelect,
             required: true,
           ),
@@ -581,74 +674,91 @@ class DynamicCommandGenerator {
       ),
       ClientCommand(
         id: 'file_get',
-        title: "Recevoir des fichiers (Taildrop)",
-        description:
-            "Vérifier et recevoir les fichiers en attente de réception.",
+        title: isFr
+            ? "Recevoir des fichiers (Taildrop)"
+            : "Receive files (Taildrop)",
+        description: isFr
+            ? "Vérifier et recevoir les fichiers en attente de réception."
+            : "Check for and receive incoming files.",
         windowsCommand: 'tailscale file get',
         linuxCommand: 'tailscale file get',
-        category: CommandCategories.maintenance,
+        category: CommandCategories.get(CommandCategories.maintenance, isFr),
         tags: ['file', 'taildrop', 'get', 'receive'],
       ),
 
       // DEBUG
       ClientCommand(
         id: 'debug_derp',
-        title: "Debug: Statut des relais DERP",
-        description: "Affiche la latence des serveurs relais DERP.",
+        title:
+            isFr ? "Debug: Statut des relais DERP" : "Debug: DERP relay status",
+        description: isFr
+            ? "Affiche la latence des serveurs relais DERP."
+            : "Displays latency to DERP relay servers.",
         windowsCommand: 'tailscale debug derp',
         linuxCommand: 'tailscale debug derp',
-        category: CommandCategories.troubleshooting,
+        category:
+            CommandCategories.get(CommandCategories.troubleshooting, isFr),
         tags: ['debug', 'derp', 'relay', 'latency'],
       ),
 
       // UP FLAGS
       ClientCommand(
         id: 'force_reauth',
-        title: "Forcer la ré-authentification",
-        description: "Force une nouvelle authentification du client.",
+        title:
+            isFr ? "Forcer la ré-authentification" : "Force re-authentication",
+        description: isFr
+            ? "Force une nouvelle authentification du client."
+            : "Forces client re-authentication.",
         windowsCommand: 'tailscale up --force-reauth',
         linuxCommand: 'sudo tailscale up --force-reauth',
-        category: CommandCategories.connection,
+        category: CommandCategories.get(CommandCategories.connection, isFr),
         tags: ['up', 'reauth', 'login'],
       ),
       ClientCommand(
         id: 'shields_up',
-        title: "Activer 'Shields Up'",
-        description:
-            "Bloque toutes les connexions entrantes, même depuis votre réseau Tailscale.",
+        title: isFr ? "Activer 'Shields Up'" : "Enable 'Shields Up'",
+        description: isFr
+            ? "Bloque toutes les connexions entrantes, même depuis votre réseau Tailscale."
+            : "Blocks all incoming connections, even from your Tailscale network.",
         windowsCommand: 'tailscale up --shields-up',
         linuxCommand: 'sudo tailscale up --shields-up',
-        category: CommandCategories.security,
+        category: CommandCategories.get(CommandCategories.security, isFr),
         tags: ['up', 'firewall', 'shields', 'security'],
       ),
       ClientCommand(
         id: 'exit_node_allow_lan',
-        title: "Autoriser l'accès LAN en mode Exit Node",
-        description:
-            "Permet à la machine d'accéder à son propre réseau local physique tout en utilisant un exit node.",
+        title: isFr
+            ? "Autoriser l'accès LAN en mode Exit Node"
+            : "Allow LAN access in Exit Node mode",
+        description: isFr
+            ? "Permet à la machine d'accéder à son propre réseau local physique tout en utilisant un exit node."
+            : "Allows the machine to access its own physical LAN while using an exit node.",
         windowsCommand: 'tailscale up --exit-node-allow-lan-access=true',
         linuxCommand: 'sudo tailscale up --exit-node-allow-lan-access=true',
-        category: CommandCategories.routing,
+        category: CommandCategories.get(CommandCategories.routing, isFr),
         tags: ['up', 'exit-node', 'lan', 'routing'],
       ),
 
       // CONNEXION
       ClientCommand(
         id: 'connect_basic',
-        title: 'Connexion simple',
-        description:
-            'Se connecter à Tailscale en spécifiant un serveur Headscale',
+        title: isFr ? 'Connexion simple' : 'Simple connection',
+        description: isFr
+            ? 'Se connecter à Tailscale en spécifiant un serveur Headscale'
+            : 'Connect to Tailscale specifying a Headscale server',
         windowsCommand: 'tailscale up --login-server={server_url}',
         linuxCommand: 'sudo tailscale up --login-server={server_url}',
-        category: CommandCategories.connection,
+        category: CommandCategories.get(CommandCategories.connection, isFr),
         tags: ['connexion', 'up', 'simple', 'serveur'],
         type: CommandType.dynamic,
         isDynamic: true,
         parameters: [
           CommandParameter(
             id: 'server_url',
-            label: 'URL du serveur Headscale',
-            description: 'Entrez l\'URL de votre serveur Headscale',
+            label: isFr ? 'URL du serveur Headscale' : 'Headscale server URL',
+            description: isFr
+                ? 'Entrez l\'URL de votre serveur Headscale'
+                : 'Enter your Headscale server URL',
             type: ParameterType.text,
             placeholder: 'https://headscale.example.com',
             required: true,
@@ -658,30 +768,37 @@ class DynamicCommandGenerator {
 
       ClientCommand(
         id: 'connect_with_authkey',
-        title: 'Connexion avec clé d\'authentification',
-        description:
-            'Se connecter à un serveur Headscale avec une clé pré-authentifiée',
+        title: isFr
+            ? 'Connexion avec clé d\'authentification'
+            : 'Connection with auth key',
+        description: isFr
+            ? 'Se connecter à un serveur Headscale avec une clé pré-authentifiée'
+            : 'Connect to a Headscale server with a pre-auth key',
         windowsCommand:
             'tailscale up --login-server={server_url} --authkey={authkey}',
         linuxCommand:
             'sudo tailscale up --login-server={server_url} --authkey={authkey}',
-        category: CommandCategories.connection,
+        category: CommandCategories.get(CommandCategories.connection, isFr),
         tags: ['connexion', 'up', 'authkey', 'serveur'],
         type: CommandType.dynamic,
         isDynamic: true,
         parameters: [
           CommandParameter(
             id: 'server_url',
-            label: 'URL du serveur Headscale',
-            description: 'Entrez l\'URL de votre serveur Headscale',
+            label: isFr ? 'URL du serveur Headscale' : 'Headscale server URL',
+            description: isFr
+                ? 'Entrez l\'URL de votre serveur Headscale'
+                : 'Enter your Headscale server URL',
             type: ParameterType.text,
             placeholder: 'https://headscale.example.com',
             required: true,
           ),
           CommandParameter(
             id: 'authkey',
-            label: 'Clé d\'authentification',
-            description: 'Entrez votre clé pré-authentifiée',
+            label: isFr ? 'Clé d\'authentification' : 'Auth key',
+            description: isFr
+                ? 'Entrez votre clé pré-authentifiée'
+                : 'Enter your pre-auth key',
             type: ParameterType.text,
             placeholder: 'nodekey-xxxxx ou tskey-xxxxx',
             required: true,
@@ -691,29 +808,37 @@ class DynamicCommandGenerator {
 
       ClientCommand(
         id: 'connect_with_routes',
-        title: 'Connexion avec routes personnalisées',
-        description: 'Se connecter en annonçant des routes spécifiques',
+        title: isFr
+            ? 'Connexion avec routes personnalisées'
+            : 'Connection with custom routes',
+        description: isFr
+            ? 'Se connecter en annonçant des routes spécifiques'
+            : 'Connect while advertising specific routes',
         windowsCommand:
             'tailscale up --login-server={server_url} --advertise-routes={routes}',
         linuxCommand:
             'sudo tailscale up --login-server={server_url} --advertise-routes={routes}',
-        category: CommandCategories.connection,
+        category: CommandCategories.get(CommandCategories.connection, isFr),
         tags: ['connexion', 'up', 'routes', 'serveur'],
         type: CommandType.dynamic,
         isDynamic: true,
         parameters: [
           CommandParameter(
             id: 'server_url',
-            label: 'URL du serveur Headscale',
-            description: 'Entrez l\'URL de votre serveur Headscale',
+            label: isFr ? 'URL du serveur Headscale' : 'Headscale server URL',
+            description: isFr
+                ? 'Entrez l\'URL de votre serveur Headscale'
+                : 'Enter your Headscale server URL',
             type: ParameterType.text,
             placeholder: 'https://headscale.example.com',
             required: true,
           ),
           CommandParameter(
             id: 'routes',
-            label: 'Routes à annoncer',
-            description: 'Entrez les routes séparées par des virgules',
+            label: isFr ? 'Routes à annoncer' : 'Routes to advertise',
+            description: isFr
+                ? 'Entrez les routes séparées par des virgules'
+                : 'Enter routes separated by commas',
             type: ParameterType.text,
             placeholder: '192.168.1.0/24,10.0.0.0/8',
             required: true,
@@ -723,75 +848,89 @@ class DynamicCommandGenerator {
 
       ClientCommand(
         id: 'disconnect',
-        title: 'Déconnexion',
-        description: 'Se déconnecter du réseau Headscale',
+        title: isFr ? 'Déconnexion' : 'Disconnect',
+        description: isFr
+            ? 'Se déconnecter du réseau Headscale'
+            : 'Disconnect from Headscale network',
         windowsCommand: 'tailscale down',
         linuxCommand: 'sudo tailscale down',
-        category: CommandCategories.connection,
+        category: CommandCategories.get(CommandCategories.connection, isFr),
         tags: ['déconnexion', 'down'],
       ),
 
       ClientCommand(
         id: 'logout',
-        title: 'Déconnexion complète',
-        description:
-            'Se déconnecter et supprimer les informations d\'authentification',
+        title: isFr ? 'Déconnexion complète' : 'Full logout',
+        description: isFr
+            ? 'Se déconnecter et supprimer les informations d\'authentification'
+            : 'Disconnect and remove authentication info',
         windowsCommand: 'tailscale logout',
         linuxCommand: 'sudo tailscale logout',
-        category: CommandCategories.connection,
+        category: CommandCategories.get(CommandCategories.connection, isFr),
         tags: ['logout', 'reset'],
       ),
 
       // SURVEILLANCE
       ClientCommand(
         id: 'status',
-        title: 'Statut de connexion',
-        description: 'Afficher le statut actuel de Tailscale',
+        title: isFr ? 'Statut de connexion' : 'Connection status',
+        description: isFr
+            ? 'Afficher le statut actuel de Tailscale'
+            : 'Show current Tailscale status',
         windowsCommand: 'tailscale status',
         linuxCommand: 'tailscale status',
-        category: CommandCategories.monitoring,
+        category: CommandCategories.get(CommandCategories.monitoring, isFr),
         tags: ['status', 'info'],
       ),
 
       ClientCommand(
         id: 'ip_info',
-        title: 'Informations IP',
-        description: 'Afficher l\'adresse IP Tailscale',
+        title: isFr ? 'Informations IP' : 'IP Information',
+        description: isFr
+            ? 'Afficher l\'adresse IP Tailscale'
+            : 'Show Tailscale IP address',
         windowsCommand: 'tailscale ip',
         linuxCommand: 'tailscale ip',
-        category: CommandCategories.monitoring,
+        category: CommandCategories.get(CommandCategories.monitoring, isFr),
         tags: ['ip', 'address'],
       ),
 
       ClientCommand(
         id: 'netcheck',
-        title: 'Test de connectivité réseau',
-        description: 'Tester la connectivité réseau et les performances',
+        title:
+            isFr ? 'Test de connectivité réseau' : 'Network connectivity test',
+        description: isFr
+            ? 'Tester la connectivité réseau et les performances'
+            : 'Test network connectivity and performance',
         windowsCommand: 'tailscale netcheck',
         linuxCommand: 'tailscale netcheck',
-        category: CommandCategories.troubleshooting,
+        category:
+            CommandCategories.get(CommandCategories.troubleshooting, isFr),
         tags: ['network', 'test', 'connectivity'],
       ),
 
       // CONFIGURATION
       ClientCommand(
         id: 'accept_routes',
-        title: 'Accepter les routes',
-        description: 'Accepter les routes annoncées par d\'autres nœuds',
+        title: isFr ? 'Accepter les routes' : 'Accept routes',
+        description: isFr
+            ? 'Accepter les routes annoncées par d\'autres nœuds'
+            : 'Accept routes advertised by other nodes',
         windowsCommand:
             'tailscale up --login-server={server_url} --accept-routes',
         linuxCommand:
             'sudo tailscale up --login-server={server_url} --accept-routes',
-        category: CommandCategories.configuration,
+        category: CommandCategories.get(CommandCategories.configuration, isFr),
         tags: ['routes', 'accept', 'serveur'],
         type: CommandType.dynamic,
         isDynamic: true,
         parameters: [
           CommandParameter(
             id: 'server_url',
-            label: 'URL du serveur Headscale',
-            description:
-                'Nécessaire pour s\'assurer que la commande est appliquée au bon réseau',
+            label: isFr ? 'URL du serveur Headscale' : 'Headscale server URL',
+            description: isFr
+                ? 'Nécessaire pour s\'assurer que la commande est appliquée au bon réseau'
+                : 'Required to ensure command applies to the correct network',
             type: ParameterType.text,
             placeholder: 'https://headscale.example.com',
             required: true,
@@ -801,21 +940,24 @@ class DynamicCommandGenerator {
 
       ClientCommand(
         id: 'disable_key_expiry',
-        title: 'Désactiver expiration clé',
-        description: 'Empêcher l\'expiration automatique de la clé',
+        title: isFr ? 'Désactiver expiration clé' : 'Disable key expiry',
+        description: isFr
+            ? 'Empêcher l\'expiration automatique de la clé'
+            : 'Prevent automatic key expiration',
         windowsCommand: 'tailscale up --login-server={server_url} --timeout=0',
         linuxCommand:
             'sudo tailscale up --login-server={server_url} --timeout=0',
-        category: CommandCategories.configuration,
+        category: CommandCategories.get(CommandCategories.configuration, isFr),
         tags: ['key', 'expiry', 'timeout', 'serveur'],
         type: CommandType.dynamic,
         isDynamic: true,
         parameters: [
           CommandParameter(
             id: 'server_url',
-            label: 'URL du serveur Headscale',
-            description:
-                'Nécessaire pour s\'assurer que la commande est appliquée au bon réseau',
+            label: isFr ? 'URL du serveur Headscale' : 'Headscale server URL',
+            description: isFr
+                ? 'Nécessaire pour s\'assurer que la commande est appliquée au bon réseau'
+                : 'Required to ensure command applies to the correct network',
             type: ParameterType.text,
             placeholder: 'https://headscale.example.com',
             required: true,
@@ -826,11 +968,13 @@ class DynamicCommandGenerator {
       // SÉCURITÉ
       ClientCommand(
         id: 'enable_ssh',
-        title: 'Activer SSH Tailscale',
-        description: 'Activer l\'accès SSH via Tailscale',
+        title: isFr ? 'Activer SSH Tailscale' : 'Enable Tailscale SSH',
+        description: isFr
+            ? 'Activer l\'accès SSH via Tailscale'
+            : 'Enable SSH access via Tailscale',
         windowsCommand: 'tailscale up --login-server={server_url} --ssh',
         linuxCommand: 'sudo tailscale up --login-server={server_url} --ssh',
-        category: CommandCategories.security,
+        category: CommandCategories.get(CommandCategories.security, isFr),
         tags: ['ssh', 'remote', 'serveur'],
         requiresElevation: true,
         type: CommandType.dynamic,
@@ -838,9 +982,10 @@ class DynamicCommandGenerator {
         parameters: [
           CommandParameter(
             id: 'server_url',
-            label: 'URL du serveur Headscale',
-            description:
-                'Nécessaire pour s\'assurer que la commande est appliquée au bon réseau',
+            label: isFr ? 'URL du serveur Headscale' : 'Headscale server URL',
+            description: isFr
+                ? 'Nécessaire pour s\'assurer que la commande est appliquée au bon réseau'
+                : 'Required to ensure command applies to the correct network',
             type: ParameterType.text,
             placeholder: 'https://headscale.example.com',
             required: true,
@@ -850,21 +995,24 @@ class DynamicCommandGenerator {
 
       ClientCommand(
         id: 'disable_ssh',
-        title: 'Désactiver SSH Tailscale',
-        description: 'Désactiver l\'accès SSH via Tailscale',
+        title: isFr ? 'Désactiver SSH Tailscale' : 'Disable Tailscale SSH',
+        description: isFr
+            ? 'Désactiver l\'accès SSH via Tailscale'
+            : 'Disable SSH access via Tailscale',
         windowsCommand: 'tailscale up --login-server={server_url} --ssh=false',
         linuxCommand:
             'sudo tailscale up --login-server={server_url} --ssh=false',
-        category: CommandCategories.security,
+        category: CommandCategories.get(CommandCategories.security, isFr),
         tags: ['ssh', 'disable', 'serveur'],
         type: CommandType.dynamic,
         isDynamic: true,
         parameters: [
           CommandParameter(
             id: 'server_url',
-            label: 'URL du serveur Headscale',
-            description:
-                'Nécessaire pour s\'assurer que la commande est appliquée au bon réseau',
+            label: isFr ? 'URL du serveur Headscale' : 'Headscale server URL',
+            description: isFr
+                ? 'Nécessaire pour s\'assurer que la commande est appliquée au bon réseau'
+                : 'Required to ensure command applies to the correct network',
             type: ParameterType.text,
             placeholder: 'https://headscale.example.com',
             required: true,
@@ -875,271 +1023,380 @@ class DynamicCommandGenerator {
       // MAINTENANCE
       ClientCommand(
         id: 'update',
-        title: 'Mettre à jour Tailscale',
-        description: 'Mettre à jour vers la dernière version',
+        title: isFr ? 'Mettre à jour Tailscale' : 'Update Tailscale',
+        description: isFr
+            ? 'Mettre à jour vers la dernière version'
+            : 'Update to the latest version',
         windowsCommand: 'tailscale update',
         linuxCommand: 'sudo tailscale update',
-        category: CommandCategories.maintenance,
+        category: CommandCategories.get(CommandCategories.maintenance, isFr),
         tags: ['update', 'upgrade'],
         requiresElevation: true,
       ),
 
       ClientCommand(
         id: 'version',
-        title: 'Version Tailscale',
-        description: 'Afficher la version installée',
+        title: isFr ? 'Version Tailscale' : 'Tailscale Version',
+        description:
+            isFr ? 'Afficher la version installée' : 'Show installed version',
         windowsCommand: 'tailscale version',
         linuxCommand: 'tailscale version',
-        category: CommandCategories.maintenance,
+        category: CommandCategories.get(CommandCategories.maintenance, isFr),
         tags: ['version', 'info'],
       ),
 
       ClientCommand(
         id: 'bugreport',
-        title: 'Rapport de bug',
-        description: 'Générer un rapport de diagnostic',
+        title: isFr ? 'Rapport de bug' : 'Bug report',
+        description: isFr
+            ? 'Générer un rapport de diagnostic'
+            : 'Generate a diagnostic report',
         windowsCommand: 'tailscale bugreport',
         linuxCommand: 'sudo tailscale bugreport',
-        category: CommandCategories.troubleshooting,
+        category:
+            CommandCategories.get(CommandCategories.troubleshooting, isFr),
         tags: ['bug', 'diagnostic', 'support'],
       ),
 
       // LINUX SPÉCIFIQUES
       ClientCommand(
         id: 'enable_ip_forwarding',
-        title: 'Activer IP forwarding (Linux)',
-        description: 'Activer le transfert IP pour le routage de sous-réseau',
+        title: isFr
+            ? 'Activer IP forwarding (Linux)'
+            : 'Enable IP forwarding (Linux)',
+        description: isFr
+            ? 'Activer le transfert IP pour le routage de sous-réseau'
+            : 'Enable IP forwarding for subnet routing',
         windowsCommand: 'echo "Non applicable sur Windows"',
         linuxCommand:
             'echo \'net.ipv4.ip_forward = 1\' | sudo tee -a /etc/sysctl.conf && echo \'net.ipv6.conf.all.forwarding = 1\' | sudo tee -a /etc/sysctl.conf && sudo sysctl -p',
-        category: CommandCategories.configuration,
+        category: CommandCategories.get(CommandCategories.configuration, isFr),
         tags: ['linux', 'forwarding', 'routing'],
         requiresElevation: true,
-        notes: 'Requis sur Linux pour annoncer des routes de sous-réseau',
+        notes: isFr
+            ? 'Requis sur Linux pour annoncer des routes de sous-réseau'
+            : 'Required on Linux to advertise subnet routes',
       ),
 
       ClientCommand(
         id: 'install_tailscale_debian',
-        title: 'Installer Tailscale (Debian/Ubuntu)',
-        description: 'Installer Tailscale sur les systèmes basés sur Debian',
+        title: isFr
+            ? 'Installer Tailscale (Debian/Ubuntu)'
+            : 'Install Tailscale (Debian/Ubuntu)',
+        description: isFr
+            ? 'Installer Tailscale sur les systèmes basés sur Debian'
+            : 'Install Tailscale on Debian-based systems',
         windowsCommand: 'echo "Non applicable sur Windows"',
         linuxCommand: 'curl -fsSL https://tailscale.com/install.sh | sh',
-        category: CommandCategories.maintenance,
+        category: CommandCategories.get(CommandCategories.maintenance, isFr),
         tags: ['linux', 'install', 'debian', 'ubuntu'],
         requiresElevation: true,
-        notes: 'Installation automatique pour Debian, Ubuntu et dérivés',
+        notes: isFr
+            ? 'Installation automatique pour Debian, Ubuntu et dérivés'
+            : 'Automatic installation for Debian, Ubuntu and derivatives',
       ),
 
       ClientCommand(
         id: 'install_tailscale_rhel',
-        title: 'Installer Tailscale (RHEL/CentOS/Fedora)',
-        description: 'Installer Tailscale sur les systèmes Red Hat',
+        title: isFr
+            ? 'Installer Tailscale (RHEL/CentOS/Fedora)'
+            : 'Install Tailscale (RHEL/CentOS/Fedora)',
+        description: isFr
+            ? 'Installer Tailscale sur les systèmes Red Hat'
+            : 'Install Tailscale on Red Hat systems',
         windowsCommand: 'echo "Non applicable sur Windows"',
         linuxCommand:
             'sudo dnf config-manager --add-repo https://pkgs.tailscale.com/stable/rhel/8/tailscale.repo && sudo dnf install tailscale',
-        category: CommandCategories.maintenance,
+        category: CommandCategories.get(CommandCategories.maintenance, isFr),
         tags: ['linux', 'install', 'rhel', 'centos', 'fedora'],
         requiresElevation: true,
-        notes: 'Installation pour Red Hat Enterprise Linux, CentOS, Fedora',
+        notes: isFr
+            ? 'Installation pour Red Hat Enterprise Linux, CentOS, Fedora'
+            : 'Installation for Red Hat Enterprise Linux, CentOS, Fedora',
       ),
 
       ClientCommand(
         id: 'install_tailscale_arch',
-        title: 'Installer Tailscale (Arch Linux)',
-        description: 'Installer Tailscale sur Arch Linux',
+        title: isFr
+            ? 'Installer Tailscale (Arch Linux)'
+            : 'Install Tailscale (Arch Linux)',
+        description: isFr
+            ? 'Installer Tailscale sur Arch Linux'
+            : 'Install Tailscale on Arch Linux',
         windowsCommand: 'echo "Non applicable sur Windows"',
         linuxCommand: 'sudo pacman -S tailscale',
-        category: CommandCategories.maintenance,
+        category: CommandCategories.get(CommandCategories.maintenance, isFr),
         tags: ['linux', 'install', 'arch'],
         requiresElevation: true,
-        notes: 'Installation via le gestionnaire de paquets pacman',
+        notes: isFr
+            ? 'Installation via le gestionnaire de paquets pacman'
+            : 'Installation via pacman package manager',
       ),
 
       ClientCommand(
         id: 'enable_tailscale_service',
-        title: 'Activer le service Tailscale (Linux)',
-        description: 'Activer et démarrer le service Tailscale au boot',
+        title: isFr
+            ? 'Activer le service Tailscale (Linux)'
+            : 'Enable Tailscale service (Linux)',
+        description: isFr
+            ? 'Activer et démarrer le service Tailscale au boot'
+            : 'Enable and start Tailscale service at boot',
         windowsCommand: 'echo "Non applicable sur Windows"',
         linuxCommand: 'sudo systemctl enable --now tailscaled',
-        category: CommandCategories.configuration,
+        category: CommandCategories.get(CommandCategories.configuration, isFr),
         tags: ['linux', 'service', 'systemd'],
         requiresElevation: true,
-        notes: 'Active le démon Tailscale et le démarre automatiquement',
+        notes: isFr
+            ? 'Active le démon Tailscale et le démarre automatiquement'
+            : 'Enables Tailscale daemon and starts it automatically',
       ),
 
       ClientCommand(
         id: 'check_tailscale_service',
-        title: 'Vérifier le service Tailscale (Linux)',
-        description: 'Vérifier le statut du service Tailscale',
+        title: isFr
+            ? 'Vérifier le service Tailscale (Linux)'
+            : 'Check Tailscale service (Linux)',
+        description: isFr
+            ? 'Vérifier le statut du service Tailscale'
+            : 'Check Tailscale service status',
         windowsCommand: 'echo "Non applicable sur Windows"',
         linuxCommand: 'sudo systemctl status tailscaled',
-        category: CommandCategories.troubleshooting,
+        category:
+            CommandCategories.get(CommandCategories.troubleshooting, isFr),
         tags: ['linux', 'service', 'status'],
         requiresElevation: false,
-        notes: 'Affiche l\'état du démon Tailscale',
+        notes: isFr
+            ? 'Affiche l\'état du démon Tailscale'
+            : 'Shows Tailscale daemon status',
       ),
 
       ClientCommand(
         id: 'restart_tailscale_service',
-        title: 'Redémarrer le service Tailscale (Linux)',
-        description: 'Redémarrer le démon Tailscale',
+        title: isFr
+            ? 'Redémarrer le service Tailscale (Linux)'
+            : 'Restart Tailscale service (Linux)',
+        description:
+            isFr ? 'Redémarrer le démon Tailscale' : 'Restart Tailscale daemon',
         windowsCommand: 'echo "Non applicable sur Windows"',
         linuxCommand: 'sudo systemctl restart tailscaled',
-        category: CommandCategories.troubleshooting,
+        category:
+            CommandCategories.get(CommandCategories.troubleshooting, isFr),
         tags: ['linux', 'service', 'restart'],
         requiresElevation: true,
-        notes: 'Redémarre le service en cas de problème',
+        notes: isFr
+            ? 'Redémarre le service en cas de problème'
+            : 'Restarts the service in case of issues',
       ),
 
       ClientCommand(
         id: 'check_firewall_ufw',
-        title: 'Configurer UFW pour Tailscale (Linux)',
-        description: 'Configurer le pare-feu UFW pour autoriser Tailscale',
+        title: isFr
+            ? 'Configurer UFW pour Tailscale (Linux)'
+            : 'Configure UFW for Tailscale (Linux)',
+        description: isFr
+            ? 'Configurer le pare-feu UFW pour autoriser Tailscale'
+            : 'Configure UFW firewall to allow Tailscale',
         windowsCommand: 'echo "Non applicable sur Windows"',
         linuxCommand:
             'sudo ufw allow in on tailscale0 && sudo ufw allow out on tailscale0',
-        category: CommandCategories.security,
+        category: CommandCategories.get(CommandCategories.security, isFr),
         tags: ['linux', 'firewall', 'ufw'],
         requiresElevation: true,
-        notes: 'Configure UFW pour autoriser le trafic Tailscale',
+        notes: isFr
+            ? 'Configure UFW pour autoriser le trafic Tailscale'
+            : 'Configures UFW to allow Tailscale traffic',
       ),
 
       ClientCommand(
         id: 'check_firewall_iptables',
-        title: 'Configurer iptables pour Tailscale (Linux)',
-        description: 'Configurer iptables pour autoriser Tailscale',
+        title: isFr
+            ? 'Configurer iptables pour Tailscale (Linux)'
+            : 'Configure iptables for Tailscale (Linux)',
+        description: isFr
+            ? 'Configurer iptables pour autoriser Tailscale'
+            : 'Configure iptables to allow Tailscale',
         windowsCommand: 'echo "Non applicable sur Windows"',
         linuxCommand:
             'sudo iptables -I INPUT -i tailscale0 -j ACCEPT && sudo iptables -I FORWARD -i tailscale0 -j ACCEPT && sudo iptables -I FORWARD -o tailscale0 -j ACCEPT',
-        category: CommandCategories.security,
+        category: CommandCategories.get(CommandCategories.security, isFr),
         tags: ['linux', 'firewall', 'iptables'],
         requiresElevation: true,
-        notes: 'Configure iptables pour autoriser le trafic Tailscale',
+        notes: isFr
+            ? 'Configure iptables pour autoriser le trafic Tailscale'
+            : 'Configures iptables to allow Tailscale traffic',
       ),
 
       ClientCommand(
-          id: 'setup_subnet_router_linux',
-          title: 'Configurer routeur de sous-réseau (Linux)',
-          description:
-              'Configuration complète pour devenir un routeur de sous-réseau',
-          windowsCommand: 'echo "Non applicable sur Windows"',
-          linuxCommand:
-              'echo \'net.ipv4.ip_forward = 1\' | sudo tee -a /etc/sysctl.conf && echo \'net.ipv6.conf.all.forwarding = 1\' | sudo tee -a /etc/sysctl.conf && sudo sysctl -p && sudo tailscale up --login-server={server_url} --advertise-routes=192.168.1.0/24 --accept-routes',
-          category: CommandCategories.routing,
-          tags: ['linux', 'subnet', 'router', 'forwarding', 'serveur'],
-          requiresElevation: true,
-          notes:
-              'Active le forwarding IP et configure le routage de sous-réseau. Remplacez les routes par les vôtres.',
-          type: CommandType.dynamic,
-          isDynamic: true,
-          parameters: [
-            CommandParameter(
-              id: 'server_url',
-              label: 'URL du serveur Headscale',
-              description: 'URL de votre serveur Headscale',
-              type: ParameterType.text,
-              placeholder: 'https://headscale.example.com',
-              required: true,
-            ),
-          ]),
+        id: 'setup_subnet_router_linux',
+        title: isFr
+            ? 'Configurer routeur de sous-réseau (Linux)'
+            : 'Configure subnet router (Linux)',
+        description: isFr
+            ? 'Configuration complète pour devenir un routeur de sous-réseau'
+            : 'Full configuration to become a subnet router',
+        windowsCommand: 'echo "Non applicable sur Windows"',
+        linuxCommand:
+            'echo \'net.ipv4.ip_forward = 1\' | sudo tee -a /etc/sysctl.conf && echo \'net.ipv6.conf.all.forwarding = 1\' | sudo tee -a /etc/sysctl.conf && sudo sysctl -p && sudo tailscale up --login-server={server_url} --advertise-routes=192.168.1.0/24 --accept-routes',
+        category: CommandCategories.get(CommandCategories.routing, isFr),
+        tags: ['linux', 'subnet', 'router', 'forwarding', 'serveur'],
+        requiresElevation: true,
+        notes: isFr
+            ? 'Active le forwarding IP et configure le routage de sous-réseau. Remplacez les routes par les vôtres.'
+            : 'Enables IP forwarding and configures subnet routing. Replace routes with yours.',
+        type: CommandType.dynamic,
+        isDynamic: true,
+        parameters: [
+          CommandParameter(
+            id: 'server_url',
+            label: isFr ? 'URL du serveur Headscale' : 'Headscale server URL',
+            description: isFr
+                ? 'URL de votre serveur Headscale'
+                : 'Your Headscale server URL',
+            type: ParameterType.text,
+            placeholder: 'https://headscale.example.com',
+            required: true,
+          ),
+        ],
+      ),
 
       ClientCommand(
         id: 'check_tailscale_logs',
-        title: 'Consulter les logs Tailscale (Linux)',
-        description: 'Afficher les logs du service Tailscale',
+        title: isFr
+            ? 'Consulter les logs Tailscale (Linux)'
+            : 'View Tailscale logs (Linux)',
+        description: isFr
+            ? 'Afficher les logs du service Tailscale'
+            : 'Show logs of Tailscale service',
         windowsCommand: 'echo "Non applicable sur Windows"',
         linuxCommand: 'sudo journalctl -u tailscaled -f',
-        category: CommandCategories.troubleshooting,
+        category:
+            CommandCategories.get(CommandCategories.troubleshooting, isFr),
         tags: ['linux', 'logs', 'debug'],
         requiresElevation: false,
-        notes: 'Affiche les logs en temps réel du démon Tailscale',
+        notes: isFr
+            ? 'Affiche les logs en temps réel du démon Tailscale'
+            : 'Shows real-time logs of the Tailscale daemon',
       ),
 
       ClientCommand(
         id: 'uninstall_tailscale_debian',
-        title: 'Désinstaller Tailscale (Debian/Ubuntu)',
-        description: 'Désinstaller complètement Tailscale',
+        title: isFr
+            ? 'Désinstaller Tailscale (Debian/Ubuntu)'
+            : 'Uninstall Tailscale (Debian/Ubuntu)',
+        description: isFr
+            ? 'Désinstaller complètement Tailscale'
+            : 'Uninstall Tailscale completely',
         windowsCommand: 'echo "Non applicable sur Windows"',
         linuxCommand: 'sudo apt remove tailscale && sudo apt purge tailscale',
-        category: CommandCategories.maintenance,
+        category: CommandCategories.get(CommandCategories.maintenance, isFr),
         tags: ['linux', 'uninstall', 'debian', 'ubuntu'],
         requiresElevation: true,
-        notes: 'Supprime Tailscale et ses fichiers de configuration',
+        notes: isFr
+            ? 'Supprime Tailscale et ses fichiers de configuration'
+            : 'Removes Tailscale and its configuration files',
       ),
 
       ClientCommand(
         id: 'backup_tailscale_config',
-        title: 'Sauvegarder la configuration Tailscale (Linux)',
-        description: 'Sauvegarder les fichiers de configuration Tailscale',
+        title: isFr
+            ? 'Sauvegarder la configuration Tailscale (Linux)'
+            : 'Backup Tailscale configuration (Linux)',
+        description: isFr
+            ? 'Sauvegarder les fichiers de configuration Tailscale'
+            : 'Backup Tailscale configuration files',
         windowsCommand: 'echo "Non applicable sur Windows"',
         linuxCommand:
             'sudo tar -czf ~/tailscale-backup-\$(date +%Y%m%d).tar.gz /var/lib/tailscale/',
-        category: CommandCategories.maintenance,
+        category: CommandCategories.get(CommandCategories.maintenance, isFr),
         tags: ['linux', 'backup', 'configuration'],
         requiresElevation: true,
-        notes: 'Crée une archive de sauvegarde dans le répertoire home',
+        notes: isFr
+            ? 'Crée une archive de sauvegarde dans le répertoire home'
+            : 'Creates a backup archive in the home directory',
       ),
 
       ClientCommand(
         id: 'check_network_interfaces',
-        title: 'Vérifier les interfaces réseau (Linux)',
-        description: 'Afficher toutes les interfaces réseau incluant Tailscale',
+        title: isFr
+            ? 'Vérifier les interfaces réseau (Linux)'
+            : 'Check network interfaces (Linux)',
+        description: isFr
+            ? 'Afficher toutes les interfaces réseau incluant Tailscale'
+            : 'Show all network interfaces including Tailscale',
         windowsCommand: 'echo "Non applicable sur Windows"',
         linuxCommand:
             'ip addr show && echo "--- Routes Tailscale ---" && ip route show table 52',
-        category: CommandCategories.troubleshooting,
+        category:
+            CommandCategories.get(CommandCategories.troubleshooting, isFr),
         tags: ['linux', 'network', 'interfaces'],
         requiresElevation: false,
-        notes: 'Affiche les interfaces et les routes Tailscale',
+        notes: isFr
+            ? 'Affiche les interfaces et les routes Tailscale'
+            : 'Shows interfaces and Tailscale routes',
       ),
 
       ClientCommand(
-          id: 'setup_exit_node_linux',
-          title: 'Configurer nœud de sortie (Linux)',
-          description: 'Configuration complète pour devenir un nœud de sortie',
-          windowsCommand: 'echo "Non applicable sur Windows"',
-          linuxCommand:
-              'echo \'net.ipv4.ip_forward = 1\' | sudo tee -a /etc/sysctl.conf && echo \'net.ipv6.conf.all.forwarding = 1\' | sudo tee -a /etc/sysctl.conf && sudo sysctl -p && sudo tailscale up --login-server={server_url} --advertise-exit-node',
-          category: CommandCategories.routing,
-          tags: ['linux', 'exit-node', 'forwarding', 'serveur'],
-          requiresElevation: true,
-          notes:
-              'Active le forwarding et configure ce nœud comme point de sortie Internet',
-          type: CommandType.dynamic,
-          isDynamic: true,
-          parameters: [
-            CommandParameter(
-              id: 'server_url',
-              label: 'URL du serveur Headscale',
-              description: 'URL de votre serveur Headscale',
-              type: ParameterType.text,
-              placeholder: 'https://headscale.example.com',
-              required: true,
-            ),
-          ]),
+        id: 'setup_exit_node_linux',
+        title: isFr
+            ? 'Configurer nœud de sortie (Linux)'
+            : 'Configure exit node (Linux)',
+        description: isFr
+            ? 'Configuration complète pour devenir un nœud de sortie'
+            : 'Full configuration to become an exit node',
+        windowsCommand: 'echo "Non applicable sur Windows"',
+        linuxCommand:
+            'echo \'net.ipv4.ip_forward = 1\' | sudo tee -a /etc/sysctl.conf && echo \'net.ipv6.conf.all.forwarding = 1\' | sudo tee -a /etc/sysctl.conf && sudo sysctl -p && sudo tailscale up --login-server={server_url} --advertise-exit-node',
+        category: CommandCategories.get(CommandCategories.routing, isFr),
+        tags: ['linux', 'exit-node', 'forwarding', 'serveur'],
+        requiresElevation: true,
+        notes: isFr
+            ? 'Active le forwarding et configure ce nœud comme point de sortie Internet'
+            : 'Enables forwarding and configures this node as an Internet exit point',
+        type: CommandType.dynamic,
+        isDynamic: true,
+        parameters: [
+          CommandParameter(
+            id: 'server_url',
+            label: isFr ? 'URL du serveur Headscale' : 'Headscale server URL',
+            description: isFr
+                ? 'URL de votre serveur Headscale'
+                : 'Your Headscale server URL',
+            type: ParameterType.text,
+            placeholder: 'https://headscale.example.com',
+            required: true,
+          ),
+        ],
+      ),
 
       ClientCommand(
-          id: 'configure_dns_linux',
-          title: 'Configurer DNS Tailscale (Linux)',
-          description: 'Configurer la résolution DNS via Tailscale',
-          windowsCommand: 'echo "Non applicable sur Windows"',
-          linuxCommand:
-              'sudo tailscale up --login-server={server_url} --accept-dns=true',
-          category: CommandCategories.configuration,
-          tags: ['linux', 'dns', 'resolution', 'serveur'],
-          requiresElevation: true,
-          type: CommandType.dynamic,
-          isDynamic: true,
-          parameters: [
-            CommandParameter(
-              id: 'server_url',
-              label: 'URL du serveur Headscale',
-              description: 'URL de votre serveur Headscale',
-              type: ParameterType.text,
-              placeholder: 'https://headscale.example.com',
-              required: true,
-            ),
-          ]),
+        id: 'configure_dns_linux',
+        title: isFr
+            ? 'Configurer DNS Tailscale (Linux)'
+            : 'Configure Tailscale DNS (Linux)',
+        description: isFr
+            ? 'Configurer la résolution DNS via Tailscale'
+            : 'Configure DNS resolution via Tailscale',
+        windowsCommand: 'echo "Non applicable sur Windows"',
+        linuxCommand:
+            'sudo tailscale up --login-server={server_url} --accept-dns=true',
+        category: CommandCategories.get(CommandCategories.configuration, isFr),
+        tags: ['linux', 'dns', 'resolution', 'serveur'],
+        requiresElevation: true,
+        type: CommandType.dynamic,
+        isDynamic: true,
+        parameters: [
+          CommandParameter(
+            id: 'server_url',
+            label: isFr ? 'URL du serveur Headscale' : 'Headscale server URL',
+            description: isFr
+                ? 'URL de votre serveur Headscale'
+                : 'Your Headscale server URL',
+            type: ParameterType.text,
+            placeholder: 'https://headscale.example.com',
+            required: true,
+          ),
+        ],
+      ),
     ];
   }
 }

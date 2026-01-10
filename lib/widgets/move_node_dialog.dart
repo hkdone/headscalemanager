@@ -99,10 +99,15 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
           final allNodes = await provider.apiService.getNodes();
           final serverId = provider.activeServer?.id;
           if (serverId == null) {
-            showSafeSnackBar(context, isFr ? 'Aucun serveur actif sélectionné.' : 'No active server selected.');
+            showSafeSnackBar(
+                context,
+                isFr
+                    ? 'Aucun serveur actif sélectionné.'
+                    : 'No active server selected.');
             return;
           }
-          final tempRules = await provider.storageService.getTemporaryRules(serverId);
+          final tempRules =
+              await provider.storageService.getTemporaryRules(serverId);
           final aclGenerator = NewAclGeneratorService();
           final newPolicyMap = aclGenerator.generatePolicy(
               users: allUsers, nodes: allNodes, temporaryRules: tempRules);
@@ -134,52 +139,84 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
 
     return AlertDialog(
       title: Text(isFr ? 'Déplacer l\'appareil' : 'Move Device'),
-      content: FutureBuilder<List<User>>(
-        future: _usersFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const SizedBox(
-              height: 100,
-              child: Center(child: CircularProgressIndicator()),
-            );
-          }
-          if (snapshot.hasError) {
-            return Text(isFr
-                ? 'Échec du chargement des utilisateurs : ${snapshot.error}'
-                : 'Failed to load users: ${snapshot.error}');
-          }
-          final users = snapshot.data ?? [];
-          final otherUsers =
-              users.where((u) => u.name != widget.node.user).toList();
-
-          if (otherUsers.isEmpty) {
-            return Text(isFr
-                ? 'Aucun autre utilisateur disponible.'
-                : 'No other users available.');
-          }
-
-          _selectedUser ??= otherUsers.first;
-
-          return DropdownButtonFormField<User>(
-            initialValue: _selectedUser,
-            isExpanded: true,
-            items: otherUsers.map((user) {
-              return DropdownMenuItem<User>(
-                value: user,
-                child: Text(user.name),
-              );
-            }).toList(),
-            onChanged: (user) {
-              setState(() {
-                _selectedUser = user;
-              });
-            },
-            decoration: InputDecoration(
-              labelText: isFr ? 'Sélectionner un utilisateur' : 'Select a user',
-              border: const OutlineInputBorder(),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8.0),
+            margin: const EdgeInsets.only(bottom: 16.0),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              border: Border.all(color: Colors.orange),
+              borderRadius: BorderRadius.circular(8.0),
             ),
-          );
-        },
+            child: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isFr
+                        ? 'Attention : Cette fonctionnalité est incompatible avec Headscale v0.26+ (commande supprimée).'
+                        : 'Warning: This feature is incompatible with Headscale v0.26+ (command removed).',
+                    style: const TextStyle(color: Colors.orange, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: FutureBuilder<List<User>>(
+              future: _usersFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const SizedBox(
+                    height: 100,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return Text(isFr
+                      ? 'Échec du chargement des utilisateurs : ${snapshot.error}'
+                      : 'Failed to load users: ${snapshot.error}');
+                }
+                final users = snapshot.data ?? [];
+                final otherUsers =
+                    users.where((u) => u.name != widget.node.user).toList();
+
+                if (otherUsers.isEmpty) {
+                  return Text(isFr
+                      ? 'Aucun autre utilisateur disponible.'
+                      : 'No other users available.');
+                }
+
+                _selectedUser ??= otherUsers.first;
+
+                return DropdownButtonFormField<User>(
+                  initialValue: _selectedUser,
+                  isExpanded: true,
+                  items: otherUsers.map((user) {
+                    return DropdownMenuItem<User>(
+                      value: user,
+                      child: Text(user.name),
+                    );
+                  }).toList(),
+                  onChanged: (user) {
+                    setState(() {
+                      _selectedUser = user;
+                    });
+                  },
+                  decoration: InputDecoration(
+                    labelText:
+                        isFr ? 'Sélectionner un utilisateur' : 'Select a user',
+                    border: const OutlineInputBorder(),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
       actions: <Widget>[
         TextButton(

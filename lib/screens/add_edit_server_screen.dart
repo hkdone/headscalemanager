@@ -24,7 +24,8 @@ class _AddEditServerScreenState extends State<AddEditServerScreen> {
     super.initState();
     _nameController = TextEditingController(text: widget.server?.name ?? '');
     _urlController = TextEditingController(text: widget.server?.url ?? '');
-    _apiKeyController = TextEditingController(text: widget.server?.apiKey ?? '');
+    _apiKeyController =
+        TextEditingController(text: widget.server?.apiKey ?? '');
   }
 
   @override
@@ -37,7 +38,6 @@ class _AddEditServerScreenState extends State<AddEditServerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isFr = context.watch<AppProvider>().locale.languageCode == 'fr';
     final isEditing = widget.server != null;
 

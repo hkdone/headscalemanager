@@ -171,10 +171,15 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
           final allNodes = await apiService.getNodes();
           final serverId = appProvider.activeServer?.id;
           if (serverId == null) {
-            showSafeSnackBar(context, isFr ? 'Aucun serveur actif sélectionné.' : 'No active server selected.');
+            showSafeSnackBar(
+                context,
+                isFr
+                    ? 'Aucun serveur actif sélectionné.'
+                    : 'No active server selected.');
             return;
           }
-          final tempRules = await appProvider.storageService.getTemporaryRules(serverId);
+          final tempRules =
+              await appProvider.storageService.getTemporaryRules(serverId);
           final aclGenerator = NewAclGeneratorService();
           final newPolicyMap = aclGenerator.generatePolicy(
               users: allUsers, nodes: allNodes, temporaryRules: tempRules);
@@ -209,6 +214,29 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              margin: const EdgeInsets.only(bottom: 16.0),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                border: Border.all(color: Colors.blue),
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isFr
+                          ? 'Note : Avec Headscale v0.26+, les tags sont stricts. Un appareil ne peut plus être "dé-tagué" une fois tagué.'
+                          : 'Note: With Headscale v0.26+, tags are strict. A device cannot be "un-tagged" once tagged.',
+                      style: const TextStyle(color: Colors.blue, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Text(isFr ? 'Tags Actuels' : 'Current Tags',
                 style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),

@@ -118,9 +118,6 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
-    final locale = context.watch<AppProvider>().locale;
-    final isFr = locale.languageCode == 'fr';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -463,10 +460,15 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       final updatedNodes = await apiService.getNodes(); // Re-fetch nodes
       final serverId = appProvider.activeServer?.id;
       if (serverId == null) {
-        showSafeSnackBar(context, isFr ? 'Aucun serveur actif sélectionné.' : 'No active server selected.');
+        showSafeSnackBar(
+            context,
+            isFr
+                ? 'Aucun serveur actif sélectionné.'
+                : 'No active server selected.');
         return;
       }
-      final tempRules = await appProvider.storageService.getTemporaryRules(serverId);
+      final tempRules =
+          await appProvider.storageService.getTemporaryRules(serverId);
 
       final aclGenerator = NewAclGeneratorService();
       final newPolicyMap = aclGenerator.generatePolicy(
