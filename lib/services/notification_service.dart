@@ -1,7 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:headscalemanager/api/headscale_api_service.dart';
 import 'package:headscalemanager/models/node.dart';
-import 'package:headscalemanager/models/server.dart';
 import 'package:headscalemanager/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
@@ -50,7 +49,7 @@ void callbackDispatcher() {
       try {
         final storageService = StorageService();
         await storageService.init(); // Important for migration
-        
+
         final servers = await storageService.getServers();
         final activeServerId = await storageService.getActiveServerId();
 
@@ -58,7 +57,7 @@ void callbackDispatcher() {
           print("No active server configured. Exiting background task.");
           return Future.value(true);
         }
-        
+
         final activeServer = servers.firstWhere((s) => s.id == activeServerId);
 
         final apiService = HeadscaleApiService(

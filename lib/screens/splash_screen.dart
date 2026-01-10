@@ -4,7 +4,6 @@ import 'package:headscalemanager/screens/home_screen.dart';
 import 'package:headscalemanager/screens/lock_screen.dart';
 import 'package:headscalemanager/screens/settings_screen.dart';
 import 'package:headscalemanager/services/security_service.dart';
-import 'package:headscalemanager/services/storage_service.dart';
 import 'package:provider/provider.dart';
 
 /// Écran de démarrage (Splash Screen) de l'application.
