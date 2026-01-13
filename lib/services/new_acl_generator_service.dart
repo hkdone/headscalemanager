@@ -127,7 +127,14 @@ class NewAclGeneratorService {
       if (userTags.isEmpty) continue;
 
       final destinations = <String>{};
-      destinations.add('autogroup:internet:*'); // Accès Internet explicite
+
+      // Check if the user has any node with the 'exit-node' tag
+      final hasExitNode = userNodes
+          .any((node) => node.tags.any((tag) => tag.contains(';exit-node')));
+
+      if (hasExitNode) {
+        destinations.add('autogroup:internet:*'); // Accès Internet explicite
+      }
 
       // Ajouter les tags des nœuds de l'utilisateur comme destinations
       for (var tag in userTags) {

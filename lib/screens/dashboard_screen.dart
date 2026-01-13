@@ -522,11 +522,15 @@ class _UserNodeCard extends StatelessWidget {
                         await appProvider.apiService.getNodes();
                     final serverId = appProvider.activeServer?.id;
                     if (serverId == null) {
-                      showSafeSnackBar(context, isFr ? 'Aucun serveur actif sélectionné.' : 'No active server selected.');
+                      showSafeSnackBar(
+                          context,
+                          isFr
+                              ? 'Aucun serveur actif sélectionné.'
+                              : 'No active server selected.');
                       return;
                     }
-                    final tempRules =
-                        await appProvider.storageService.getTemporaryRules(serverId);
+                    final tempRules = await appProvider.storageService
+                        .getTemporaryRules(serverId);
                     final aclGenerator = NewAclGeneratorService();
                     final newPolicyMap = aclGenerator.generatePolicy(
                         users: allUsers,
@@ -580,7 +584,8 @@ class _UserNodeCard extends StatelessWidget {
         routesToClean.where((r) => r != '0.0.0.0/0' && r != '::/0').toList();
     final hadLanSharing = lanRoutes.isNotEmpty;
 
-    String title = isFr ? 'Nettoyage Requis' : 'Cleanup Required';
+    String title =
+        isFr ? 'Attention : Suppression de Routes' : 'Warning: Route Deletion';
     String content = isFr
         ? 'La configuration du nœud "${node.name}" est désynchronisée.\n\n'
         : 'Node "${node.name}" configuration is out of sync.\n\n';
@@ -596,8 +601,8 @@ class _UserNodeCard extends StatelessWidget {
           : 'The client has stopped sharing the subnet(s): ${lanRoutes.join(', ')}.\n';
     }
     content += isFr
-        ? '\nVoulez-vous nettoyer la configuration ?'
-        : '\nDo you want to clean up the configuration?';
+        ? '\nATTENTION : Ces routes orphelines vont être SUPPRIMÉES de la configuration.\n\nVoulez-vous confirmer cette suppression ?'
+        : '\nWARNING: These orphaned routes will be DELETED from the configuration.\n\nDo you want to confirm this deletion?';
 
     showDialog(
       context: context,
@@ -612,7 +617,7 @@ class _UserNodeCard extends StatelessWidget {
               onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-              child: Text(isFr ? 'Oui, Nettoyer' : 'Yes, Clean Up'),
+              child: Text(isFr ? 'Oui, Supprimer' : 'Yes, Delete'),
               onPressed: () async {
                 Navigator.of(context).pop();
                 showSafeSnackBar(
@@ -647,11 +652,15 @@ class _UserNodeCard extends StatelessWidget {
                         await appProvider.apiService.getNodes();
                     final serverId = appProvider.activeServer?.id;
                     if (serverId == null) {
-                      showSafeSnackBar(context, isFr ? 'Aucun serveur actif sélectionné.' : 'No active server selected.');
+                      showSafeSnackBar(
+                          context,
+                          isFr
+                              ? 'Aucun serveur actif sélectionné.'
+                              : 'No active server selected.');
                       return;
                     }
-                    final tempRules =
-                        await appProvider.storageService.getTemporaryRules(serverId);
+                    final tempRules = await appProvider.storageService
+                        .getTemporaryRules(serverId);
                     final aclGenerator = NewAclGeneratorService();
                     final newPolicyMap = aclGenerator.generatePolicy(
                         users: allUsers,

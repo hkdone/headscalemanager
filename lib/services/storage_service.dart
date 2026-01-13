@@ -98,4 +98,25 @@ class StorageService {
   Future<String?> getData(String key) async {
     return await _storage.read(key: key);
   }
+
+  Future<void> saveCustomDnsRecords(
+      String serverId, Map<String, String> records) async {
+    final String recordsJson = json.encode(records);
+    await _storage.write(
+        key: 'CUSTOM_DNS_RECORDS_$serverId', value: recordsJson);
+  }
+
+  Future<Map<String, String>> getCustomDnsRecords(String serverId) async {
+    final String? recordsJson =
+        await _storage.read(key: 'CUSTOM_DNS_RECORDS_$serverId');
+    if (recordsJson != null && recordsJson.isNotEmpty) {
+      try {
+        final Map<String, dynamic> decodedMap = json.decode(recordsJson);
+        return decodedMap.map((key, value) => MapEntry(key, value.toString()));
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
+  }
 }

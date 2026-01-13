@@ -18,6 +18,7 @@ class _DnsScreenState extends State<DnsScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
   bool _isHelpCardExpanded = false;
+  Map<String, String> _customDnsRecords = {}; // nodeId -> alias
 
   @override
   void initState() {
@@ -27,14 +28,24 @@ class _DnsScreenState extends State<DnsScreen> {
 
   Future<void> _fetchData() async {
     try {
-      final apiService =
-          Provider.of<AppProvider>(context, listen: false).apiService;
+      final appProvider = Provider.of<AppProvider>(context, listen: false);
+      final apiService = appProvider.apiService;
+      final serverId = appProvider.activeServer?.id;
+
       final nodes = await apiService.getNodes();
+
+      Map<String, String> customRecords = {};
+      if (serverId != null) {
+        customRecords =
+            await appProvider.storageService.getCustomDnsRecords(serverId);
+      }
+
       if (mounted) {
         setState(() {
           _nodes = nodes;
-          _filteredNodes = nodes;
+          _filteredNodes = _applyFilter(nodes, _searchQuery);
           _isLoading = false;
+          _customDnsRecords = customRecords;
         });
       }
     } catch (e) {
@@ -54,20 +65,39 @@ class _DnsScreenState extends State<DnsScreen> {
     }
   }
 
+  List<Node> _applyFilter(List<Node> nodes, String query) {
+    if (query.isEmpty) return nodes;
+    final queryLower = query.toLowerCase();
+    return nodes.where((node) {
+      final customAlias = _customDnsRecords[node.id]?.toLowerCase() ?? '';
+      return node.name.toLowerCase().contains(queryLower) ||
+          node.fqdn.toLowerCase().contains(queryLower) ||
+          customAlias.contains(queryLower) ||
+          node.ipAddresses.any((ip) => ip.contains(queryLower));
+    }).toList();
+  }
+
   void _filterNodes(String query) {
     setState(() {
       _searchQuery = query;
-      if (_searchQuery.isEmpty) {
-        _filteredNodes = _nodes;
-      } else {
-        _filteredNodes = _nodes.where((node) {
-          final queryLower = query.toLowerCase();
-          return node.name.toLowerCase().contains(queryLower) ||
-              node.fqdn.toLowerCase().contains(queryLower) ||
-              node.ipAddresses.any((ip) => ip.contains(queryLower));
-        }).toList();
-      }
+      _filteredNodes = _applyFilter(_nodes, query);
     });
+  }
+
+  Future<void> _saveCustomRecord(String nodeId, String alias) async {
+    final appProvider = context.read<AppProvider>();
+    final serverId = appProvider.activeServer?.id;
+    if (serverId == null) return;
+
+    if (alias.trim().isEmpty) {
+      _customDnsRecords.remove(nodeId);
+    } else {
+      _customDnsRecords[nodeId] = alias.trim();
+    }
+
+    await appProvider.storageService
+        .saveCustomDnsRecords(serverId, _customDnsRecords);
+    _filterNodes(_searchQuery); // Re-apply filter to update view
   }
 
   String _getIpv4(Node node) =>
@@ -86,83 +116,201 @@ class _DnsScreenState extends State<DnsScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _fetchData,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: TextField(
-                      decoration: InputDecoration(
-                        labelText: isFr
-                            ? 'Rechercher par nom, FQDN ou IP'
-                            : 'Search by name, FQDN, or IP',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: theme.cardColor,
-                      ),
-                      onChanged: _filterNodes,
-                    ),
+        child: Column(
+          children: [
+            _buildWarningBanner(context, isFr),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TextField(
+                decoration: InputDecoration(
+                  labelText: isFr
+                      ? 'Rechercher par nom, FQDN, alias ou IP'
+                      : 'Search by name, FQDN, alias, or IP',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  Expanded(
-                    child: _filteredNodes.isEmpty && !_isLoading
-                        ? Center(
-                            child: Text(
-                                isFr ? 'Aucun nœud trouvé' : 'No nodes found'))
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            itemCount: _filteredNodes.length,
-                            itemBuilder: (context, index) {
-                              final node = _filteredNodes[index];
-                              final ipv4 = _getIpv4(node);
-                              final ipv6 = _getIpv6(node);
-
-                              return Card(
-                                elevation: 0,
-                                margin: const EdgeInsets.symmetric(
-                                    vertical: 6, horizontal: 8),
-                                color: theme.cardColor,
-                                child: ListTile(
-                                  isThreeLine: true,
-                                  title: Text(node.name,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16)),
-                                  subtitle: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(node.fqdn,
-                                          style: const TextStyle(
-                                              fontFamily: 'monospace')),
-                                      const SizedBox(height: 8),
-                                      Wrap(
-                                        spacing: 8.0,
-                                        runSpacing: 8.0,
-                                        children: [
-                                          _buildActionButton(
-                                              context, isFr, 'DNS', node.fqdn),
-                                          if (ipv4.isNotEmpty)
-                                            _buildActionButton(
-                                                context, isFr, 'IPv4', ipv4),
-                                          if (ipv6.isNotEmpty)
-                                            _buildActionButton(
-                                                context, isFr, 'IPv6', ipv6),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                  _buildHelpCard(context, isFr),
-                ],
+                  filled: true,
+                  fillColor: theme.cardColor,
+                ),
+                onChanged: _filterNodes,
               ),
+            ),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filteredNodes.isEmpty
+                      ? Center(
+                          child: Text(
+                              isFr ? 'Aucun nœud trouvé' : 'No nodes found'))
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          itemCount: _filteredNodes.length,
+                          itemBuilder: (context, index) {
+                            final node = _filteredNodes[index];
+                            final ipv4 = _getIpv4(node);
+                            final ipv6 = _getIpv6(node);
+                            final customAlias = _customDnsRecords[node.id];
+
+                            return Card(
+                              elevation: 0,
+                              margin: const EdgeInsets.symmetric(
+                                  vertical: 6, horizontal: 8),
+                              color: theme.cardColor,
+                              child: ListTile(
+                                isThreeLine: true,
+                                title: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(node.name,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16)),
+                                    ),
+                                    if (customAlias != null)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                            color: theme
+                                                .colorScheme.tertiaryContainer,
+                                            borderRadius:
+                                                BorderRadius.circular(8)),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.bookmark,
+                                                size: 12,
+                                                color: theme.colorScheme
+                                                    .onTertiaryContainer),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              customAlias,
+                                              style: theme.textTheme.labelSmall
+                                                  ?.copyWith(
+                                                      color: theme.colorScheme
+                                                          .onTertiaryContainer,
+                                                      fontWeight:
+                                                          FontWeight.bold),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(node.fqdn,
+                                        style: const TextStyle(
+                                            fontFamily: 'monospace')),
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 8.0,
+                                      runSpacing: 8.0,
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      children: [
+                                        _buildActionButton(
+                                            context, isFr, 'DNS', node.fqdn),
+                                        if (ipv4.isNotEmpty)
+                                          _buildActionButton(
+                                              context, isFr, 'IPv4', ipv4),
+                                        if (ipv6.isNotEmpty)
+                                          _buildActionButton(
+                                              context, isFr, 'IPv6', ipv6),
+                                        IconButton(
+                                            onPressed: () =>
+                                                _showEditAliasDialog(
+                                                    context, node, customAlias),
+                                            tooltip: isFr
+                                                ? 'Ajouter/Modifier un alias DNS (Mémo local)'
+                                                : 'Add/Edit DNS Alias (Local Memo)',
+                                            icon: Icon(Icons.edit_note,
+                                                color:
+                                                    theme.colorScheme.primary)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+            ),
+            _buildHelpCard(context, isFr),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWarningBanner(BuildContext context, bool isFr) {
+    return Container(
+      width: double.infinity,
+      color: Colors.amber.withOpacity(0.2),
+      padding: const EdgeInsets.all(12.0),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: Colors.orange),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              isFr
+                  ? "Les noms affichés sont estimés. Les configurations serveur (MagicDNS/Extra Records) ne sont pas visibles ici mais fonctionnent correctement."
+                  : "Displayed names are estimated. Server-side custom MagicDNS/Extra Records are not visible here but work correctly.",
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.orange[800],
+                    fontWeight: FontWeight.w500,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditAliasDialog(
+      BuildContext context, Node node, String? currentAlias) {
+    final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
+    final controller = TextEditingController(text: currentAlias);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isFr ? 'Alias DNS (Mémo Local)' : 'DNS Alias (Local Memo)'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isFr
+                  ? "Cet alias est uniquement sauvegardé localement sur cet appareil pour votre référence. Assurez-vous d'ajouter cet enregistrement dans le fichier 'config.yaml' de votre serveur Headscale pour qu'il soit effectif sur le réseau."
+                  : "This alias is only saved locally on this device for your reference. Make sure to add this record to your Headscale server's 'config.yaml' for it to work on the network.",
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: isFr ? 'Nom DNS personnalisé' : 'Custom DNS Name',
+                hintText: 'ex: nas.home',
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(isFr ? 'Annuler' : 'Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              _saveCustomRecord(node.id, controller.text);
+              Navigator.pop(context);
+            },
+            child: Text(isFr ? 'Sauvegarder' : 'Save'),
+          ),
+        ],
       ),
     );
   }

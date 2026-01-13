@@ -18,8 +18,9 @@ Map<String, String> _getTranslations(String lang, String nodeName,
     return {
       'approval_title': 'Approval Required',
       'approval_body': 'Node "$nodeName" is requesting new permissions.',
-      'cleanup_title': 'Cleanup Required',
-      'cleanup_body': 'Node "$nodeName" configuration is out of sync.',
+      'cleanup_title': 'Route Deletion Warning',
+      'cleanup_body':
+          'Node "$nodeName" has orphaned routes that need to be deleted.',
       'status_title': 'Status Change',
       'status_body':
           'Node "$nodeName" is now ${onlineStatus ? 'online' : 'offline'}.',
@@ -29,8 +30,8 @@ Map<String, String> _getTranslations(String lang, String nodeName,
   return {
     'approval_title': 'Approbation Requise',
     'approval_body': 'Le nœud "$nodeName" demande de nouvelles permissions.',
-    'cleanup_title': 'Nettoyage Requis',
-    'cleanup_body': 'La configuration du nœud "$nodeName" est désynchronisée.',
+    'cleanup_title': 'Avertissement de Suppression',
+    'cleanup_body': 'Le nœud "$nodeName" a des routes orphelines à supprimer.',
     'status_title': 'Changement de Statut',
     'status_body':
         'Le nœud "$nodeName" est maintenant ${onlineStatus ? 'en ligne' : 'hors ligne'}.',

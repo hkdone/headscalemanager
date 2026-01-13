@@ -11,6 +11,7 @@ import 'package:headscalemanager/services/new_acl_generator_service.dart';
 import 'package:headscalemanager/widgets/shared_routes_access_dialog.dart';
 import 'package:headscalemanager/utils/ip_utils.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import 'package:headscalemanager/screens/acl_puzzle_screen.dart';
 
 class AclScreen extends StatefulWidget {
   const AclScreen({super.key});
@@ -154,6 +155,19 @@ class _AclScreenState extends State<AclScreen> {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const AclManagerScreen()),
+              );
+            },
+          ),
+          SpeedDialChild(
+            child: const Icon(Icons.extension),
+            label: isFr ? 'Vue Puzzle (Builder)' : 'Puzzle View (Builder)',
+            backgroundColor: Colors.purple,
+            labelBackgroundColor: Colors.purple,
+            labelStyle: const TextStyle(color: Colors.white),
+            foregroundColor: Colors.white,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AclPuzzleScreen()),
               );
             },
           ),
@@ -1008,7 +1022,9 @@ class _AclScreenState extends State<AclScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isFr ? 'Aucun serveur actif sélectionné.' : 'No active server selected.'),
+            content: Text(isFr
+                ? 'Aucun serveur actif sélectionné.'
+                : 'No active server selected.'),
             backgroundColor: Colors.red,
           ),
         );
