@@ -1,10 +1,7 @@
 import 'dart:convert';
 import 'package:headscalemanager/models/acl_puzzle_model.dart';
-import 'package:headscalemanager/services/new_acl_generator_service.dart';
 
 class AclPuzzleService {
-  final NewAclGeneratorService _baseGenerator = NewAclGeneratorService();
-
   /// Converts a list of PuzzleRules into a full Headscale ACL Policy JSON
   /// It reuses the base generator for groups/tags definitions but replaces
   /// the 'acls' section with the custom rules.
@@ -53,9 +50,95 @@ class AclPuzzleService {
     return {
       'groups': groups,
       'tagOwners': tagOwners,
-      'autoApprovers': autoApprovers,
-      'acls': generatedAcls,
       'hosts': hosts,
+      'acls': generatedAcls,
+      'autoApprovers': autoApprovers,
     };
+  }
+
+  /// Parses a full Headscale ACL Policy JSON into a list of PuzzleRules.
+  /// It attempts to map raw strings back to known PuzzleEntities.
+  List<PuzzleRule> parseJsonToPuzzle({
+    required Map<String, dynamic> jsonPolicy,
+    required List<PuzzleEntity> availableEntities,
+  }) {
+    final List<PuzzleRule> rules = [];
+    final acls = jsonPolicy['acls'];
+
+    if (acls is! List) return rules;
+
+    for (var acl in acls) {
+      if (acl is! Map<String, dynamic>) continue;
+
+      final action = acl['action']?.toString() ?? 'accept';
+      final srcList = acl['src'];
+      final dstList = acl['dst'];
+
+      if (srcList is! List || dstList is! List) continue;
+
+      // Map Sources
+      final List<PuzzleEntity> sources = [];
+      for (var srcItem in srcList) {
+        final srcStr = srcItem.toString();
+        // Try to find exact match in available entities
+        final match = availableEntities.firstWhere(
+          (e) => e.value == srcStr,
+          orElse: () => PuzzleEntity(
+            id: srcStr,
+            type: _inferType(srcStr),
+            value: srcStr,
+            displayLabel: srcStr,
+          ),
+        );
+        sources.add(match);
+      }
+
+      // Map Destinations
+      final List<PuzzleEntity> destinations = [];
+      for (var dstItem in dstList) {
+        var dstStr = dstItem.toString();
+        // Remove port suffix if present (e.g. ":*") for matching
+        // We only support ":*" or exact matches for now in this simple UI
+        if (dstStr.endsWith(':*')) {
+          dstStr = dstStr.substring(0, dstStr.length - 2);
+        }
+
+        final match = availableEntities.firstWhere(
+          (e) => e.value == dstStr,
+          orElse: () => PuzzleEntity(
+            id: dstStr,
+            type: _inferType(dstStr),
+            value: dstStr,
+            displayLabel: dstStr,
+          ),
+        );
+        destinations.add(match);
+      }
+
+      rules.add(PuzzleRule(
+        sources: sources,
+        destinations: destinations,
+        action: action,
+      ));
+    }
+
+    return rules;
+  }
+
+  PuzzleEntityType _inferType(String value) {
+    if (value.startsWith('group:')) return PuzzleEntityType.group;
+    if (value.startsWith('tag:')) return PuzzleEntityType.tag;
+    if (value.startsWith('autogroup:internet'))
+      return PuzzleEntityType.internet;
+    if (value.contains('/'))
+      return PuzzleEntityType.cidr; // loose check for CIDR
+    // Check if it looks like a host? For now default to host or user?
+    // Actually Headscale users are just strings like "myuser".
+    // We'll guess User if it has no special chars, but it's ambiguous.
+    // Let's default to Host if it's an IP, User otherwise.
+    // Simple heuristic:
+    if (RegExp(r'^\d+\.\d+\.\d+\.\d+$').hasMatch(value))
+      return PuzzleEntityType.host;
+    return PuzzleEntityType.user;
   }
 }

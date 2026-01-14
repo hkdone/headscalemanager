@@ -25,7 +25,7 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
   // Cached data for Entity Selection
   List<User> _users = [];
   List<Node> _nodes = [];
-  List<PuzzleEntity> _availableEntities = [];
+  final List<PuzzleEntity> _availableEntities = [];
 
   @override
   void initState() {
@@ -42,10 +42,37 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
       final users = await apiService.getUsers();
       final nodes = await apiService.getNodes();
 
+      // Load current policy
+      Map<String, dynamic> currentPolicy = {};
+      try {
+        final policyString = await apiService.getAclPolicy();
+        if (policyString.isNotEmpty) {
+          try {
+            currentPolicy = json.decode(policyString);
+          } catch (e) {
+            debugPrint('Error parsing ACL policy JSON: $e');
+            // Optionally show error to user or handle HuJSON if needed
+          }
+        }
+      } catch (e) {
+        // Ignore if no policy exists or error
+        debugPrint('Error loading ACL policy: $e');
+      }
+
       setState(() {
         _users = users;
         _nodes = nodes;
         _buildAvailableEntities(isFr);
+
+        // Parse existing policy
+        if (currentPolicy.isNotEmpty) {
+          _puzzleRules.clear();
+          _puzzleRules.addAll(_puzzleService.parseJsonToPuzzle(
+            jsonPolicy: currentPolicy,
+            availableEntities: _availableEntities,
+          ));
+        }
+
         _isLoading = false;
       });
     } catch (e) {
@@ -132,6 +159,7 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
       isScrollControlled: true,
       builder: (ctx) => _RuleEditorDialog(
         availableEntities: _availableEntities,
+        existingRules: _puzzleRules,
         onSave: (rule) {
           setState(() {
             _puzzleRules.add(rule);
@@ -212,50 +240,53 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _puzzleRules.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.extension_off,
-                          size: 64, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      Text(
-                        isFr
-                            ? 'Aucune pièce de puzzle'
-                            : 'No puzzle pieces yet',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(color: Colors.grey),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        isFr
-                            ? 'Appuyez sur + pour commencer'
-                            : 'Tap + to start building',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(color: Colors.grey),
-                      ),
-                    ],
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _puzzleRules.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.extension_off,
+                            size: 64, color: Colors.grey),
+                        const SizedBox(height: 16),
+                        Text(
+                          isFr
+                              ? 'Aucune pièce de puzzle'
+                              : 'No puzzle pieces yet',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(color: Colors.grey),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          isFr
+                              ? 'Appuyez sur + pour commencer'
+                              : 'Tap + to start building',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _puzzleRules.length,
+                    itemBuilder: (context, index) {
+                      final rule = _puzzleRules[index];
+                      return _PuzzleBlockCard(
+                        rule: rule,
+                        onDelete: () => _deleteRule(index),
+                        service:
+                            _puzzleService, // Pass service for code preview
+                      );
+                    },
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _puzzleRules.length,
-                  itemBuilder: (context, index) {
-                    final rule = _puzzleRules[index];
-                    return _PuzzleBlockCard(
-                      rule: rule,
-                      onDelete: () => _deleteRule(index),
-                      service: _puzzleService, // Pass service for code preview
-                    );
-                  },
-                ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addRule,
         icon: const Icon(Icons.add),
@@ -423,10 +454,13 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
 
 class _RuleEditorDialog extends StatefulWidget {
   final List<PuzzleEntity> availableEntities;
+  final List<PuzzleRule> existingRules;
   final Function(PuzzleRule) onSave;
 
   const _RuleEditorDialog(
-      {required this.availableEntities, required this.onSave});
+      {required this.availableEntities,
+      required this.existingRules,
+      required this.onSave});
 
   @override
   State<_RuleEditorDialog> createState() => _RuleEditorDialogState();
@@ -442,58 +476,60 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
     final isFr = context.watch<AppProvider>().locale.languageCode == 'fr';
 
     // A simple wizard-like bottom sheet
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            _currentStep == 0
-                ? (isFr ? 'Étape 1: QUI ? (Source)' : 'Step 1: WHO? (Source)')
-                : (isFr
-                    ? 'Étape 2: VERS QUOI ? (Destination)'
-                    : 'Step 2: TO WHAT? (Destination)'),
-            style: Theme.of(context).textTheme.headlineSmall,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: _buildEntityList(
-                _currentStep == 0 ? _selectedSources : _selectedDestinations,
-                isFr),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (_currentStep > 0)
-                TextButton(
-                  onPressed: () => setState(() => _currentStep--),
-                  child: Text(isFr ? 'Précédent' : 'Back'),
-                )
-              else
-                const SizedBox(),
-              ElevatedButton(
-                onPressed: () {
-                  if (_currentStep == 0) {
-                    if (_selectedSources.isEmpty) return; // TODO show warning
-                    setState(() => _currentStep++);
-                  } else {
-                    if (_selectedDestinations.isEmpty)
-                      return; // TODO show warning
-                    widget.onSave(PuzzleRule(
-                        sources: List.from(_selectedSources),
-                        destinations: List.from(_selectedDestinations)));
-                  }
-                },
-                child: Text(_currentStep == 0
-                    ? (isFr ? 'Suivant' : 'Next')
-                    : (isFr ? 'Ajouter la pièce' : 'Add Piece')),
-              ),
-            ],
-          )
-        ],
+    return SafeArea(
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              _currentStep == 0
+                  ? (isFr ? 'Étape 1: QUI ? (Source)' : 'Step 1: WHO? (Source)')
+                  : (isFr
+                      ? 'Étape 2: VERS QUOI ? (Destination)'
+                      : 'Step 2: TO WHAT? (Destination)'),
+              style: Theme.of(context).textTheme.headlineSmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: _buildEntityList(
+                  _currentStep == 0 ? _selectedSources : _selectedDestinations,
+                  isFr),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (_currentStep > 0)
+                  TextButton(
+                    onPressed: () => setState(() => _currentStep--),
+                    child: Text(isFr ? 'Précédent' : 'Back'),
+                  )
+                else
+                  const SizedBox(),
+                ElevatedButton(
+                  onPressed: () {
+                    if (_currentStep == 0) {
+                      if (_selectedSources.isEmpty) return; // TODO show warning
+                      setState(() => _currentStep++);
+                    } else {
+                      if (_selectedDestinations.isEmpty)
+                        return; // TODO show warning
+                      widget.onSave(PuzzleRule(
+                          sources: List.from(_selectedSources),
+                          destinations: List.from(_selectedDestinations)));
+                    }
+                  },
+                  child: Text(_currentStep == 0
+                      ? (isFr ? 'Suivant' : 'Next')
+                      : (isFr ? 'Ajouter la pièce' : 'Add Piece')),
+                ),
+              ],
+            )
+          ],
+        ),
       ),
     );
   }
@@ -501,11 +537,41 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
   Widget _buildEntityList(List<PuzzleEntity> selectedList, bool isFr) {
     // Group entities by type for better UI
     final grouped = <PuzzleEntityType, List<PuzzleEntity>>{};
+
+    // Smart Filtering Logic for Step 2 (Destinations)
+    Set<String> excludedIds = {};
+    if (_currentStep == 1) {
+      for (var rule in widget.existingRules) {
+        // If the rule has *any* of the currently selected sources
+        bool sharesSource = rule.sources.any((ruleSrc) => _selectedSources
+            .any((selectedSrc) => selectedSrc.value == ruleSrc.value));
+
+        if (sharesSource) {
+          // Then we should exclude all destinations of this rule
+          for (var dst in rule.destinations) {
+            excludedIds.add(dst.value);
+            // Also handle implicit :* logic if needed, but value matching should suffice
+            // given how we parse and store them.
+          }
+        }
+      }
+    }
+
     for (var e in widget.availableEntities) {
-      // Skip Internet/CIDR for sources usually? Headscale allows it but usually sources are Users/Groups/Hosts/Tags
+      // Step 0: Skip Internet/CIDR for sources usually
       if (e.type == PuzzleEntityType.internet && _currentStep == 0) continue;
 
+      // Step 1: Filter out already configured destinations
+      if (_currentStep == 1 && excludedIds.contains(e.value)) continue;
+
       grouped.putIfAbsent(e.type, () => []).add(e);
+    }
+
+    if (grouped.isEmpty) {
+      return Center(
+          child: Text(isFr
+              ? 'Aucune destination disponible (déjà configuré ?)'
+              : 'No available destinations (already configured?)'));
     }
 
     return ListView(
