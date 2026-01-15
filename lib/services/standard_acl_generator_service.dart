@@ -165,7 +165,11 @@ class StandardAclGeneratorService {
         if (n.tags.contains(stdExitTag)) {
           activeUserTags.add(stdExitTag);
           hasActiveExitNodes = true;
+        } else if (n.isExitNode) {
+          // Fix: Also check explicit flag from Node object
+          hasActiveExitNodes = true;
         }
+
         if (n.tags.contains(stdLanTag)) activeUserTags.add(stdLanTag);
 
         // Legacy Tags
@@ -206,30 +210,11 @@ class StandardAclGeneratorService {
 
       // Add specific LAN routes shared by own nodes
       for (var node in userNodes) {
-        // Check finding specific tag responsible for routes
-        String? actualLanTag;
-        if (node.tags.contains(stdLanTag)) {
-          actualLanTag = stdLanTag;
-        } else {
-          actualLanTag = node.tags
-              .firstWhere((t) => t.contains(';lan-sharer'), orElse: () => '');
-          if (actualLanTag.isEmpty) actualLanTag = null;
-        }
-
-        String? actualExitTag;
-        if (node.tags.contains(stdExitTag)) {
-          actualExitTag = stdExitTag;
-        } else {
-          actualExitTag = node.tags
-              .firstWhere((t) => t.contains(';exit-node'), orElse: () => '');
-          if (actualExitTag.isEmpty) actualExitTag = null;
-        }
-
-        if (actualLanTag != null || actualExitTag != null) {
-          for (var route in node.sharedRoutes) {
-            if (route != '0.0.0.0/0' && route != '::/0') {
-              destinations.add('$route:*');
-            }
+        // Fix: Check routes irrespective of tags
+        // If the node shares routes, we should add them.
+        for (var route in node.sharedRoutes) {
+          if (route != '0.0.0.0/0' && route != '::/0') {
+            destinations.add('$route:*');
           }
         }
       }

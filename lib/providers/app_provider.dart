@@ -24,6 +24,37 @@ class AppProvider extends ChangeNotifier {
     await _loadLocale();
     await _loadServers();
     await _loadAclEnginePreference();
+
+    // Auto-detect if we should benefit from Standard ACL Engine
+    if (_activeServer != null && !_useStandardAclEngine) {
+      try {
+        final nodes = await _apiService!.getNodes();
+        bool hasStandardTags = false;
+        bool hasLegacyMergedTags = false;
+
+        for (var node in nodes) {
+          for (var tag in node.tags) {
+            if (tag.contains(';') &&
+                (tag.contains('exit-node') || tag.contains('lan-sharer'))) {
+              hasLegacyMergedTags = true;
+            }
+            if (!tag.contains(';') &&
+                (tag.endsWith('-exit-node') || tag.endsWith('-lan-sharer'))) {
+              hasStandardTags = true;
+            }
+          }
+        }
+
+        if (hasStandardTags && !hasLegacyMergedTags) {
+          await setStandardAclEngineEnabled(true);
+          print(
+              'Auto-enabled Standard ACL Engine due to detected standard tags.');
+        }
+      } catch (e) {
+        print('Error auto-detecting ACL engine: $e');
+      }
+    }
+
     await NotificationService.initialize();
     _initializationCompleter.complete();
   }

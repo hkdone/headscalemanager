@@ -290,11 +290,24 @@ class _AclScreenState extends State<AclScreen> {
       subtitle: Text('Port: $portDisplay | Proto: $protoDisplay'),
       trailing: IconButton(
         icon: const Icon(Icons.delete, color: Colors.red),
-        onPressed: () {
+        onPressed: () async {
           setState(() {
             _temporaryRules.removeAt(index);
           });
-          _generateNewAclPolicy(showSnackbar: true); // Regenerate after delete
+
+          final appProvider = context.read<AppProvider>();
+          final storage = appProvider.storageService;
+          final serverId = appProvider.activeServer?.id;
+          if (serverId != null) {
+            await storage.saveTemporaryRules(serverId, _temporaryRules);
+          }
+
+          final locale = appProvider.locale;
+          final isFr = locale.languageCode == 'fr';
+          await _generateAndExportPolicy(
+              message: isFr
+                  ? 'Règle supprimée et politique mise à jour.'
+                  : 'Rule deleted and policy updated.');
         },
       ),
     );
