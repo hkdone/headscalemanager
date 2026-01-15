@@ -50,8 +50,9 @@ class CliCommandDisplayDialog extends StatelessWidget {
         ElevatedButton.icon(
           icon: const Icon(Icons.copy),
           label: Text(isFr ? 'Copier la commande CLI' : 'Copy CLI Command'),
-          onPressed: () {
-            Clipboard.setData(ClipboardData(text: command));
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: command));
+            if (!context.mounted) return;
             showSafeSnackBar(
                 context,
                 isFr

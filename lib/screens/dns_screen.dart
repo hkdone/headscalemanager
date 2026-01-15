@@ -247,7 +247,7 @@ class _DnsScreenState extends State<DnsScreen> {
   Widget _buildWarningBanner(BuildContext context, bool isFr) {
     return Container(
       width: double.infinity,
-      color: Colors.amber.withOpacity(0.2),
+      color: Colors.amber.withValues(alpha: 0.2),
       padding: const EdgeInsets.all(12.0),
       child: Row(
         children: [
@@ -325,7 +325,10 @@ class _DnsScreenState extends State<DnsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('$label ${isFr ? 'copié' : 'copied'}!')));
         } else if (choice == 'share') {
-          Share.share(value);
+          SharePlus.instance.share(ShareParams(
+            text: value,
+            subject: 'DNS Info: $label',
+          ));
         }
       },
       itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[

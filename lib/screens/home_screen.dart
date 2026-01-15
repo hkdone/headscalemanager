@@ -11,6 +11,7 @@ import 'package:headscalemanager/screens/help_screen.dart';
 import 'package:headscalemanager/screens/help_screen_en.dart';
 import 'package:provider/provider.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:headscalemanager/widgets/legacy_migration_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,6 +22,35 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForLegacyTags();
+    });
+  }
+
+  Future<void> _checkForLegacyTags() async {
+    final provider = context.read<AppProvider>();
+    // Check if migration is already needed based on tags
+    try {
+      // We explicitly fetch nodes to be sure we have fresh data
+      final nodes = await provider.apiService.getNodes();
+      final hasLegacyTags =
+          nodes.any((n) => n.tags.any((t) => t.contains(';')));
+
+      if (hasLegacyTags && mounted) {
+        showDialog(
+          barrierDismissible: false,
+          context: context,
+          builder: (_) => const LegacyMigrationDialog(),
+        );
+      }
+    } catch (e) {
+      // Silent failure check
+    }
+  }
 
   static const List<Widget> _widgetOptions = <Widget>[
     DashboardScreen(),

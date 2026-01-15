@@ -148,8 +148,8 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
     final dy = (screenHeight - scaledGraphHeight) / 2 - (minY * scale);
 
     final matrix = Matrix4.identity()
-      ..translate(dx, dy)
-      ..scale(scale);
+      ..setTranslationRaw(dx, dy, 0)
+      ..scale(scale, scale, 1.0);
 
     _transformationController.value = matrix;
   }
@@ -747,7 +747,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
                   offset: const Offset(0, 0),
                 ),
                 BoxShadow(
-                  color: nodeColor.withOpacity(0.7),
+                  color: nodeColor.withValues(alpha: 0.7),
                   spreadRadius: 1,
                   blurRadius: 3,
                 )
@@ -755,7 +755,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
             : [
                 // Subtle shadow for offline nodes
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.4),
+                  color: Colors.black.withValues(alpha: 0.4),
                   spreadRadius: 1,
                   blurRadius: 2,
                   offset: const Offset(1, 1),
@@ -813,7 +813,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
         shadows: [
           BoxShadow(
             color: (isDarkMode ? Colors.green[800] : Colors.green[200])!
-                .withOpacity(0.5),
+                .withValues(alpha: 0.5),
             spreadRadius: 2,
             blurRadius: 4,
           )
@@ -978,7 +978,7 @@ class FiberCurvedEdgePainter extends EdgeRenderer {
       canvas.drawPath(path, fiberPaint);
 
       final flowPaint = Paint()
-        ..color = Colors.white.withOpacity(1)
+        ..color = Colors.white.withValues(alpha: 1)
         ..strokeWidth = 2.0
         ..style = PaintingStyle.stroke;
 
@@ -988,7 +988,7 @@ class FiberCurvedEdgePainter extends EdgeRenderer {
       } else {
         // Dessine une ligne statique si hors ligne
         final staticFlowPaint = Paint()
-          ..color = Colors.grey.withOpacity(0.5)
+          ..color = Colors.grey.withValues(alpha: 0.5)
           ..strokeWidth = 1.0
           ..style = PaintingStyle.stroke;
         canvas.drawPath(path, staticFlowPaint);
@@ -1000,7 +1000,7 @@ class FiberCurvedEdgePainter extends EdgeRenderer {
       } else {
         // Dessine une ligne statique si hors ligne
         final staticPaint = Paint()
-          ..color = Colors.grey.withOpacity(0.5)
+          ..color = Colors.grey.withValues(alpha: 0.5)
           ..strokeWidth = 1.5
           ..style = PaintingStyle.stroke;
         canvas.drawPath(path, staticPaint);

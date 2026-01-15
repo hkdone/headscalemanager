@@ -119,7 +119,8 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
       context: context,
       builder: (ctx) => CreatePreAuthKeyDialog(usersFuture: _usersFuture),
     );
-    if (result != null && mounted) {
+    if (result != null) {
+      if (!mounted) return;
       _refreshData();
       showSafeSnackBar(
           context,
@@ -171,6 +172,7 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
               try {
                 final apiService = context.read<AppProvider>().apiService;
                 await apiService.expirePreAuthKey(key.user!.id, key.key);
+                if (!context.mounted) return;
                 _refreshData();
                 Navigator.of(context).pop();
                 showSafeSnackBar(
@@ -204,6 +206,7 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
                     ?.copyWith(color: theme.colorScheme.onPrimary)),
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: fullCommand));
+              if (!context.mounted) return;
               showSafeSnackBar(
                   context,
                   isFr
@@ -235,7 +238,15 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
               version: QrVersions.auto,
               size: 200.0,
               backgroundColor: Colors.white,
-              foregroundColor: Colors.black,
+              // foregroundColor is deprecated, verify if QrImageView needs replacement or update
+              eyeStyle: const QrEyeStyle(
+                eyeShape: QrEyeShape.square,
+                color: Colors.black,
+              ),
+              dataModuleStyle: const QrDataModuleStyle(
+                dataModuleShape: QrDataModuleShape.square,
+                color: Colors.black,
+              ),
               errorStateBuilder: (cxt, err) {
                 return Center(
                   child: Text(
@@ -363,6 +374,7 @@ class _PreAuthKeyCard extends StatelessWidget {
             .read<AppProvider>()
             .apiService
             .expirePreAuthKey(apiKey.user!.id, apiKey.key);
+        if (!context.mounted) return;
         showSafeSnackBar(context,
             isFr ? 'Clé expirée avec succès.' : 'Key expired successfully.');
         onAction(); // This will trigger the refresh
@@ -414,6 +426,7 @@ class _PreAuthKeyCard extends StatelessWidget {
                     ?.copyWith(color: theme.colorScheme.onPrimary)),
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: fullCommand));
+              if (!context.mounted) return;
               showSafeSnackBar(
                   context, isFr ? 'Commande copiée !' : 'Command copied!');
             },

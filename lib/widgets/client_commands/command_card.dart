@@ -124,8 +124,10 @@ class CommandCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -142,7 +144,7 @@ class CommandCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.purple.withOpacity(0.1),
+                      color: Colors.purple.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -159,7 +161,7 @@ class CommandCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.2),
+                      color: Colors.grey.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -192,7 +194,7 @@ class CommandCard extends StatelessWidget {
                       color: Theme.of(context)
                           .colorScheme
                           .outline
-                          .withOpacity(0.3),
+                          .withValues(alpha: 0.3),
                     ),
                   ),
                   child: Column(
@@ -230,7 +232,7 @@ class CommandCard extends StatelessWidget {
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               fontFamily: 'monospace',
                               backgroundColor: isLinuxSpecific
-                                  ? Colors.grey.withOpacity(0.1)
+                                  ? Colors.grey.withValues(alpha: 0.1)
                                   : null,
                               color: isLinuxSpecific || isDynamic
                                   ? Colors.grey
@@ -248,10 +250,10 @@ class CommandCard extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
+                      color: Colors.blue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: Colors.blue.withOpacity(0.3),
+                        color: Colors.blue.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Column(

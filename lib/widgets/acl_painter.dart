@@ -18,11 +18,11 @@ class AclPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paintInternal = Paint()
-      ..color = Colors.blue.withOpacity(0.6)
+      ..color = Colors.blue.withValues(alpha: 0.6)
       ..strokeWidth = 2.0;
 
     final paintExternal = Paint()
-      ..color = Colors.redAccent.withOpacity(0.6)
+      ..color = Colors.redAccent.withValues(alpha: 0.6)
       ..strokeWidth = 2.5;
 
     final bodyRenderBox = context.findRenderObject() as RenderBox?;

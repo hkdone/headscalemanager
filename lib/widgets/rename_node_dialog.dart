@@ -84,6 +84,7 @@ class _RenameNodeDialogState extends State<RenameNodeDialog> {
                     .read<AppProvider>()
                     .apiService
                     .renameNode(widget.node.id, newName);
+                if (!context.mounted) return;
                 widget.onNodeRenamed();
                 Navigator.of(context).pop();
                 showSafeSnackBar(

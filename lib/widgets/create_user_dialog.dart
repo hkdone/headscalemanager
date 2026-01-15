@@ -69,12 +69,12 @@ class _CreateUserDialogState extends State<CreateUserDialog> {
 
             try {
               await appProvider.apiService.createUser(finalName);
-              if (mounted) {
+              if (context.mounted) {
                 Navigator.of(context).pop(true); // Success
               }
             } catch (e) {
               debugPrint('Erreur lors de la création de l\'utilisateur : $e');
-              if (mounted) {
+              if (context.mounted) {
                 showSafeSnackBar(
                     context,
                     isFr

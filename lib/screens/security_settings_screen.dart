@@ -8,7 +8,7 @@ class SecuritySettingsScreen extends StatefulWidget {
   const SecuritySettingsScreen({super.key});
 
   @override
-  _SecuritySettingsScreenState createState() => _SecuritySettingsScreenState();
+  State<SecuritySettingsScreen> createState() => _SecuritySettingsScreenState();
 }
 
 class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
@@ -86,6 +86,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
             onChanged: (_isPinConfigured && _canCheckBiometrics)
                 ? (bool value) async {
                     await _securityService.saveBiometricsEnabled(value);
+                    if (!context.mounted) return;
                     setState(() {
                       _biometricsEnabled = value;
                     });

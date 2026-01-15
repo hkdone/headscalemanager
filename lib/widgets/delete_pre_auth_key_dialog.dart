@@ -45,6 +45,7 @@ class DeletePreAuthKeyDialog extends StatelessWidget {
             try {
               await provider.apiService
                   .expirePreAuthKey(preAuthKey.user!.id, preAuthKey.key);
+              if (!context.mounted) return;
               Navigator.of(context).pop(); // Ferme le dialogue de confirmation
               onKeyDeleted(); // Appelle le callback pour rafraîchir la liste
               showSafeSnackBar(

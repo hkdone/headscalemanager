@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
+import 'package:headscalemanager/services/new_acl_generator_service.dart';
+import 'package:headscalemanager/services/standard_acl_generator_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
 // For debugPrint
@@ -89,33 +92,120 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
           onPressed: () async {
             if (_formKey.currentState!.validate()) {
               final String newSubnet = _subnetController.text;
-              final List<String> combinedRoutes =
-                  List.from(widget.node.sharedRoutes);
-
-              if (!combinedRoutes.contains(newSubnet)) {
-                combinedRoutes.add(newSubnet);
-              }
 
               try {
+                // 1. Update Tags (add lan-sharer capability)
+                final useStandardEngine = appProvider.useStandardAclEngine;
+                List<String> currentTags = List.from(widget.node.tags);
+                List<String> newTags = [];
+
+                if (useStandardEngine) {
+                  // Standard Mode
+                  final clientTag = currentTags.firstWhere(
+                      (t) => t.contains('-client'),
+                      orElse: () => '');
+                  if (clientTag.isNotEmpty) {
+                    final normUser = widget.node.user;
+                    final capTag = 'tag:$normUser-lan-sharer';
+                    if (!currentTags.contains(capTag)) {
+                      newTags = [...currentTags, capTag];
+                    } else {
+                      newTags = currentTags;
+                    }
+                  } else {
+                    newTags = currentTags; // Fallback
+                  }
+                } else {
+                  // Legacy Mode
+                  final clientTagIndex =
+                      currentTags.indexWhere((t) => t.contains('-client'));
+                  if (clientTagIndex != -1) {
+                    final oldTag = currentTags[clientTagIndex];
+                    if (!oldTag.contains('lan-sharer')) {
+                      newTags = List.from(currentTags);
+                      newTags[clientTagIndex] = '$oldTag;lan-sharer';
+                    } else {
+                      newTags = currentTags;
+                    }
+                  } else {
+                    newTags = currentTags;
+                  }
+                }
+
+                if (newTags != currentTags) {
+                  await appProvider.apiService.setTags(widget.node.id, newTags);
+                }
+
+                // 2. Set Routes
+                final List<String> combinedRoutes =
+                    List.from(widget.node.sharedRoutes);
+                if (!combinedRoutes.contains(newSubnet)) {
+                  combinedRoutes.add(newSubnet);
+                }
+
                 await appProvider.apiService
                     .setNodeRoutes(widget.node.id, combinedRoutes);
-                showSafeSnackBar(
-                    context,
-                    isFr
-                        ? 'Route de sous-réseau activée.'
-                        : 'Subnet route enabled.');
-                widget.onSubnetShared(); // Appelle le callback pour rafraîchir
 
-                // Fermer la boîte de dialogue de saisie du sous-réseau
+                // 3. Update ACLs if in ACL Mode
+                bool aclMode = true;
+                try {
+                  await appProvider.apiService.getAclPolicy();
+                } catch (e) {
+                  aclMode = false;
+                }
+
+                if (aclMode) {
+                  if (context.mounted) {
+                    showSafeSnackBar(context,
+                        isFr ? 'Mise à jour des ACLs...' : 'Updating ACLs...');
+                  }
+                  // Regenerate Policy
+                  final allUsers = await appProvider.apiService.getUsers();
+                  final allNodes = await appProvider.apiService.getNodes();
+                  final serverId = appProvider.activeServer?.id;
+
+                  if (serverId != null) {
+                    final tempRules = await appProvider.storageService
+                        .getTemporaryRules(serverId);
+
+                    Map<String, dynamic> newPolicyMap;
+                    if (useStandardEngine) {
+                      final aclGenerator = StandardAclGeneratorService();
+                      newPolicyMap = aclGenerator.generatePolicy(
+                          users: allUsers,
+                          nodes: allNodes,
+                          temporaryRules: tempRules);
+                    } else {
+                      final aclGenerator = NewAclGeneratorService();
+                      newPolicyMap = aclGenerator.generatePolicy(
+                          users: allUsers,
+                          nodes: allNodes,
+                          temporaryRules: tempRules);
+                    }
+
+                    final newPolicyJson = jsonEncode(newPolicyMap);
+                    await appProvider.apiService.setAclPolicy(newPolicyJson);
+                  }
+                }
+
+                if (context.mounted) {
+                  showSafeSnackBar(
+                      context,
+                      isFr
+                          ? 'Route de sous-réseau activée.'
+                          : 'Subnet route enabled.');
+                }
+                widget.onSubnetShared();
+
+                if (!context.mounted) return;
                 Navigator.of(context).pop();
 
-                // Afficher le dialogue de commande Tailscale pour le sous-réseau.
-                final serverUrl =
-                    appProvider.activeServer?.url;
+                final serverUrl = appProvider.activeServer?.url;
                 final String loginServer = serverUrl?.endsWith('/') == true
                     ? serverUrl!.substring(0, serverUrl.length - 1)
                     : serverUrl ?? '';
 
+                if (!context.mounted) return;
                 showDialog(
                   context: context,
                   builder: (ctx) => SubnetCommandDialog(
@@ -139,8 +229,7 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
                 debugPrint(
                     'Erreur lors de l\'activation de la route de sous-réseau : $e');
                 if (!mounted) return;
-                Navigator.of(context)
-                    .pop(); // Fermer la boîte de dialogue même en cas d'erreur
+                Navigator.of(context).pop();
                 showSafeSnackBar(
                     context,
                     isFr

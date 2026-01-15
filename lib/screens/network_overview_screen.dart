@@ -139,13 +139,6 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
     // Si une autre actualisation a été lancée, on ne commence pas un nouveau traceroute.
     if (_traceRouteGeneration != generation) return;
 
-    // La génération garantit qu'une seule trace est active et pertinente.
-
-    // Log de débogage : Affiche toutes les IPs connues au début de la trace.
-    final allKnownIps = _nodes.expand((node) => node.ipAddresses).toList();
-    print('--- Début du Traceroute (Génération $generation) ---');
-    print('IPs connues: $allKnownIps');
-
     setState(() {
       _isTracingRoute = true;
       // On s'assure de vider les données pour la nouvelle trace.
@@ -188,7 +181,7 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
       }
 
       // Log de débogage : Affiche chaque saut.
-      print('Génération $generation - Saut $ttl: $hopIp');
+      // print('Génération $generation - Saut $ttl: $hopIp');
 
       // N'applique les changements que si la génération est toujours valide.
       if (_traceRouteGeneration == generation && mounted) {
@@ -218,7 +211,7 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
     }
 
     if (mounted && _traceRouteGeneration == generation) {
-      print('--- Fin du Traceroute (Génération $generation) ---');
+      // print('--- Fin du Traceroute (Génération $generation) ---');
       setState(() {
         _isTracingRoute = false;
       });

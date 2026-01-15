@@ -100,7 +100,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           Text(
               '${isFr ? 'Créé le' : 'Created on'}: ${widget.user.createdAt?.toLocal() ?? 'N/A'}',
               style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onPrimary.withOpacity(0.7))),
+                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.7))),
         ],
       ),
     );
@@ -181,6 +181,7 @@ class _NodeCard extends StatelessWidget {
     final isFr = locale.languageCode == 'fr';
     try {
       await action();
+      if (!context.mounted) return;
       showSafeSnackBar(context, successMessage);
       onNodeUpdate();
     } catch (e) {
@@ -207,7 +208,7 @@ class _NodeCard extends StatelessWidget {
     final isFr = locale.languageCode == 'fr';
     final onlineColor = node.online
         ? Colors.green
-        : theme.colorScheme.onPrimary.withOpacity(0.5);
+        : theme.colorScheme.onPrimary.withValues(alpha: 0.5);
     final isExitNode = node.isExitNode;
     final hasSharedRoutes = node.sharedRoutes.isNotEmpty;
 
@@ -241,7 +242,7 @@ class _NodeCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(node.ipAddresses.join('\n'),
                 style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onPrimary.withOpacity(0.7))),
+                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.7))),
             const Spacer(),
             if (isExitNode)
               Row(
@@ -267,8 +268,8 @@ class _NodeCard extends StatelessWidget {
                       child: Text(
                         node.sharedRoutes.join(", "),
                         style: theme.textTheme.bodySmall?.copyWith(
-                            color:
-                                theme.colorScheme.onPrimary.withOpacity(0.7)),
+                            color: theme.colorScheme.onPrimary
+                                .withValues(alpha: 0.7)),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -278,10 +279,10 @@ class _NodeCard extends StatelessWidget {
             const Spacer(),
             Text(isFr ? 'Dernière connexion:' : 'Last seen:',
                 style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onPrimary.withOpacity(0.7))),
+                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.7))),
             Text(node.lastSeen.toLocal().toString(),
                 style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onPrimary.withOpacity(0.7))),
+                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.7))),
           ],
         ),
       ),

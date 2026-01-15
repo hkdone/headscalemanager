@@ -41,6 +41,7 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
     try {
       // 1. Move node to the new user
       await provider.apiService.moveNode(widget.node.id, _selectedUser!);
+      if (!mounted) return;
 
       // 2. Update tags to reflect the new owner
       final List<String> oldTags = List.from(widget.node.tags);
@@ -61,6 +62,7 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
       newTags.add(newClientTag);
 
       await provider.apiService.setTags(widget.node.id, newTags);
+      if (!mounted) return;
 
       // 3. Handle ACLs if necessary
       bool aclMode = true;
@@ -99,6 +101,7 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
           final allNodes = await provider.apiService.getNodes();
           final serverId = provider.activeServer?.id;
           if (serverId == null) {
+            if (!mounted) return;
             showSafeSnackBar(
                 context,
                 isFr
@@ -114,6 +117,7 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
           final newPolicyJson = jsonEncode(newPolicyMap);
           await provider.apiService.setAclPolicy(newPolicyJson);
 
+          if (!mounted) return;
           showSafeSnackBar(
               context, isFr ? 'ACLs mises à jour !' : 'ACLs updated!');
         }
@@ -147,7 +151,7 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
             padding: const EdgeInsets.all(8.0),
             margin: const EdgeInsets.only(bottom: 16.0),
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.1),
+              color: Colors.orange.withValues(alpha: 0.1),
               border: Border.all(color: Colors.orange),
               borderRadius: BorderRadius.circular(8.0),
             ),

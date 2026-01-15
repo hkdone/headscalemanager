@@ -177,6 +177,7 @@ class _ApiKeyCard extends StatelessWidget {
   void _handleMenuSelection(BuildContext context, String value) async {
     final locale = context.read<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
+    final apiService = context.read<AppProvider>().apiService;
 
     switch (value) {
       case 'expire':
@@ -187,10 +188,7 @@ class _ApiKeyCard extends StatelessWidget {
                 ? 'Voulez-vous vraiment faire expirer la clé API avec le préfixe ${apiKey.prefix} ?'
                 : 'Do you really want to expire the API key with prefix ${apiKey.prefix}?');
         if (confirm) {
-          await context
-              .read<AppProvider>()
-              .apiService
-              .expireApiKey(apiKey.prefix);
+          await apiService.expireApiKey(apiKey.prefix);
           onAction();
         }
         break;
@@ -202,10 +200,7 @@ class _ApiKeyCard extends StatelessWidget {
                 ? 'Voulez-vous vraiment supprimer la clé API avec le préfixe ${apiKey.prefix} ?'
                 : 'Do you really want to delete the API key with prefix ${apiKey.prefix}?');
         if (confirm) {
-          await context
-              .read<AppProvider>()
-              .apiService
-              .deleteApiKey(apiKey.prefix);
+          await apiService.deleteApiKey(apiKey.prefix);
           onAction();
         }
         break;

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:headscalemanager/models/acl_puzzle_model.dart';
 
 class AclPuzzleService {
@@ -87,7 +86,7 @@ class AclPuzzleService {
             id: srcStr,
             type: _inferType(srcStr),
             value: srcStr,
-            displayLabel: srcStr,
+            displayLabel: _formatLabel(srcStr),
           ),
         );
         sources.add(match);
@@ -98,7 +97,6 @@ class AclPuzzleService {
       for (var dstItem in dstList) {
         var dstStr = dstItem.toString();
         // Remove port suffix if present (e.g. ":*") for matching
-        // We only support ":*" or exact matches for now in this simple UI
         if (dstStr.endsWith(':*')) {
           dstStr = dstStr.substring(0, dstStr.length - 2);
         }
@@ -109,7 +107,7 @@ class AclPuzzleService {
             id: dstStr,
             type: _inferType(dstStr),
             value: dstStr,
-            displayLabel: dstStr,
+            displayLabel: _formatLabel(dstStr),
           ),
         );
         destinations.add(match);
@@ -128,17 +126,32 @@ class AclPuzzleService {
   PuzzleEntityType _inferType(String value) {
     if (value.startsWith('group:')) return PuzzleEntityType.group;
     if (value.startsWith('tag:')) return PuzzleEntityType.tag;
-    if (value.startsWith('autogroup:internet'))
+    if (value.startsWith('autogroup:internet')) {
       return PuzzleEntityType.internet;
-    if (value.contains('/'))
+    }
+    if (value.contains('/')) {
       return PuzzleEntityType.cidr; // loose check for CIDR
-    // Check if it looks like a host? For now default to host or user?
-    // Actually Headscale users are just strings like "myuser".
-    // We'll guess User if it has no special chars, but it's ambiguous.
-    // Let's default to Host if it's an IP, User otherwise.
-    // Simple heuristic:
-    if (RegExp(r'^\d+\.\d+\.\d+\.\d+$').hasMatch(value))
+    }
+
+    // Heuristic for IPs
+    if (RegExp(r'^\d+\.\d+\.\d+\.\d+$').hasMatch(value)) {
       return PuzzleEntityType.host;
+    }
+
+    // Default to User if no specific prefix is found, assuming it's a bare username
     return PuzzleEntityType.user;
+  }
+
+  String _formatLabel(String value) {
+    if (value.contains(';')) {
+      // Legacy merged tag support (e.g. tag:user-client;exit-node)
+      // We truncate to make it readable, or keep it as is if short
+      return value.replaceAll('tag:', 'Tag: ');
+    }
+    // Standard tag support
+    if (value.startsWith('tag:')) {
+      return value.replaceFirst('tag:', 'Tag: ');
+    }
+    return value;
   }
 }

@@ -8,7 +8,7 @@ class SetupPinScreen extends StatefulWidget {
   const SetupPinScreen({super.key});
 
   @override
-  _SetupPinScreenState createState() => _SetupPinScreenState();
+  State<SetupPinScreen> createState() => _SetupPinScreenState();
 }
 
 class _SetupPinScreenState extends State<SetupPinScreen> {
@@ -60,6 +60,7 @@ class _SetupPinScreenState extends State<SetupPinScreen> {
     } else {
       if (_firstPin == _enteredPin) {
         await _securityService.savePin(_enteredPin);
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isFr
@@ -85,6 +86,7 @@ class _SetupPinScreenState extends State<SetupPinScreen> {
   void _clearPin() async {
     final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
     await _securityService.clearPin();
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(isFr ? 'Code PIN supprimé.' : 'PIN deleted.'),

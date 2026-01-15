@@ -121,6 +121,7 @@ class SubnetCommandDialog extends StatelessWidget {
                 : 'Copy Tailscale Command'),
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: tailscaleCommand));
+              if (!context.mounted) return;
               showSafeSnackBar(
                   context,
                   isFr

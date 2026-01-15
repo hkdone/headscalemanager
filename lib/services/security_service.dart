@@ -54,8 +54,8 @@ class SecurityService {
   Future<bool> canCheckBiometrics() async {
     try {
       return await _localAuth.canCheckBiometrics;
-    } on PlatformException catch (e) {
-      print("Error checking biometrics: $e");
+    } on PlatformException catch (_) {
+      // print("Error checking biometrics: ...");
       return false;
     }
   }
@@ -67,8 +67,8 @@ class SecurityService {
         persistAcrossBackgrounding: true,
         biometricOnly: false,
       );
-    } on PlatformException catch (e) {
-      print("Authentication error: $e");
+    } on PlatformException catch (_) {
+      // print("Authentication error: ...");
       return false;
     }
   }

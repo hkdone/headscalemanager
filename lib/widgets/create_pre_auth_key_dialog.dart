@@ -181,6 +181,7 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
                   expiration: expiration,
                   aclTags: aclTags,
                 );
+                if (!context.mounted) return;
                 Navigator.of(context).pop(key); // Return the created key
               } catch (e) {
                 debugPrint('Erreur lors de la création de la clé : $e');

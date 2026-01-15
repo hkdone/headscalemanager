@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:headscalemanager/services/new_acl_generator_service.dart';
+import 'package:headscalemanager/services/standard_acl_generator_service.dart';
 import 'package:headscalemanager/widgets/shared_routes_access_dialog.dart';
 import 'package:headscalemanager/utils/ip_utils.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
@@ -31,9 +32,11 @@ class _AclScreenState extends State<AclScreen> {
   List<Node> _destinationNodes = [];
   Node? _selectedSourceNode;
   Node? _selectedDestinationNode;
-  final _portController = TextEditingController();
+  final TextEditingController _portController = TextEditingController();
   final List<Map<String, dynamic>> _temporaryRules = [];
+  String _selectedProtocol = 'any'; // 'any', 'tcp', 'udp'
   String? _activeServerId;
+  bool? _lastStandardAclEngineEnabled;
 
   @override
   void initState() {
@@ -45,8 +48,19 @@ class _AclScreenState extends State<AclScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final appProvider = context.watch<AppProvider>();
+    bool shouldReload = false;
+
     if (_activeServerId != appProvider.activeServer?.id) {
       _activeServerId = appProvider.activeServer?.id;
+      shouldReload = true;
+    }
+
+    if (_lastStandardAclEngineEnabled != appProvider.useStandardAclEngine) {
+      _lastStandardAclEngineEnabled = appProvider.useStandardAclEngine;
+      shouldReload = true;
+    }
+
+    if (shouldReload) {
       _loadInitialData();
     }
   }
@@ -239,6 +253,53 @@ class _AclScreenState extends State<AclScreen> {
     );
   }
 
+  Widget _buildRuleItem(Map<String, dynamic> rule, int index) {
+    final src = rule['src'] as String;
+    final dst = rule['dst'] as String;
+    final port = rule['port'] as String?;
+    final proto = rule['proto'] as String? ?? 'any';
+    final portDisplay =
+        (port == null || port.isEmpty || port == '*') ? 'All ports' : port;
+    final protoDisplay = proto.toUpperCase();
+
+    return ListTile(
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.outbound, size: 16, color: Colors.blue),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: Text('Src: $src',
+                      style: const TextStyle(fontWeight: FontWeight.bold))),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.login, size: 16, color: Colors.green),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: Text('Dst: $dst',
+                      style: const TextStyle(fontWeight: FontWeight.bold))),
+            ],
+          ),
+        ],
+      ),
+      subtitle: Text('Port: $portDisplay | Proto: $protoDisplay'),
+      trailing: IconButton(
+        icon: const Icon(Icons.delete, color: Colors.red),
+        onPressed: () {
+          setState(() {
+            _temporaryRules.removeAt(index);
+          });
+          _generateNewAclPolicy(showSnackbar: true); // Regenerate after delete
+        },
+      ),
+    );
+  }
+
   Widget _buildTemporaryRulesSection() {
     final locale = context.watch<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
@@ -269,7 +330,6 @@ class _AclScreenState extends State<AclScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  flex: 2,
                   child: _buildNodeDropdown(
                     'Source (Node)',
                     _selectedSourceNode,
@@ -291,7 +351,6 @@ class _AclScreenState extends State<AclScreen> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  flex: 2,
                   child: _buildNodeDropdown(
                     'Destination (Node)',
                     _selectedDestinationNode,
@@ -299,13 +358,44 @@ class _AclScreenState extends State<AclScreen> {
                     (node) => setState(() => _selectedDestinationNode = node),
                   ),
                 ),
-                const SizedBox(width: 10),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
                 Expanded(
-                  flex: 1,
                   child: TextField(
                     controller: _portController,
+                    decoration: InputDecoration(
+                      labelText: isFr ? 'Port (Optionnel)' : 'Port (Optional)',
+                      hintText: 'ex: 80, 443',
+                      border: const OutlineInputBorder(),
+                    ),
                     keyboardType: TextInputType.number,
-                    decoration: _buildInputDecoration('Port', 'ex: 443'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _selectedProtocol,
+                    decoration: InputDecoration(
+                      labelText: isFr ? 'Protocole' : 'Protocol',
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: [
+                      DropdownMenuItem(
+                          value: 'any',
+                          child: Text(isFr ? 'Tous (Any)' : 'Any')),
+                      const DropdownMenuItem(value: 'tcp', child: Text('TCP')),
+                      const DropdownMenuItem(value: 'udp', child: Text('UDP')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _selectedProtocol = val;
+                        });
+                      }
+                    },
                   ),
                 ),
               ],
@@ -335,56 +425,25 @@ class _AclScreenState extends State<AclScreen> {
                       color: Theme.of(context)
                           .colorScheme
                           .onSurface
-                          .withOpacity(0.6)),
+                          .withValues(alpha: 0.6)),
                   tooltip:
                       isFr ? 'Effacer toutes les règles' : 'Clear All Rules',
                   onPressed: _clearTemporaryRules,
                 )
               ],
             ),
-            Wrap(
-              spacing: 8.0,
-              runSpacing: 4.0,
-              children: _temporaryRules.asMap().entries.map((entry) {
-                int idx = entry.key;
-                Map<String, dynamic> rule = entry.value;
-                final src = rule['src'] as String;
-                final dst = rule['dst'] as String;
-                final port = rule['port'] as String?;
-
-                final srcNodeName = _getNodeNameFromIpOrSubnet(src);
-                final dstNodeName = _getNodeNameFromIpOrSubnet(dst);
-
-                final label =
-                    '$srcNodeName -> $dstNodeName:${port != null && port.isNotEmpty ? port : '*'}';
-
-                return Chip(
-                  label: Text(label, overflow: TextOverflow.ellipsis),
-                  onDeleted: () => _removeTemporaryRule(idx),
-                  backgroundColor:
-                      Theme.of(context).colorScheme.primary.withAlpha(25),
-                  deleteIconColor: Theme.of(context).colorScheme.primary,
-                  labelStyle:
-                      TextStyle(color: Theme.of(context).colorScheme.primary),
-                );
-              }).toList(),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _temporaryRules.length,
+              itemBuilder: (context, index) {
+                return _buildRuleItem(_temporaryRules[index], index);
+              },
             ),
           ],
         ),
       ),
     );
-  }
-
-  String _getNodeNameFromIpOrSubnet(String ipOrSubnet) {
-    try {
-      return _allNodes
-          .firstWhere((node) =>
-              node.ipAddresses.contains(ipOrSubnet) ||
-              node.sharedRoutes.contains(ipOrSubnet))
-          .name;
-    } catch (e) {
-      return ipOrSubnet;
-    }
   }
 
   DropdownButtonFormField<Node> _buildNodeDropdown(String label,
@@ -421,12 +480,52 @@ class _AclScreenState extends State<AclScreen> {
     );
   }
 
+  String? _getMatchingSourceIp(Node sourceNode, String destinationIp) {
+    try {
+      // Determine destination type (IPv4 or IPv6)
+      // Check if it's a CIDR or plain IP
+      final cleanDest = destinationIp.split('/')[0];
+      final destAddress = InternetAddress(cleanDest);
+      final isDestIPv6 = destAddress.type == InternetAddressType.IPv6;
+
+      // Find matching source
+      return sourceNode.ipAddresses.firstWhere((ip) {
+        // Remove CIDR if present (shouldn't be for source IPs usually but safe to check)
+        final cleanIp = ip.split('/')[0];
+        try {
+          final address = InternetAddress(cleanIp);
+          return (address.type == InternetAddressType.IPv6) == isDestIPv6;
+        } catch (_) {
+          return false;
+        }
+      }, orElse: () => '');
+    } catch (_) {
+      // Fallback: if destination is invalid or parsing fails, return first IP (legacy behavior) or null?
+      // Let's assume default behavior if check fails
+      return sourceNode.ipAddresses.isNotEmpty
+          ? sourceNode.ipAddresses.first
+          : null;
+    }
+  }
+
+  void _showIpMismatchError(BuildContext context, bool isFr, String dest) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+            isFr
+                ? 'Impossible de trouver une IP source compatible (IPv4/IPv6) pour la destination: $dest'
+                : 'Could not find a compatible source IP (IPv4/IPv6) for destination: $dest',
+            style: TextStyle(color: Theme.of(context).colorScheme.onError)),
+        backgroundColor: Theme.of(context).colorScheme.error));
+  }
+
   bool _ruleExists(Map<String, dynamic> newRule) {
     return _temporaryRules.any((rule) {
       final bool srcMatch = rule['src'] == newRule['src'];
       final bool dstMatch = rule['dst'] == newRule['dst'];
       final bool portMatch = (rule['port'] ?? '') == (newRule['port'] ?? '');
-      return srcMatch && dstMatch && portMatch;
+      final bool protoMatch =
+          (rule['proto'] ?? 'any') == (newRule['proto'] ?? 'any');
+      return srcMatch && dstMatch && portMatch && protoMatch;
     });
   }
 
@@ -456,7 +555,7 @@ class _AclScreenState extends State<AclScreen> {
           backgroundColor: Theme.of(context).colorScheme.error));
       return;
     }
-    final sourceIp = _selectedSourceNode!.ipAddresses.first;
+    // final sourceIp = _selectedSourceNode!.ipAddresses.first; // REMOVED
 
     List<Map<String, dynamic>> newRulesToAdd = [];
 
@@ -473,6 +572,8 @@ class _AclScreenState extends State<AclScreen> {
         ),
       );
 
+      if (!mounted) return;
+
       // Debug: Afficher le résultat reçu du dialogue
       debugPrint('DEBUG: Résultat reçu du dialogue: $result');
 
@@ -488,66 +589,103 @@ class _AclScreenState extends State<AclScreen> {
         // Debug: Afficher le choix et les règles extraites
         debugPrint('DEBUG: Choix extrait: $choice');
         debugPrint('DEBUG: Règles extraites: $rules');
-      } catch (e) {
-        debugPrint('DEBUG: Erreur lors de l\'extraction du choix/règles: $e');
-        debugPrint(
-            'DEBUG: Type de result[\'choice\']: ${result['choice'].runtimeType}');
-        return;
-      }
 
-      final choice = result['choice'] as RouteAccessChoice;
-      final rules = result['rules'] as Map<String, dynamic>;
+        if (choice == RouteAccessChoice.none) {
+          // Fallback: add rule for the node itself if subnet access is denied
+          if (_selectedDestinationNode!.ipAddresses.isNotEmpty) {
+            String? fallbackDest;
+            String? fallbackSrc;
 
-      if (choice == RouteAccessChoice.none) {
-        // Fallback: add rule for the node itself if subnet access is denied
-        if (_selectedDestinationNode!.ipAddresses.isNotEmpty) {
-          final destinationIp = _selectedDestinationNode!.ipAddresses.first;
-          final port = _portController.text.trim();
-          newRulesToAdd.add({
-            'src': sourceIp,
-            'dst': destinationIp,
-            'port': port.isEmpty ? '*' : port,
-          });
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(isFr
-                ? 'Accès au sous-réseau non configuré et le nœud n\'a pas d\'IP pour une règle de base.'
-                : 'Subnet access not configured and the node has no IP for a fallback rule.'),
-          ));
-          return;
-        }
-      } else if (choice == RouteAccessChoice.full) {
-        for (var route in sharedLanRoutes) {
-          newRulesToAdd.add({
-            'src': sourceIp,
-            'dst': route,
-            'port': '*',
-          });
-        }
-      } else if (choice == RouteAccessChoice.custom) {
-        rules.forEach((route, ruleDetails) {
-          final startIp = (ruleDetails['startIp'] as String).trim();
-          final endIp = (ruleDetails['endIp'] as String).trim();
-          final ports = (ruleDetails['ports'] as String).trim();
+            // Try to find a pair that works
+            // check destination IPs
+            for (var destIp in _selectedDestinationNode!.ipAddresses) {
+              final src = _getMatchingSourceIp(_selectedSourceNode!, destIp);
+              if (src != null && src.isNotEmpty) {
+                fallbackDest = destIp;
+                fallbackSrc = src;
+                break;
+              }
+            }
 
-          if (startIp.isEmpty) return;
-
-          String dst;
-          if (endIp.isNotEmpty) {
-            final range = IpUtils.generateIpRange(startIp, endIp);
-            dst = range.join(',');
+            if (fallbackDest != null && fallbackSrc != null) {
+              final port = _portController.text.trim();
+              newRulesToAdd.add({
+                'src': fallbackSrc,
+                'dst': fallbackDest,
+                'port': port.isEmpty ? '*' : port,
+                'proto': _selectedProtocol,
+              });
+            } else {
+              _showIpMismatchError(context, isFr, "Fallback IP");
+              return;
+            }
           } else {
-            dst = startIp;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(isFr
+                  ? 'Accès au sous-réseau non configuré et le nœud n\'a pas d\'IP pour une règle de base.'
+                  : 'Subnet access not configured and the node has no IP for a fallback rule.'),
+            ));
+            return;
           }
-
-          if (dst.isNotEmpty) {
+        } else if (choice == RouteAccessChoice.full) {
+          for (var route in sharedLanRoutes) {
+            final src = _getMatchingSourceIp(_selectedSourceNode!, route);
+            if (src == null || src.isEmpty) {
+              _showIpMismatchError(context, isFr, route);
+              return;
+            }
             newRulesToAdd.add({
-              'src': sourceIp,
-              'dst': dst,
-              'port': ports.isEmpty ? '*' : ports,
+              'src': src,
+              'dst': route,
+              'port': '*',
+              'proto': _selectedProtocol,
             });
           }
-        });
+        } else if (choice == RouteAccessChoice.custom) {
+          // rules.forEach loop logic
+          for (var entry in rules.entries) {
+            final ruleDetails = entry.value;
+            final startIp = (ruleDetails['startIp'] as String).trim();
+            final endIp = (ruleDetails['endIp'] as String).trim();
+            final ports = (ruleDetails['ports'] as String).trim();
+
+            if (startIp.isEmpty) continue;
+
+            String dst;
+            if (endIp.isNotEmpty) {
+              // Range logic - assume range is same IP version as startIp
+              // Note: Generating full list of IPs might be heavy if range is huge.
+              // Logic assumes startIp and endIp are safe.
+              final range = IpUtils.generateIpRange(startIp, endIp);
+              dst = range.join(',');
+            } else {
+              dst = startIp;
+            }
+
+            if (dst.isNotEmpty) {
+              // Note: if dst is comma separated list, check first one for version?
+              // Or check each?
+              // The generateIpRange ensures same type.
+              final firstDest = dst.split(',').first;
+              final src = _getMatchingSourceIp(_selectedSourceNode!, firstDest);
+
+              if (src == null || src.isEmpty) {
+                _showIpMismatchError(context, isFr, firstDest);
+                return;
+              }
+
+              newRulesToAdd.add({
+                'src': src,
+                'dst': dst,
+                'port': ports.isEmpty ? '*' : ports,
+                'proto': _selectedProtocol,
+              });
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('DEBUG: Erreur lors de l\'extraction du choix/règles: $e');
+        return;
       }
     } else {
       if (_selectedDestinationNode!.ipAddresses.isEmpty) {
@@ -560,25 +698,63 @@ class _AclScreenState extends State<AclScreen> {
             backgroundColor: Theme.of(context).colorScheme.error));
         return;
       }
-      final destinationIp = _selectedDestinationNode!.ipAddresses.first;
 
-      if (sourceIp == destinationIp) {
+      // Single node destination (no shared routes)
+      // Try to match IPs
+      String? validDest;
+      String? validSrc;
+
+      // Prefer IPv4 if available? Or depend on what dest has.
+      // Strategy: Try IPv4 match first, then IPv6? Or just first available pair?
+      // Let's iterate dest IPs.
+      for (var destIp in _selectedDestinationNode!.ipAddresses) {
+        final src = _getMatchingSourceIp(_selectedSourceNode!, destIp);
+        if (src != null && src.isNotEmpty) {
+          validDest = destIp;
+          validSrc = src;
+          // Stop if found?
+          // If User wants specifically IPv6, he might be disappointed if we pick IPv4.
+          // But here we are selecting a Node, so any connectivity is good?
+          // But wait, the previous logic just picked first IP (IPv4 usually).
+          // If we find IPv4 pair, good. If not, IPv6 pair.
+          // Let's prioritize IPv4 to match legacy behavior if possible.
+          final cleanDest = destIp.split('/')[0];
+          if (InternetAddress(cleanDest).type == InternetAddressType.IPv4) {
+            break; // Found IPv4 pair, awesome.
+          }
+        }
+      }
+
+      if (validDest != null && validSrc != null) {
+        if (validSrc == validDest) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(
+                  isFr
+                      ? 'Les nœuds source et destination ne peuvent pas être identiques.'
+                      : 'Source and destination nodes cannot be the same.',
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onError)),
+              backgroundColor: Theme.of(context).colorScheme.error));
+          return;
+        }
+
+        final port = _portController.text.trim();
+        newRulesToAdd.add({
+          'src': validSrc,
+          'dst': validDest,
+          'port': port,
+          'proto': _selectedProtocol,
+        });
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(
                 isFr
-                    ? 'Les nœuds source et destination ne peuvent pas être identiques.'
-                    : 'Source and destination nodes cannot be the same.',
+                    ? 'Impossible de trouver une paire d\'adresses IP compatibles (IPv4/IPv6) entre la source et la destination.'
+                    : 'Could not find a compatible IP pair (IPv4/IPv6) between source and destination.',
                 style: TextStyle(color: Theme.of(context).colorScheme.onError)),
             backgroundColor: Theme.of(context).colorScheme.error));
         return;
       }
-
-      final port = _portController.text.trim();
-      newRulesToAdd.add({
-        'src': sourceIp,
-        'dst': destinationIp,
-        'port': port,
-      });
     }
 
     int addedCount = 0;
@@ -642,11 +818,20 @@ class _AclScreenState extends State<AclScreen> {
           _allNodes.isNotEmpty ? _allNodes : await apiService.getNodes();
       if (_allNodes.isEmpty) _allNodes = nodes;
 
-      _currentAclPolicy = _newAclGeneratorService.generatePolicy(
-        users: users,
-        nodes: nodes,
-        temporaryRules: _temporaryRules,
-      );
+      if (appProvider.useStandardAclEngine) {
+        final standardAclGeneratorService = StandardAclGeneratorService();
+        _currentAclPolicy = standardAclGeneratorService.generatePolicy(
+          users: users,
+          nodes: nodes,
+          temporaryRules: _temporaryRules,
+        );
+      } else {
+        _currentAclPolicy = _newAclGeneratorService.generatePolicy(
+          users: users,
+          nodes: nodes,
+          temporaryRules: _temporaryRules,
+        );
+      }
 
       _updateAclControllerText();
 
@@ -675,7 +860,7 @@ class _AclScreenState extends State<AclScreen> {
                         color: Theme.of(context)
                             .colorScheme
                             .onPrimary
-                            .withOpacity(0.7),
+                            .withValues(alpha: 0.7),
                         fontSize: 12)),
               ],
             ),
@@ -703,49 +888,6 @@ class _AclScreenState extends State<AclScreen> {
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  Future<void> _removeTemporaryRule(int index) async {
-    if (!mounted) return;
-    final locale = context.read<AppProvider>().locale;
-    final isFr = locale.languageCode == 'fr';
-
-    final bool confirm = await showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(isFr ? 'Confirmer la suppression' : 'Confirm Deletion'),
-            content: Text(isFr
-                ? 'Cela va supprimer la règle et appliquer immédiatement la nouvelle politique au serveur. Continuer ?'
-                : 'This will delete the rule and immediately apply the new policy to the server. Continue?'),
-            actions: [
-              TextButton(
-                  child: Text(isFr ? 'Annuler' : 'Cancel'),
-                  onPressed: () => Navigator.of(ctx).pop(false)),
-              TextButton(
-                  child: Text(isFr ? 'Confirmer' : 'Confirm',
-                      style: const TextStyle(color: Colors.red)),
-                  onPressed: () => Navigator.of(ctx).pop(true)),
-            ],
-          ),
-        ) ??
-        false;
-
-    if (!confirm || !mounted) return;
-
-    setState(() {
-      _temporaryRules.removeAt(index);
-    });
-
-    final appProvider = context.read<AppProvider>();
-    final storage = appProvider.storageService;
-    final serverId = appProvider.activeServer?.id;
-    if (serverId != null) {
-      await storage.saveTemporaryRules(serverId, _temporaryRules);
-    }
-    await _generateAndExportPolicy(
-        message: isFr
-            ? 'Règle supprimée et politique mise à jour.'
-            : 'Rule deleted and policy updated.');
   }
 
   Future<void> _clearTemporaryRules() async {
@@ -833,6 +975,8 @@ class _AclScreenState extends State<AclScreen> {
           false;
 
       if (!confirm) return;
+
+      if (!mounted) return;
     }
 
     setState(() => _isLoading = true);
@@ -943,8 +1087,12 @@ class _AclScreenState extends State<AclScreen> {
       final file = File('${directory.path}/acl.json');
       await file.writeAsString(aclJsonString);
 
-      await Share.shareXFiles([XFile(file.path)],
-          text: 'Voici votre politique ACL Headscale.');
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text: 'Voici votre politique ACL Headscale.',
+        ),
+      );
     } catch (e) {
       debugPrint('Erreur lors du partage du fichier ACL : $e');
       if (mounted) {

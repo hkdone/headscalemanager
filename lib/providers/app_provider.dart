@@ -23,6 +23,7 @@ class AppProvider extends ChangeNotifier {
     await _storageService.init();
     await _loadLocale();
     await _loadServers();
+    await _loadAclEnginePreference();
     await NotificationService.initialize();
     _initializationCompleter.complete();
   }
@@ -134,6 +135,20 @@ class AppProvider extends ChangeNotifier {
       apiKey: _activeServer!.apiKey,
       baseUrl: _activeServer!.url,
     );
+    notifyListeners();
+  }
+
+  bool _useStandardAclEngine = false;
+  bool get useStandardAclEngine => _useStandardAclEngine;
+
+  Future<void> _loadAclEnginePreference() async {
+    _useStandardAclEngine = await _storageService.getStandardAclEngineEnabled();
+    notifyListeners();
+  }
+
+  Future<void> setStandardAclEngineEnabled(bool enabled) async {
+    _useStandardAclEngine = enabled;
+    await _storageService.setStandardAclEngineEnabled(enabled);
     notifyListeners();
   }
 }

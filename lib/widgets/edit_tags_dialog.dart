@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/new_acl_generator_service.dart';
+import 'package:headscalemanager/services/standard_acl_generator_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
 
@@ -26,10 +27,18 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
   @override
   void initState() {
     super.initState();
-    _currentTags = _consolidateTags(List.from(widget.node.tags));
+    // In legacy mode, we consolidate tags on load to present them cleanly.
+    // In standard mode, we treat tags as they are.
+    final useStandardEngine = context.read<AppProvider>().useStandardAclEngine;
+    if (useStandardEngine) {
+      _currentTags = List.from(widget.node.tags);
+    } else {
+      _currentTags = _consolidateTags(List.from(widget.node.tags));
+    }
   }
 
   List<String> _consolidateTags(List<String> tags) {
+    // Only used in Legacy Mode
     final clientTagIndex = tags.indexWhere((t) => t.contains('-client'));
 
     if (clientTagIndex == -1) {
@@ -73,46 +82,78 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
   }
 
   String get baseTag {
+    // Finds the "main" user tag, e.g. tag:bob-client
     return _currentTags
-        .firstWhere((t) => t.contains('-client'), orElse: () => '')
+        .firstWhere((t) => t.contains('-client') && !t.contains(';'),
+            orElse: () => _currentTags.firstWhere((t) => t.contains('-client'),
+                orElse: () => ''))
+        .split(';')
+        .first // In case of legacy tag, take the first part
         .replaceFirst('tag:', '');
   }
 
   bool hasCapabilityTag(String capability) {
-    return baseTag.split(';').contains(capability);
+    final useStandardEngine = context.read<AppProvider>().useStandardAclEngine;
+    if (useStandardEngine) {
+      // Check for explicit tag:user-capability
+      final userBase = baseTag.replaceAll('-client', ''); // e.g. 'bob'
+      return _currentTags.contains('tag:$userBase-$capability');
+    } else {
+      // Legacy check inside fused tag
+      final clientTag = _currentTags.firstWhere((t) => t.contains('-client'),
+          orElse: () => '');
+      return clientTag.split(';').contains(capability);
+    }
   }
 
   void _updateCapability(String capability, {required bool add}) {
+    final useStandardEngine = context.read<AppProvider>().useStandardAclEngine;
+
     setState(() {
-      final clientTagIndex =
-          _currentTags.indexWhere((t) => t.contains('-client'));
-      if (clientTagIndex == -1) return;
+      if (useStandardEngine) {
+        // STANDARD MODE: Add/Remove separate tags
+        final userBase = baseTag.replaceAll('-client', '');
+        final capabilityTag = 'tag:$userBase-$capability'.toLowerCase();
 
-      final oldClientTag = _currentTags[clientTagIndex];
-      final parts = oldClientTag
-          .replaceFirst('tag:', '')
-          .split(';')
-          .where((p) => p.isNotEmpty)
-          .toSet();
-
-      if (add) {
-        parts.add(capability);
+        if (add) {
+          if (!_currentTags.contains(capabilityTag)) {
+            _currentTags.add(capabilityTag);
+          }
+        } else {
+          _currentTags.remove(capabilityTag);
+        }
       } else {
-        parts.remove(capability);
+        // LEGACY MODE: Merge into semicolon tag
+        final clientTagIndex =
+            _currentTags.indexWhere((t) => t.contains('-client'));
+        if (clientTagIndex == -1) return;
+
+        final oldClientTag = _currentTags[clientTagIndex];
+        final parts = oldClientTag
+            .replaceFirst('tag:', '')
+            .split(';')
+            .where((p) => p.isNotEmpty)
+            .toSet();
+
+        if (add) {
+          parts.add(capability.toLowerCase());
+        } else {
+          parts.remove(capability.toLowerCase());
+        }
+
+        final clientPart =
+            parts.firstWhere((p) => p.contains('-client'), orElse: () => '');
+        if (clientPart.isEmpty) return;
+
+        final otherParts = parts.where((p) => p != clientPart).toList()..sort();
+
+        final newClientTagBuilder = StringBuffer('tag:$clientPart');
+        if (otherParts.isNotEmpty) {
+          newClientTagBuilder.write(';${otherParts.join(';')}');
+        }
+
+        _currentTags[clientTagIndex] = newClientTagBuilder.toString();
       }
-
-      final clientPart =
-          parts.firstWhere((p) => p.contains('-client'), orElse: () => '');
-      if (clientPart.isEmpty) return;
-
-      final otherParts = parts.where((p) => p != clientPart).toList()..sort();
-
-      final newClientTagBuilder = StringBuffer('tag:$clientPart');
-      if (otherParts.isNotEmpty) {
-        newClientTagBuilder.write(';${otherParts.join(';')}');
-      }
-
-      _currentTags[clientTagIndex] = newClientTagBuilder.toString();
     });
   }
 
@@ -131,6 +172,7 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
     try {
       // Save tags first
       await apiService.setTags(widget.node.id, _currentTags);
+      if (!mounted) return;
       showSafeSnackBar(context, isFr ? 'Tags mis à jour.' : 'Tags updated.');
 
       // Check for ACL mode
@@ -171,6 +213,7 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
           final allNodes = await apiService.getNodes();
           final serverId = appProvider.activeServer?.id;
           if (serverId == null) {
+            if (!mounted) return;
             showSafeSnackBar(
                 context,
                 isFr
@@ -180,12 +223,24 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
           }
           final tempRules =
               await appProvider.storageService.getTemporaryRules(serverId);
-          final aclGenerator = NewAclGeneratorService();
-          final newPolicyMap = aclGenerator.generatePolicy(
-              users: allUsers, nodes: allNodes, temporaryRules: tempRules);
+
+          Map<String, dynamic> newPolicyMap;
+          if (appProvider.useStandardAclEngine) {
+            // Use New Standard Engine
+            final aclGenerator = StandardAclGeneratorService();
+            newPolicyMap = aclGenerator.generatePolicy(
+                users: allUsers, nodes: allNodes, temporaryRules: tempRules);
+          } else {
+            // Use Legacy Engine
+            final aclGenerator = NewAclGeneratorService();
+            newPolicyMap = aclGenerator.generatePolicy(
+                users: allUsers, nodes: allNodes, temporaryRules: tempRules);
+          }
+
           final newPolicyJson = jsonEncode(newPolicyMap);
           await apiService.setAclPolicy(newPolicyJson);
 
+          if (!mounted) return;
           showSafeSnackBar(
               context, isFr ? 'ACLs mises à jour !' : 'ACLs updated!');
         }
@@ -193,8 +248,11 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
 
       // Final actions
       widget.onTagsUpdated();
-      Navigator.of(context).pop();
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
+      if (!mounted) return;
       showSafeSnackBar(context, isFr ? 'Échec: $e' : 'Failed: $e');
     }
   }
@@ -218,7 +276,7 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
               padding: const EdgeInsets.all(8.0),
               margin: const EdgeInsets.only(bottom: 16.0),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 border: Border.all(color: Colors.blue),
                 borderRadius: BorderRadius.circular(8.0),
               ),

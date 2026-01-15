@@ -44,6 +44,7 @@ class DeleteUserDialog extends StatelessWidget {
           onPressed: () async {
             try {
               await provider.apiService.deleteUser(user.id);
+              if (!context.mounted) return;
               Navigator.of(context).pop(); // Ferme le dialogue de confirmation
               onUserDeleted(); // Appelle le callback pour rafraîchir la liste
               showSafeSnackBar(

@@ -565,7 +565,8 @@ routes:
         ),
         subtitle: Text(
           'Find useful Tailscale CLI commands.',
-          style: TextStyle(color: theme.colorScheme.onPrimary.withOpacity(0.8)),
+          style: TextStyle(
+              color: theme.colorScheme.onPrimary.withValues(alpha: 0.8)),
         ),
         trailing:
             Icon(Icons.arrow_forward_ios, color: theme.colorScheme.onPrimary),
@@ -619,6 +620,7 @@ routes:
                     color: Theme.of(context).colorScheme.primary),
                 onPressed: () async {
                   await Clipboard.setData(const ClipboardData(text: githubUrl));
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                         content: Text('GitHub link copied!',

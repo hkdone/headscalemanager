@@ -333,55 +333,60 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
       child: Column(
         children: [
           // Visual Part
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              children: [
-                // Sources
-                Expanded(
-                  flex: 3,
-                  child: Column(
-                    children: widget.rule.sources
-                        .map((e) => Chip(
-                              label: Text(e.displayLabel,
-                                  style: const TextStyle(fontSize: 10)),
-                              visualDensity: VisualDensity.compact,
-                              avatar: Icon(_getIconForType(e.type), size: 14),
-                            ))
-                        .toList(),
-                  ),
-                ),
-                // Arrow / Action
-                Expanded(
-                    flex: 1,
+          InkWell(
+            onTap: () => _showDetailsDialog(context, isFr),
+            borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                children: [
+                  // Sources
+                  Expanded(
+                    flex: 3,
                     child: Column(
-                      children: [
-                        Icon(Icons.arrow_forward, color: Colors.green),
-                        Text(isFr ? 'AUTOR.' : 'ALLOW',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green))
-                      ],
-                    )),
-                // Destinations
-                Expanded(
-                  flex: 3,
-                  child: Column(
-                    children: widget.rule.destinations
-                        .map((e) => Chip(
-                              label: Text(e.displayLabel,
-                                  style: const TextStyle(fontSize: 10)),
-                              visualDensity: VisualDensity.compact,
-                              avatar: Icon(_getIconForType(e.type), size: 14),
-                            ))
-                        .toList(),
+                      children: widget.rule.sources
+                          .map((e) => Chip(
+                                label: Text(e.displayLabel,
+                                    style: const TextStyle(fontSize: 10)),
+                                visualDensity: VisualDensity.compact,
+                                avatar: Icon(_getIconForType(e.type), size: 14),
+                              ))
+                          .toList(),
+                    ),
                   ),
-                ),
-                IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.grey),
-                    onPressed: widget.onDelete)
-              ],
+                  // Arrow / Action
+                  Expanded(
+                      flex: 1,
+                      child: Column(
+                        children: [
+                          const Icon(Icons.arrow_forward, color: Colors.green),
+                          Text(isFr ? 'AUTOR.' : 'ALLOW',
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green))
+                        ],
+                      )),
+                  // Destinations
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      children: widget.rule.destinations
+                          .map((e) => Chip(
+                                label: Text(e.displayLabel,
+                                    style: const TextStyle(fontSize: 10)),
+                                visualDensity: VisualDensity.compact,
+                                avatar: Icon(_getIconForType(e.type), size: 14),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                  IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.grey),
+                      onPressed: widget.onDelete)
+                ],
+              ),
             ),
           ),
 
@@ -395,7 +400,7 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+              color: theme.colorScheme.surfaceContainerHighest.withAlpha(77),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -449,6 +454,68 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
       case PuzzleEntityType.internet:
         return Icons.public;
     }
+  }
+
+  void _showDetailsDialog(BuildContext context, bool isFr) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isFr ? 'Détails de la règle' : 'Rule Details'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDetailSection(ctx, isFr ? 'SOURCES' : 'SOURCES',
+                  widget.rule.sources, Colors.blue),
+              const Divider(),
+              Center(
+                child: Chip(
+                  label: Text(isFr ? 'ACTION: AUTORISER' : 'ACTION: ALLOW',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  backgroundColor: Colors.green.withAlpha(51),
+                  avatar: const Icon(Icons.check_circle, color: Colors.green),
+                ),
+              ),
+              const Divider(),
+              _buildDetailSection(ctx, isFr ? 'DESTINATIONS' : 'DESTINATIONS',
+                  widget.rule.destinations, Colors.orange),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Fermer'),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailSection(BuildContext context, String title,
+      List<PuzzleEntity> entities, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title,
+            style: TextStyle(
+                fontWeight: FontWeight.bold, color: color, fontSize: 16)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8.0,
+          runSpacing: 4.0,
+          children: entities
+              .map((e) => Chip(
+                    avatar: Icon(_getIconForType(e.type), size: 16),
+                    label: Text(e.displayLabel),
+                    backgroundColor: color.withAlpha(26),
+                    side: BorderSide(color: color.withAlpha(77)),
+                  ))
+              .toList(),
+        ),
+      ],
+    );
   }
 }
 
@@ -512,11 +579,24 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
                 ElevatedButton(
                   onPressed: () {
                     if (_currentStep == 0) {
-                      if (_selectedSources.isEmpty) return; // TODO show warning
+                      if (_selectedSources.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(isFr
+                                ? 'Veuillez sélectionner au moins une source.'
+                                : 'Please select at least one source.'),
+                            backgroundColor: Colors.orange));
+                        return;
+                      }
                       setState(() => _currentStep++);
                     } else {
-                      if (_selectedDestinations.isEmpty)
-                        return; // TODO show warning
+                      if (_selectedDestinations.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(isFr
+                                ? 'Veuillez sélectionner au moins une destination.'
+                                : 'Please select at least one destination.'),
+                            backgroundColor: Colors.orange));
+                        return;
+                      }
                       widget.onSave(PuzzleRule(
                           sources: List.from(_selectedSources),
                           destinations: List.from(_selectedDestinations)));

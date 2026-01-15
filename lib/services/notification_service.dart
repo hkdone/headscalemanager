@@ -42,7 +42,7 @@ Map<String, String> _getTranslations(String lang, String nodeName,
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     if (task == backgroundTaskName) {
-      print("Background task started: Checking node statuses...");
+      // print("Background task started: Checking node statuses...");
       await NotificationService.showPersistentNotification(
         'Vérification en cours',
         'Analyse des changements réseau...',
@@ -55,7 +55,7 @@ void callbackDispatcher() {
         final activeServerId = await storageService.getActiveServerId();
 
         if (servers.isEmpty || activeServerId == null) {
-          print("No active server configured. Exiting background task.");
+          // print("No active server configured. Exiting background task.");
           return Future.value(true);
         }
 
@@ -91,7 +91,7 @@ void callbackDispatcher() {
           if (hasPendingApproval) {
             newApprovalIds.add(node.id);
             if (!approvalNotifiedIds.contains(node.id)) {
-              print("Found new pending node: ${node.name}");
+              // print("Found new pending node: ${node.name}");
               await NotificationService.showNotification(
                 translations['approval_title']!,
                 translations['approval_body']!,
@@ -105,7 +105,7 @@ void callbackDispatcher() {
           if (hasDesync) {
             newCleanupIds.add(node.id);
             if (!cleanupNotifiedIds.contains(node.id)) {
-              print("Found desynchronized node: ${node.name}");
+              // print("Found desynchronized node: ${node.name}");
               await NotificationService.showNotification(
                 translations['cleanup_title']!,
                 translations['cleanup_body']!,
@@ -119,8 +119,7 @@ void callbackDispatcher() {
             final lastKnownStatus = prefs.getBool(lastKnownStatusKey);
 
             if (lastKnownStatus != null && node.online != lastKnownStatus) {
-              print(
-                  "Status change for ${node.name}: now ${node.online ? 'online' : 'offline'}");
+              // print("Status change for ${node.name}: now ${node.online ? 'online' : 'offline'}");
               await NotificationService.showNotification(
                 translations['status_title']!,
                 translations['status_body']!,
@@ -134,9 +133,9 @@ void callbackDispatcher() {
         // Save the new state lists back to storage
         await prefs.setStringList('approvalNotifiedIds', newApprovalIds);
         await prefs.setStringList('cleanupNotifiedIds', newCleanupIds);
-        print("Background task finished.");
+        // print("Background task finished.");
       } catch (e) {
-        print("Error in background task: $e");
+        // print("Error in background task: $e");
         return Future.value(false);
       } finally {
         await NotificationService.hidePersistentNotification();
@@ -182,7 +181,7 @@ class NotificationService {
 
     await Workmanager().initialize(
       callbackDispatcher,
-      isInDebugMode: true,
+      // isInDebugMode: true, // Removed deprecated parameter
     );
   }
 
@@ -196,10 +195,10 @@ class NotificationService {
           networkType: NetworkType.connected,
         ),
       );
-      print("Background task enabled and registered.");
+      // print("Background task enabled and registered.");
     } else {
       await Workmanager().cancelByUniqueName(taskUniqueName);
-      print("Background task cancelled.");
+      // print("Background task cancelled.");
     }
   }
 

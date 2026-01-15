@@ -77,6 +77,7 @@ Future<void> showTailscaleUpCommandDialog(
                                   onPressed: () async {
                                     await Clipboard.setData(
                                         ClipboardData(text: command));
+                                    if (!context.mounted) return;
                                     showSafeSnackBar(
                                         context,
                                         isFr
@@ -89,7 +90,8 @@ Future<void> showTailscaleUpCommandDialog(
                                   icon: const Icon(Icons.share),
                                   label: Text(isFr ? 'Partager' : 'Share'),
                                   onPressed: () {
-                                    Share.share(command);
+                                    SharePlus.instance
+                                        .share(ShareParams(text: command));
                                   },
                                 ),
                               ],
@@ -122,6 +124,7 @@ Future<void> showTailscaleUpCommandDialog(
                                     onPressed: () async {
                                       await Clipboard.setData(
                                           ClipboardData(text: loginServer));
+                                      if (!context.mounted) return;
                                       showSafeSnackBar(
                                           context,
                                           isFr
@@ -133,8 +136,11 @@ Future<void> showTailscaleUpCommandDialog(
                                   ElevatedButton.icon(
                                     icon: const Icon(Icons.share),
                                     label: Text(isFr ? 'Partager' : 'Share'),
-                                    onPressed: () {
-                                      Share.share(loginServer);
+                                    onPressed: () async {
+                                      await SharePlus.instance
+                                          .share(ShareParams(
+                                        text: loginServer,
+                                      ));
                                     },
                                   ),
                                 ],
@@ -242,6 +248,7 @@ Future<void> showHeadscaleRegisterCommandDialog(
                               .read<AppProvider>()
                               .apiService
                               .registerMachine(key, user.name);
+                          if (!context.mounted) return;
                           Navigator.of(dialogContext)
                               .pop(); // Close registration dialog
                           showSafeSnackBar(
@@ -342,6 +349,7 @@ Future<void> _showAddTagsDialog(BuildContext context, Node node) async {
 
                   try {
                     await provider.apiService.setTags(node.id, [baseTag]);
+                    if (!context.mounted) return;
                     Navigator.of(dialogContext).pop();
                     showSafeSnackBar(
                         context,

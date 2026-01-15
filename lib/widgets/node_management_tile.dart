@@ -36,6 +36,7 @@ class NodeManagementTile extends StatelessWidget {
       String successMessage) async {
     try {
       await action();
+      if (!context.mounted) return;
       showSafeSnackBar(context, successMessage);
       onNodeUpdate(); // Rafraîchit la liste des nœuds après l'action.
     } catch (e) {

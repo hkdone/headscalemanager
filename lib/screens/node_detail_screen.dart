@@ -40,6 +40,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   Future<void> _loadMonitoringStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final monitoredNodes = prefs.getStringList('monitoredNodeIds') ?? [];
+    if (!mounted) return;
     setState(() {
       _isMonitoringEnabled = monitoredNodes.contains(_currentNode.id);
     });
@@ -49,7 +50,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     final prefs = await SharedPreferences.getInstance();
     List<String> monitoredNodes = prefs.getStringList('monitoredNodeIds') ?? [];
     String lastKnownStatusKey = 'monitoredNode_${_currentNode.id}_status';
-
+    if (!mounted) return;
     setState(() {
       _isMonitoringEnabled = value;
     });
@@ -163,7 +164,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
               Icon(Icons.circle,
                   color: _currentNode.online
                       ? Colors.green
-                      : theme.colorScheme.onPrimary.withOpacity(0.5),
+                      : theme.colorScheme.onPrimary.withValues(alpha: 0.5),
                   size: 16),
               const SizedBox(width: 8),
               Text(
@@ -173,7 +174,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                   style: theme.textTheme.bodyMedium?.copyWith(
                       color: _currentNode.online
                           ? Colors.green
-                          : theme.colorScheme.onPrimary.withOpacity(0.5),
+                          : theme.colorScheme.onPrimary.withValues(alpha: 0.5),
                       fontWeight: FontWeight.bold)),
               const Spacer(),
               if (widget.node.isExitNode)
@@ -199,7 +200,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           Text(
               '${isFr ? 'Dernière connexion' : 'Last seen'}: ${_currentNode.lastSeen.toLocal()}',
               style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onPrimary.withOpacity(0.7))),
+                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.7))),
         ],
       ),
     );
@@ -219,7 +220,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                 ? 'Recevoir une notification si le nœud se connecte ou se déconnecte.'
                 : 'Receive a notification if the node goes online or offline.',
             style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onPrimary.withOpacity(0.7))),
+                color: theme.colorScheme.onPrimary.withValues(alpha: 0.7))),
         value: _isMonitoringEnabled,
         onChanged: _toggleMonitoring,
         contentPadding: EdgeInsets.zero,
@@ -240,7 +241,8 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                   fontWeight: FontWeight.bold,
                   color: theme.colorScheme.onPrimary)),
           Divider(
-              height: 20, color: theme.colorScheme.onPrimary.withOpacity(0.5)),
+              height: 20,
+              color: theme.colorScheme.onPrimary.withValues(alpha: 0.5)),
           if (_ipv4.isNotEmpty) _DetailRowWithCopy(label: 'IPv4', value: _ipv4),
           if (_ipv6.isNotEmpty) _DetailRowWithCopy(label: 'IPv6', value: _ipv6),
         ],
@@ -261,7 +263,8 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                   fontWeight: FontWeight.bold,
                   color: theme.colorScheme.onPrimary)),
           Divider(
-              height: 20, color: theme.colorScheme.onPrimary.withOpacity(0.5)),
+              height: 20,
+              color: theme.colorScheme.onPrimary.withValues(alpha: 0.5)),
           _DetailRowWithCopy(
               label: isFr ? 'ID Nœud' : 'Node ID', value: _currentNode.id),
           _DetailRowWithCopy(
@@ -294,7 +297,8 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                   fontWeight: FontWeight.bold,
                   color: theme.colorScheme.onPrimary)),
           Divider(
-              height: 20, color: theme.colorScheme.onPrimary.withOpacity(0.5)),
+              height: 20,
+              color: theme.colorScheme.onPrimary.withValues(alpha: 0.5)),
           Text(
               isFr
                   ? 'Cochez les routes que vous souhaitez approuver pour ce nœud.'
@@ -362,7 +366,8 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                   fontWeight: FontWeight.bold,
                   color: theme.colorScheme.onPrimary)),
           Divider(
-              height: 20, color: theme.colorScheme.onPrimary.withOpacity(0.5)),
+              height: 20,
+              color: theme.colorScheme.onPrimary.withValues(alpha: 0.5)),
           Text('Tags:',
               style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -449,17 +454,20 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       }
 
       // Procéder à la sauvegarde si aucun conflit
+      if (!mounted) return;
       showSafeSnackBar(
           context, isFr ? 'Mise à jour des routes...' : 'Updating routes...');
       await apiService.setNodeRoutes(_currentNode.id, _selectedRoutes.toList());
 
       // Régénérer et appliquer les ACLs
+      if (!mounted) return;
       showSafeSnackBar(
           context, isFr ? 'Mise à jour des ACLs...' : 'Updating ACLs...');
       final allUsers = await apiService.getUsers();
       final updatedNodes = await apiService.getNodes(); // Re-fetch nodes
       final serverId = appProvider.activeServer?.id;
       if (serverId == null) {
+        if (!mounted) return;
         showSafeSnackBar(
             context,
             isFr
@@ -528,9 +536,9 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                       onChanged: _toggleContinuousPing,
                       activeThumbColor: theme.colorScheme.onPrimary,
                       inactiveTrackColor:
-                          theme.colorScheme.onPrimary.withOpacity(0.3),
+                          theme.colorScheme.onPrimary.withValues(alpha: 0.3),
                       inactiveThumbColor:
-                          theme.colorScheme.onPrimary.withOpacity(0.7),
+                          theme.colorScheme.onPrimary.withValues(alpha: 0.7),
                     ),
                   ],
                 ),
@@ -590,9 +598,9 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         Container(
           height: 150,
           decoration: BoxDecoration(
-            color: theme.colorScheme.onPrimary.withOpacity(0.1),
-            border:
-                Border.all(color: theme.colorScheme.onPrimary.withOpacity(0.3)),
+            color: theme.colorScheme.onPrimary.withValues(alpha: 0.1),
+            border: Border.all(
+                color: theme.colorScheme.onPrimary.withValues(alpha: 0.3)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: ListView.builder(
@@ -655,10 +663,10 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
               show: true,
               drawVerticalLine: true,
               getDrawingHorizontalLine: (value) => FlLine(
-                  color: theme.colorScheme.onPrimary.withOpacity(0.5),
+                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.5),
                   strokeWidth: 0.1),
               getDrawingVerticalLine: (value) => FlLine(
-                  color: theme.colorScheme.onPrimary.withOpacity(0.5),
+                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.5),
                   strokeWidth: 0.1)),
           titlesData: const FlTitlesData(
             leftTitles: AxisTitles(
@@ -670,7 +678,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           borderData: FlBorderData(
               show: true,
               border: Border.all(
-                  color: theme.colorScheme.onPrimary.withOpacity(0.5),
+                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.5),
                   width: 1)),
           minX: spots.first.x,
           maxX: spots.last.x,
@@ -684,7 +692,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                   show: true,
-                  color: theme.colorScheme.secondary.withOpacity(0.3)),
+                  color: theme.colorScheme.secondary.withValues(alpha: 0.3)),
             ),
           ],
         ),

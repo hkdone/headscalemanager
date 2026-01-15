@@ -9,7 +9,7 @@ class LockScreen extends StatefulWidget {
   const LockScreen({super.key});
 
   @override
-  _LockScreenState createState() => _LockScreenState();
+  State<LockScreen> createState() => _LockScreenState();
 }
 
 class _LockScreenState extends State<LockScreen> {

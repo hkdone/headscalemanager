@@ -36,7 +36,7 @@ class AnimatedEdgePainter extends EdgeRenderer {
       final extractedPath = metric.extractPath(offset, offset + length);
 
       final pulsePaint = Paint()
-        ..color = Colors.white.withOpacity(0.7)
+        ..color = Colors.white.withValues(alpha: 0.7)
         ..strokeWidth = edgePaint.strokeWidth
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round

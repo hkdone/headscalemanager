@@ -200,6 +200,7 @@ class _AddAclRuleDialogState extends State<AddAclRuleDialog> {
             'port': port.isEmpty ? '*' : port,
           });
         } else {
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(isFr
                 ? 'Accès au sous-réseau non configuré et le nœud n\'a pas d\'IP pour une règle de base.'

@@ -141,8 +141,12 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
 
   void _shareCommand(ClientCommand command) {
     final platformCommand = command.getCommandForPlatform(_selectedPlatform);
-    Share.share(platformCommand,
-        subject: 'Tailscale Command: ${command.title}');
+    SharePlus.instance.share(
+      ShareParams(
+        text: platformCommand,
+        subject: 'Tailscale Command: ${command.title}',
+      ),
+    );
   }
 
   void _showParameterDialog(ClientCommand command) {

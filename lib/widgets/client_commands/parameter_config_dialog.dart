@@ -116,8 +116,10 @@ class _ParameterConfigDialogState extends State<ParameterConfigDialog> {
   }
 
   void _shareCommand(String command) {
-    Share.share(command,
-        subject: 'Commande Tailscale: ${widget.command.title}');
+    SharePlus.instance.share(ShareParams(
+      text: command,
+      subject: 'Commande Tailscale: ${widget.command.title}',
+    ));
   }
 
   Widget _buildParameterField(CommandParameter param) {
@@ -227,8 +229,10 @@ class _ParameterConfigDialogState extends State<ParameterConfigDialog> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Column(

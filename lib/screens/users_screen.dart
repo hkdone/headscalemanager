@@ -110,8 +110,8 @@ class _UsersScreenState extends State<UsersScreen> {
               builder: (ctx) => const CreateUserDialog(),
             );
             if (userCreated == true) {
-              _refreshUsers();
-              if (mounted) {
+              if (context.mounted) _refreshUsers();
+              if (context.mounted) {
                 showSafeSnackBar(
                     context,
                     isFr
@@ -178,7 +178,8 @@ class _UserCard extends StatelessWidget {
                   Text(
                     '${isFr ? 'Créé le' : 'Created on'}: ${user.createdAt?.toLocal().toString().substring(0, 10) ?? 'N/A'}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onPrimary.withOpacity(0.7)),
+                        color:
+                            theme.colorScheme.onPrimary.withValues(alpha: 0.7)),
                   ),
                 ],
               ),

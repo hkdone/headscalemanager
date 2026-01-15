@@ -119,4 +119,16 @@ class StorageService {
     }
     return {};
   }
+
+  static const _aclEngineKey = 'ACL_ENGINE_STANDARD_ENABLED';
+
+  Future<void> setStandardAclEngineEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_aclEngineKey, enabled);
+  }
+
+  Future<bool> getStandardAclEngineEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_aclEngineKey) ?? false;
+  }
 }

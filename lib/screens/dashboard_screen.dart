@@ -373,7 +373,7 @@ class _UserNodeCard extends StatelessWidget {
       icons.add(
         Container(
           decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.2),
+            color: Colors.blue.withValues(alpha: 0.2),
             shape: BoxShape.circle,
           ),
           child: IconButton(
@@ -475,19 +475,20 @@ class _UserNodeCard extends StatelessWidget {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: Text(title),
           content: Text(content),
           actions: <Widget>[
             TextButton(
               child: Text(isFr ? 'Non' : 'No'),
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
             ),
             TextButton(
               child: Text(isFr ? 'Oui' : 'Yes'),
               onPressed: () async {
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
+                if (!context.mounted) return;
                 showSafeSnackBar(
                     context, isFr ? 'Traitement en cours...' : 'Processing...');
 
@@ -522,6 +523,7 @@ class _UserNodeCard extends StatelessWidget {
                         await appProvider.apiService.getNodes();
                     final serverId = appProvider.activeServer?.id;
                     if (serverId == null) {
+                      if (!context.mounted) return;
                       showSafeSnackBar(
                           context,
                           isFr
@@ -539,6 +541,7 @@ class _UserNodeCard extends StatelessWidget {
                     final newPolicyJson = jsonEncode(newPolicyMap);
                     await appProvider.apiService.setAclPolicy(newPolicyJson);
 
+                    if (!context.mounted) return;
                     showSafeSnackBar(
                         context,
                         isFr
@@ -548,6 +551,7 @@ class _UserNodeCard extends StatelessWidget {
                     // Simplified logic: Routes only
                     await appProvider.apiService
                         .setNodeRoutes(node.id, routesToApprove);
+                    if (!context.mounted) return;
                     showSafeSnackBar(
                         context,
                         isFr
@@ -555,6 +559,7 @@ class _UserNodeCard extends StatelessWidget {
                             : 'Routes approved (ACLs not managed).');
                   }
                 } catch (e) {
+                  if (!context.mounted) return;
                   showSafeSnackBar(
                       context,
                       isFr
@@ -607,19 +612,20 @@ class _UserNodeCard extends StatelessWidget {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: Text(title),
           content: Text(content),
           actions: <Widget>[
             TextButton(
               child: Text(isFr ? 'Non' : 'No'),
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
             ),
             TextButton(
               child: Text(isFr ? 'Oui, Supprimer' : 'Yes, Delete'),
               onPressed: () async {
-                Navigator.of(context).pop();
+                Navigator.of(dialogContext).pop();
+                if (!context.mounted) return;
                 showSafeSnackBar(
                     context, isFr ? 'Nettoyage en cours...' : 'Cleaning up...');
 
@@ -652,6 +658,7 @@ class _UserNodeCard extends StatelessWidget {
                         await appProvider.apiService.getNodes();
                     final serverId = appProvider.activeServer?.id;
                     if (serverId == null) {
+                      if (!context.mounted) return;
                       showSafeSnackBar(
                           context,
                           isFr
@@ -669,6 +676,7 @@ class _UserNodeCard extends StatelessWidget {
                     final newPolicyJson = jsonEncode(newPolicyMap);
                     await appProvider.apiService.setAclPolicy(newPolicyJson);
 
+                    if (!context.mounted) return;
                     showSafeSnackBar(
                         context,
                         isFr
@@ -678,6 +686,7 @@ class _UserNodeCard extends StatelessWidget {
                     // Simplified logic: Routes only
                     await appProvider.apiService
                         .setNodeRoutes(node.id, remainingRoutes);
+                    if (!context.mounted) return;
                     showSafeSnackBar(
                         context,
                         isFr
@@ -685,6 +694,7 @@ class _UserNodeCard extends StatelessWidget {
                             : 'Route configuration cleaned up (ACLs not managed).');
                   }
                 } catch (e) {
+                  if (!context.mounted) return;
                   showSafeSnackBar(context,
                       isFr ? 'Échec du nettoyage: $e' : 'Cleanup failed: $e');
                 } finally {
