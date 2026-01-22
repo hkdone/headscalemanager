@@ -56,6 +56,11 @@ class AppProvider extends ChangeNotifier {
     }
 
     await NotificationService.initialize();
+
+    if (_activeServer != null) {
+      _detectServerVersion(); // Détection asynchrone au démarrage
+    }
+
     _initializationCompleter.complete();
   }
 
@@ -73,6 +78,7 @@ class AppProvider extends ChangeNotifier {
   Locale get locale => _locale;
   List<Server> get servers => _servers;
   Server? get activeServer => _activeServer;
+  String get serverVersion => _activeServer?.version ?? '0.25.0';
 
   Future<void> _loadLocale() async {
     final languageCode = await _storageService.getLanguage();
@@ -167,6 +173,29 @@ class AppProvider extends ChangeNotifier {
       baseUrl: _activeServer!.url,
     );
     notifyListeners();
+    _detectServerVersion(); // Détecter la version après le changement
+  }
+
+  Future<void> _detectServerVersion() async {
+    if (_apiService == null || _activeServer == null) return;
+
+    try {
+      final versionInfo = await _apiService!.getVersion();
+      final updatedServer =
+          _activeServer!.copyWith(version: versionInfo.version);
+
+      // Update local state and persistence
+      _activeServer = updatedServer;
+      final index = _servers.indexWhere((s) => s.id == updatedServer.id);
+      if (index != -1) {
+        _servers[index] = updatedServer;
+        await _storageService.saveServers(_servers);
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Erreur lors de la détection de la version : $e');
+      // On garde la version actuelle ou le défaut s'il n'y a pas de réponse
+    }
   }
 
   bool _useStandardAclEngine = false;

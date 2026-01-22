@@ -21,10 +21,17 @@ Permettre à l'application d'identifier la version du serveur Headscale pour ada
 - [ ] **Fallback** : Si `/version` renvoie 404, on utilisera "0.25.0" par défaut.
 
 ## Étapes de réalisation
-- [ ] **Étape 1** : Créer le modèle Dart `VersionInfo` correspondant au JSON de Headscale.
-- [ ] **Étape 2** : Implémenter `getVersion` dans `HeadscaleApiService` (appel GET simple).
-- [ ] **Étape 3** : Modifier `Server` et `StorageService` pour persister la version.
-- [ ] **Étape 4** : Intégrer la logique de détection automatique dans `AppProvider`.
-- [ ] **Étape 5** : Mettre à jour l'UI des Paramètres.
-- [ ] **Étape 6** : Mettre à jour l'UI de la Liste des Serveurs.
-- [ ] **Étape 7** : Ajouter un test pour vérifier le comportement si le serveur est inaccessible.
+- [x] **Étape 1** : Créer le modèle Dart `VersionInfo` correspondant au JSON de Headscale.
+- [x] **Étape 2** : Implémenter `getVersion` dans `HeadscaleApiService` (appel GET simple).
+- [x] **Étape 3** : Modifier `Server` et `StorageService` pour persister la version.
+- [x] **Étape 4** : Intégrer la logique de détection automatique dans `AppProvider`.
+- [x] **Étape 5** : Mettre à jour l'UI des Paramètres.
+- [x] **Étape 6** : Mettre à jour l'UI de la Liste des Serveurs.
+- [x] **Étape 7** : Ajouter un test pour vérifier le comportement si le serveur est inaccessible.
+
+## Points de Vérification (Beta Playstore)
+*Ces tests seront effectués après l'implémentation complète pour valider la mise en production.*
+- [ ] **Test 1** : Connexion à un serveur Headscale < v0.26. L'application doit afficher la version par défaut (0.25.0) sans erreur.
+- [ ] **Test 2** : Connexion à un serveur Headscale v0.27+. L'application doit afficher la version exacte récupérée via `/version`.
+- [ ] **Test 3** : Changement rapide entre deux serveurs de versions différentes. L'interface doit mettre à jour les informations instantanément.
+- [ ] **Test 4** : Comportement en mode hors-ligne. L'application doit afficher la dernière version connue persistée.

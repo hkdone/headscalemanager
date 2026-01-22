@@ -147,6 +147,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       .setStandardAclEngineEnabled(value);
                                 },
                               ),
+                              const Divider(),
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(Icons.info_outline,
+                                    color: Colors.blue),
+                                title: Text(
+                                  isFr
+                                      ? 'Version du serveur'
+                                      : 'Server Version',
+                                  style: theme.textTheme.bodyLarge,
+                                ),
+                                trailing: Text(
+                                  appProvider.serverVersion,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue,
+                                  ),
+                                ),
+                              ),
                               const SizedBox(height: 8),
                               // Danger Zone Header inside Card
                               Text(

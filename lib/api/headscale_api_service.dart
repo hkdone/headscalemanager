@@ -5,6 +5,7 @@ import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/models/pre_auth_key.dart';
 import 'package:headscalemanager/models/api_key.dart';
+import '../models/version_info.dart';
 
 class HeadscaleApiService {
   final String _apiKey;
@@ -12,7 +13,9 @@ class HeadscaleApiService {
 
   HeadscaleApiService({required String apiKey, required String baseUrl})
       : _apiKey = apiKey,
-        _baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+        _baseUrl = baseUrl.endsWith('/')
+            ? baseUrl.substring(0, baseUrl.length - 1)
+            : baseUrl;
 
   Map<String, String> _getHeaders() {
     return {
@@ -38,7 +41,8 @@ class HeadscaleApiService {
       final data = json.decode(response.body);
       final List<dynamic> nodesJson = data['nodes'];
       return nodesJson
-          .map((nodeJson) => Node.fromJson(nodeJson as Map<String, dynamic>, baseDomain))
+          .map((nodeJson) =>
+              Node.fromJson(nodeJson as Map<String, dynamic>, baseDomain))
           .toList();
     } else {
       throw Exception(_handleError('charger les nœuds', response));
@@ -64,7 +68,8 @@ class HeadscaleApiService {
     final String baseDomain = _baseUrl.extractBaseDomain() ?? 'headscale.local';
 
     final response = await http.post(
-      Uri.parse('$_baseUrl/api/v1/node/register?user=$userName&key=$machineKey'),
+      Uri.parse(
+          '$_baseUrl/api/v1/node/register?user=$userName&key=$machineKey'),
       headers: _getHeaders(),
     );
 
@@ -241,7 +246,8 @@ class HeadscaleApiService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List<dynamic> keysJson = data['preAuthKeys'];
-        allPreAuthKeys.addAll(keysJson.map((json) => PreAuthKey.fromJson(json)).toList());
+        allPreAuthKeys
+            .addAll(keysJson.map((json) => PreAuthKey.fromJson(json)).toList());
       } else {
         // Log error but continue with other users
       }
@@ -337,6 +343,21 @@ class HeadscaleApiService {
       return Node.fromJson(data['node'], baseDomain);
     } else {
       throw Exception(_handleError('définir les tags', response));
+    }
+  }
+
+  Future<VersionInfo> getVersion() async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/version'),
+      headers: {
+        'Accept': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return VersionInfo.fromJson(json.decode(response.body));
+    } else {
+      throw Exception('Impossible de récupérer la version du serveur');
     }
   }
 }

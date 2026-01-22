@@ -26,7 +26,9 @@ class ServerListTile extends StatelessWidget {
       ),
       child: ListTile(
         title: Text(server.name),
-        subtitle: Text(server.url),
+        subtitle: Text(
+          '${server.url}${server.version != null ? ' (v${server.version})' : ''}',
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -54,7 +56,8 @@ class ServerListTile extends StatelessWidget {
                       final confirm = await showDialog<bool>(
                         context: context,
                         builder: (context) => AlertDialog(
-                          title: Text(isFr ? 'Supprimer le serveur' : 'Delete Server'),
+                          title: Text(
+                              isFr ? 'Supprimer le serveur' : 'Delete Server'),
                           content: Text(
                             isFr
                                 ? 'Êtes-vous sûr de vouloir supprimer ce serveur ?'
