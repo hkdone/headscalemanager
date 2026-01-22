@@ -68,6 +68,55 @@ class _CreateUserDialogState extends State<CreateUserDialog> {
             }
 
             try {
+              // Étape 2 : Vérification des collisions
+              final existingUsers = await appProvider.apiService.getUsers();
+              final normalizedNewName = normalizeUserName(finalName);
+
+              bool collision = false;
+              String suggestedName = '';
+
+              for (var existingUser in existingUsers) {
+                if (existingUser.name.toLowerCase() ==
+                        finalName.toLowerCase() ||
+                    normalizeUserName(existingUser.name) == normalizedNewName) {
+                  collision = true;
+                  // Suggestion de nom simple
+                  suggestedName = '${name}1';
+                  break;
+                }
+              }
+
+              if (collision && context.mounted) {
+                final bool? proceed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text(isFr ? 'Conflit détecté' : 'Conflict detected'),
+                    content: Text(isFr
+                        ? 'Un utilisateur avec ce nom ou générant le même tag existe déjà. Voulez-vous essayer avec "$suggestedName" ?'
+                        : 'A user with this name or generating the same tag already exists. Would you like to try with "$suggestedName" ?'),
+                    actions: [
+                      TextButton(
+                        child: Text(isFr ? 'Annuler' : 'Cancel'),
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                      ),
+                      TextButton(
+                        child: Text(isFr
+                            ? 'Utiliser $suggestedName'
+                            : 'Use $suggestedName'),
+                        onPressed: () {
+                          _nameController.text = suggestedName;
+                          Navigator.of(ctx).pop(true);
+                        },
+                      ),
+                    ],
+                  ),
+                );
+                if (proceed != true) return;
+                // Si on a changé le nom, on relance la logique de création avec le nouveau nom au prochain clic ou on peut boucler ici.
+                // Pour faire simple, on s'arrête là et l'utilisateur reclique sur "Créer" après la mise à jour du texte.
+                return;
+              }
+
               await appProvider.apiService.createUser(finalName);
               if (context.mounted) {
                 Navigator.of(context).pop(true); // Success

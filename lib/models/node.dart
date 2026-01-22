@@ -112,8 +112,12 @@ class Node {
           available, // Nouveau champ mappé depuis 'availableRoutes'
       isExitNode: isExitNode,
       isLanSharer: isLanSharer,
-      tags: List<String>.from(
-          json['forcedTags'] ?? json['validTags'] ?? json['tags'] ?? []),
+      tags: List<String>.from(json['forcedTags'] ??
+          json['forced_tags'] ??
+          json['validTags'] ??
+          json['valid_tags'] ??
+          json['tags'] ??
+          []),
       baseDomain: baseDomain,
       // L'endpoint public du nœud (IP:port). Peut être vide si le nœud est hors ligne
       // ou si l'information n'est pas disponible.
