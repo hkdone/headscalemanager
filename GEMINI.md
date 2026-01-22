@@ -1,51 +1,50 @@
 # GEMINI.md - Headscale Manager
 
-## Project Overview
+## 🚀 Project Overview
+Headscale Manager is a Flutter-based multi-platform application (Android, iOS, macOS, Windows, Web) designed to manage a [Headscale](https://github.com/juanfont/headscale) server. It provides a user-friendly interface for managing nodes, users, ACLs, API keys, and pre-auth keys.
 
-This is a Flutter-based mobile application designed to manage a [Headscale](https.github.com/juanfont/headscale) server. Headscale is an open-source, self-hosted implementation of the Tailscale coordination server. The application provides a user-friendly interface to manage users, devices (nodes), ACLs (Access Control Lists), and other Headscale features directly from a mobile device or desktop.
+## 🛠 Tech Stack
+- **Framework**: Flutter (Dart)
+- **State Management**: `provider` (centralized in `AppProvider`)
+- **API Communication**: `http` package (centralized in `HeadscaleApiService`)
+- **Persistence**: 
+  - `flutter_secure_storage`: Sensitive data (API keys, Server URLs).
+  - `shared_preferences`: Application settings (locale, UI preferences).
+- **Background Tasks**: `workmanager` & `flutter_local_notifications` (for node status monitoring).
+- **UI Libraries**: `eva_icons_flutter`, `fl_chart` (analytics/viz), `graphview` (network topology UI).
 
-The application is built with Flutter, allowing it to be compiled for various platforms including Android, iOS, macOS, Web, and Windows. It interacts with the Headscale server through its REST API.
+## 📁 Project Structure & Key Files
 
-**Key Technologies:**
+### Core Architecture
+- [**main.dart**](file:///c:/Users/dkdone/StudioProjects/headscaleManager/lib/main.dart): Entry point, initializes `AppProvider` and `MaterialApp`.
+- [**lib/providers/app_provider.dart**](file:///c:/Users/dkdone/StudioProjects/headscaleManager/lib/providers/app_provider.dart): The "Brain". Manages active server switching, locale, global loading state, and holds the `HeadscaleApiService` instance.
+- [**lib/api/headscale_api_service.dart**](file:///c:/Users/dkdone/StudioProjects/headscaleManager/lib/api/headscale_api_service.dart): Implements the REST client for Headscale API. Handles error wrapping and JSON deserialization.
+- [**lib/services/storage_service.dart**](file:///c:/Users/dkdone/StudioProjects/headscaleManager/lib/services/storage_service.dart): Handles multi-server storage and secure persistence of API keys.
 
-*   **Framework:** Flutter
-*   **Language:** Dart
-*   **State Management:** `provider`
-*   **HTTP Client:** `http` package
-*   **Storage:** `flutter_secure_storage` for sensitive data (API key) and `shared_preferences` for settings.
-*   **Background Tasks:** `workmanager` for periodic checks and notifications.
-*   **UI/UX:** The project uses several packages to create a rich user experience, including `fl_chart` for data visualization and `graphview` for network topology.
+### Logic & Features
+- [**lib/services/new_acl_generator_service.dart**](file:///c:/Users/dkdone/StudioProjects/headscaleManager/lib/services/new_acl_generator_service.dart): Generates secure ACL policies based on users and node tags. Implements user isolation and automatic route approval logic.
+- [**lib/services/notification_service.dart**](file:///c:/Users/dkdone/StudioProjects/headscaleManager/lib/services/notification_service.dart): Configures background workers to check for network changes and alert the user.
+- [**lib/models/**](file:///c:/Users/dkdone/StudioProjects/headscaleManager/lib/models/): Contains typed data structures (`Node`, `User`, `PreAuthKey`, etc.) with `fromJson` logic.
 
-## Building and Running
+### UI / Screens
+- **Dashboard**: Overview of nodes & users. Automated workflow for route approval.
+- **ACL Manager**: Interactive graph of network topology and connectivity rules.
+- **Network Overview**: Diagnostic tool for pinging nodes and checking exit node paths.
+- **Key Management**: Interfaces for API Keys and Pre-Auth Keys (includes QR code generation for `tailscale up`).
 
-To build and run this project, you will need to have the Flutter SDK installed.
+## 📖 External Documentation References
+- [**ListeApiAvaible.md**](file:///c:/Users/dkdone/StudioProjects/headscaleManager/ListeApiAvaible.md): Full Headscale Swagger API definition. Use this to find available endpoints and request/response schemas.
+- [**project_summary.md**](file:///c:/Users/dkdone/StudioProjects/headscaleManager/project_summary.md): Functional summary of pages and their corresponding Dart files.
+- [**api_cli_functions_guide.md**](file:///c:/Users/dkdone/StudioProjects/headscaleManager/api_cli_functions_guide.md): Guide on mapping Headscale CLI commands to API calls.
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository-url>
-    cd headscaleManager
-    ```
+## ⚙️ Development Guidelines
+1. **API first**: Always use `HeadscaleApiService` for backend communication. If a new endpoint is needed, add it there following the pattern.
+2. **State Management**: Access services and global state via `context.read<AppProvider>()` or `Consumer<AppProvider>`.
+3. **Data Mapping**: Complex API data should always be mapped to a Model in `lib/models/`.
+4. **Localization**: The app supports French (`fr`) and English (`en`). Use the localization delegates.
+5. **Security**: Never log API keys. Use `StorageService` for sensitive persistence.
 
-2.  **Install dependencies:**
-    ```bash
-    flutter pub get
-    ```
-
-3.  **Run the application:**
-    ```bash
-    flutter run
-    ```
-    This will run the app on a connected device, emulator, or the desktop environment.
-
-**Configuration:**
-
-Before the app can connect to your Headscale server, you need to configure the server URL and API key within the app's settings screen. The `README.md` file provides detailed instructions on how to set up a Headscale server and generate an API key.
-
-## Development Conventions
-
-*   **State Management:** The project uses the `provider` package for state management. The `AppProvider` class (`lib/providers/app_provider.dart`) holds the main application state.
-*   **Code Structure:** The `lib` directory is organized by feature, with separate directories for `api`, `models`, `providers`, `screens`, `services`, `utils`, and `widgets`. This separation of concerns makes the codebase easy to navigate and maintain.
-*   **API Interaction:** All interactions with the Headscale API are centralized in the `HeadscaleApiService` class (`lib/api/headscale_api_service.dart`).
-*   **Internationalization:** The application supports multiple languages (English and French). Text strings should be added to the localization files.
-*   **Security:** The Headscale API key is stored securely using `flutter_secure_storage`.
-*   **Background Processing:** `workmanager` is used to run background tasks, such as checking for network status changes and sending notifications. This is configured in `notification_service.dart`.
+## 🧪 Testing & Verification
+- **Manual**: Test UI flows on an emulator or physical device.
+- **Network**: Use the "Network Overview" screen to verify routing logic (pings, exit nodes).
+- **ACLs**: Profile generation can be verified by inspecting the JSON output in the ACL screen.

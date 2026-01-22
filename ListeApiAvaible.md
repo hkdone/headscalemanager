@@ -1343,3 +1343,24 @@ A partir de ce document extrait de mon serveur headscale peux tu me lister toute
 }
 }
 }
+
+### 🛠️ Points d'API Manuels (Non documentés dans le Swagger officiel)
+
+- **`GET /version`** : Récupère les informations de version du serveur.
+  - **Authentification** : Aucune (Endpoint Public).
+  - **Format de réponse** : JSON (`VersionInfo`).
+
+#### Modèle `VersionInfo` (Déduit du code source `version.go`)
+```json
+{
+  "version": "string",
+  "commit": "string",
+  "buildTime": "string",
+  "dirty": "boolean",
+  "go": {
+    "version": "string",
+    "os": "string",
+    "arch": "string"
+  }
+}
+```
