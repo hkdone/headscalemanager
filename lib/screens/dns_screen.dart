@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:headscalemanager/utils/string_utils.dart';
 
 class DnsScreen extends StatefulWidget {
   const DnsScreen({super.key});
@@ -172,26 +173,89 @@ class _DnsScreenState extends State<DnsScreen> {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 8, vertical: 2),
                                         decoration: BoxDecoration(
-                                            color: theme
-                                                .colorScheme.tertiaryContainer,
+                                            color: isValidDns1123Subdomain(
+                                                    customAlias)
+                                                ? theme.colorScheme
+                                                    .tertiaryContainer
+                                                : Colors.red.withValues(
+                                                    alpha: 0.2), // Alert color
                                             borderRadius:
                                                 BorderRadius.circular(8)),
                                         child: Row(
                                           children: [
-                                            Icon(Icons.bookmark,
-                                                size: 12,
-                                                color: theme.colorScheme
-                                                    .onTertiaryContainer),
+                                            Icon(
+                                              isValidDns1123Subdomain(
+                                                      customAlias)
+                                                  ? Icons.bookmark
+                                                  : Icons.warning_amber_rounded,
+                                              size: 12,
+                                              color: isValidDns1123Subdomain(
+                                                      customAlias)
+                                                  ? theme.colorScheme
+                                                      .onTertiaryContainer
+                                                  : Colors.red,
+                                            ),
                                             const SizedBox(width: 4),
                                             Text(
                                               customAlias,
                                               style: theme.textTheme.labelSmall
                                                   ?.copyWith(
-                                                      color: theme.colorScheme
-                                                          .onTertiaryContainer,
+                                                      color: isValidDns1123Subdomain(
+                                                              customAlias)
+                                                          ? theme.colorScheme
+                                                              .onTertiaryContainer
+                                                          : Colors.red,
                                                       fontWeight:
                                                           FontWeight.bold),
                                             ),
+                                            if (!isValidDns1123Subdomain(
+                                                customAlias))
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                    left: 4.0),
+                                                child: InkWell(
+                                                  onTap: () {
+                                                    final sanitized =
+                                                        sanitizeDns1123Subdomain(
+                                                            customAlias);
+                                                    showDialog(
+                                                        context: context,
+                                                        builder: (ctx) =>
+                                                            AlertDialog(
+                                                                title: Text(isFr
+                                                                    ? 'Réparer Alias'
+                                                                    : 'Fix Alias'),
+                                                                content: Text(isFr
+                                                                    ? 'Cet alias est invalide pour la v0.27+.\nRemplacement suggéré : "$sanitized"'
+                                                                    : 'This alias is invalid for v0.27+.\nSuggested replacement: "$sanitized"'),
+                                                                actions: [
+                                                                  TextButton(
+                                                                      onPressed: () =>
+                                                                          Navigator.pop(
+                                                                              ctx),
+                                                                      child: Text(isFr
+                                                                          ? 'Ignorer'
+                                                                          : 'Ignore')),
+                                                                  TextButton(
+                                                                      onPressed:
+                                                                          () {
+                                                                        _saveCustomRecord(
+                                                                            node.id,
+                                                                            sanitized);
+                                                                        Navigator.pop(
+                                                                            ctx);
+                                                                      },
+                                                                      child: Text(isFr
+                                                                          ? 'Corriger'
+                                                                          : 'Fix')),
+                                                                ]));
+                                                  },
+                                                  child: const Icon(
+                                                      Icons.build_circle,
+                                                      size: 14,
+                                                      color: Colors.red),
+                                                ),
+                                              )
                                           ],
                                         ),
                                       ),
@@ -294,6 +358,9 @@ class _DnsScreenState extends State<DnsScreen> {
                 labelText: isFr ? 'Nom DNS personnalisé' : 'Custom DNS Name',
                 hintText: 'ex: nas.home',
                 border: const OutlineInputBorder(),
+                helperText: isFr
+                    ? 'Lettres minuscules, chiffres et tirets uniquement.'
+                    : 'Lowercase letters, numbers, and hyphens only.',
               ),
             ),
           ],
@@ -305,7 +372,36 @@ class _DnsScreenState extends State<DnsScreen> {
           ),
           TextButton(
             onPressed: () {
-              _saveCustomRecord(node.id, controller.text);
+              final text = controller.text.trim();
+              if (text.isNotEmpty && !isValidDns1123Subdomain(text)) {
+                final sanitized = sanitizeDns1123Subdomain(text);
+                showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                          title:
+                              Text(isFr ? 'Format Invalide' : 'Invalid Format'),
+                          content: Text(isFr
+                              ? 'Le nom "$text" ne respecte pas le format DNS (RFC 1123).\nVoulez-vous utiliser "$sanitized" à la place ?'
+                              : 'The name "$text" does not match DNS format (RFC 1123).\nDo you want to use "$sanitized" instead?'),
+                          actions: [
+                            TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: Text(isFr ? 'Annuler' : 'Cancel')),
+                            TextButton(
+                                onPressed: () {
+                                  Navigator.pop(ctx); // Close alert
+                                  _saveCustomRecord(
+                                      node.id, sanitized); // Save corrected
+                                  Navigator.pop(context); // Close edit dialog
+                                },
+                                child: Text(isFr
+                                    ? 'Utiliser corrigé'
+                                    : 'Use corrected')),
+                          ],
+                        ));
+                return;
+              }
+              _saveCustomRecord(node.id, text);
               Navigator.pop(context);
             },
             child: Text(isFr ? 'Sauvegarder' : 'Save'),

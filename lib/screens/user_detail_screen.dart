@@ -11,6 +11,7 @@ import 'package:headscalemanager/widgets/registration_dialogs.dart';
 import 'package:headscalemanager/widgets/rename_node_dialog.dart';
 import 'package:headscalemanager/widgets/move_node_dialog.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
+import 'package:headscalemanager/utils/string_utils.dart';
 
 /// Écran affichant les détails d'un utilisateur spécifique et ses nœuds associés.
 class UserDetailScreen extends StatefulWidget {
@@ -233,12 +234,34 @@ class _NodeCard extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            Text(node.name,
-                style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onPrimary),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(node.name,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onPrimary),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
+                ),
+                if (!isValidDns1123Subdomain(node.name))
+                  IconButton(
+                    icon: const Icon(Icons.warning_amber_rounded,
+                        color: Colors.orange, size: 20),
+                    tooltip: isFr
+                        ? 'Nom invalide (v0.27+)'
+                        : 'Invalid name (v0.27+)',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () {
+                      showDialog(
+                          context: context,
+                          builder: (dialogContext) => RenameNodeDialog(
+                              node: node, onNodeRenamed: onNodeUpdate));
+                    },
+                  )
+              ],
+            ),
             const SizedBox(height: 4),
             Text(node.ipAddresses.join('\n'),
                 style: theme.textTheme.bodySmall?.copyWith(

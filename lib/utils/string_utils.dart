@@ -37,3 +37,40 @@ extension StringUtils on String {
 String normalizeUserName(String userName) {
   return userName.split('@').first.toLowerCase();
 }
+
+/// Validation RFC 1123 pour les sous-domaines DNS.
+///
+/// Règles :
+/// - Contient uniquement des lettres minuscules, chiffres, et tirets.
+/// - Ne commence pas ni ne finit par un tiret.
+/// - Longueur max 63 caractères.
+final RegExp _dns1123Regex = RegExp(r'^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$');
+
+bool isValidDns1123Subdomain(String value) {
+  return _dns1123Regex.hasMatch(value);
+}
+
+/// Nettoie une chaîne pour la rendre conforme à la RFC 1123.
+/// Remplace les caractères invalides par des tirets et s'assure des règles de début/fin.
+String sanitizeDns1123Subdomain(String value) {
+  var sanitized = value.toLowerCase();
+
+  // Remplace tout ce qui n'est pas a-z, 0-9 par des tirets
+  sanitized = sanitized.replaceAll(RegExp(r'[^a-z0-9]'), '-');
+
+  // Supprime les tirets multiples (ex: 'te--st' -> 'te-st')
+  sanitized = sanitized.replaceAll(RegExp(r'-+'), '-');
+
+  // Supprime les tirets de début et de fin
+  if (sanitized.startsWith('-')) sanitized = sanitized.substring(1);
+  if (sanitized.endsWith('-'))
+    sanitized = sanitized.substring(0, sanitized.length - 1);
+
+  if (sanitized.length > 63) {
+    sanitized = sanitized.substring(0, 63);
+    if (sanitized.endsWith('-'))
+      sanitized = sanitized.substring(0, sanitized.length - 1);
+  }
+
+  return sanitized;
+}

@@ -10,6 +10,8 @@ import 'package:provider/provider.dart';
 import 'package:dart_ping/dart_ping.dart';
 import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:headscalemanager/utils/string_utils.dart';
+import 'package:headscalemanager/widgets/rename_node_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NodeDetailScreen extends StatefulWidget {
@@ -188,10 +190,43 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Text(_currentNode.hostname,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onPrimary)),
+          Row(
+            children: [
+              Flexible(
+                child: Text(_currentNode.hostname,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onPrimary)),
+              ),
+              if (!isValidDns1123Subdomain(_currentNode.name))
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: IconButton(
+                    icon: const Icon(Icons.warning_amber_rounded,
+                        color: Colors.orange, size: 24),
+                    tooltip: isFr
+                        ? 'Nom invalide (v0.27+)'
+                        : 'Invalid name (v0.27+)',
+                    onPressed: () {
+                      showDialog(
+                          context: context,
+                          builder: (dialogContext) => RenameNodeDialog(
+                              node: _currentNode,
+                              onNodeRenamed: () async {
+                                // Refresh local node details
+                                final updated = await context
+                                    .read<AppProvider>()
+                                    .apiService
+                                    .getNodeDetails(_currentNode.id);
+                                if (context.mounted) {
+                                  setState(() => _currentNode = updated);
+                                }
+                              }));
+                    },
+                  ),
+                )
+            ],
+          ),
           const SizedBox(height: 4),
           Text('${isFr ? 'Utilisateur' : 'User'}: ${_currentNode.user}',
               style: theme.textTheme.titleMedium
