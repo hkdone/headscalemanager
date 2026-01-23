@@ -22,4 +22,4 @@ S'adapter aux changements de la v0.26 (isolation des tags) et sécuriser la cré
 - [x] **Étape 1** : Mettre à jour le modèle `Node` pour assurer la lecture des tags sur toutes les versions (v0.25 à v0.28).
 - [x] **Étape 2** : Implémenter la logique de détection de collision dans `CreateUserDialog`.
 - [x] **Étape 3** : Ajouter l'affichage de l'alerte et la suggestion de nom automatique dans l'UI.
-- [ ] **Étape 4** : Tests de création avec des noms provoquant des collisions (ex: `Alice@abc.com` vs `alice@xyz.com`).
+- [x] **Étape 4** : Tests de création avec des noms provoquant des collisions (ex: `Alice@abc.com` vs `alice@xyz.com`).
