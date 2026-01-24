@@ -12,6 +12,7 @@ import 'package:headscalemanager/widgets/rename_node_dialog.dart';
 import 'package:headscalemanager/widgets/move_node_dialog.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
+import 'package:headscalemanager/models/version_info.dart';
 
 /// Écran affichant les détails d'un utilisateur spécifique et ses nœuds associés.
 class UserDetailScreen extends StatefulWidget {
@@ -383,11 +384,12 @@ class _NodeCard extends StatelessWidget {
             child: Text(isFr ? 'Renommer' : 'Rename',
                 style: theme.textTheme.bodyMedium
                     ?.copyWith(color: theme.colorScheme.onSurface))),
-        PopupMenuItem<String>(
-            value: 'move',
-            child: Text(isFr ? 'Changer d\'utilisateur' : 'Change user',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.onSurface))),
+        if (!VersionInfo.checkVersionAtLeast(provider.serverVersion, '0.28.0'))
+          PopupMenuItem<String>(
+              value: 'move',
+              child: Text(isFr ? 'Changer d\'utilisateur' : 'Change user',
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: theme.colorScheme.onSurface))),
         PopupMenuItem<String>(
             value: 'edit_tags',
             child: Text(isFr ? 'Modifier les tags' : 'Edit tags',

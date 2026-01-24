@@ -121,6 +121,7 @@ class _RenameNodeDialogState extends State<RenameNodeDialog> {
                 // 2. Régénérer les ACLs pour garantir la cohérence
                 final serverId = appProvider.activeServer?.id;
                 if (serverId != null) {
+                  if (!context.mounted) return;
                   showSafeSnackBar(context,
                       isFr ? 'Mise à jour des ACLs...' : 'Updating ACLs...');
                   final allUsers = await apiService.getUsers();

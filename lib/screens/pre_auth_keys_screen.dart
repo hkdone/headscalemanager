@@ -302,7 +302,9 @@ class _PreAuthKeyCard extends StatelessWidget {
             const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         leading: const Icon(Icons.check_circle, color: Colors.green),
         title: Text(
-            '${isFr ? 'Clé' : 'Key'}: ...${apiKey.key.substring(apiKey.key.length - 6)}',
+            apiKey.key.startsWith('hskey-auth-')
+                ? 'Prefix: ${apiKey.key}'
+                : '${isFr ? 'Clé' : 'Key'}: ...${apiKey.key.length > 6 ? apiKey.key.substring(apiKey.key.length - 6) : apiKey.key}',
             style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w500, fontFamily: 'monospace')),
         subtitle: Column(
@@ -370,10 +372,9 @@ class _PreAuthKeyCard extends StatelessWidget {
 
     if (confirm && context.mounted) {
       try {
-        await context
-            .read<AppProvider>()
-            .apiService
-            .expirePreAuthKey(apiKey.user!.id, apiKey.key);
+        final provider = context.read<AppProvider>();
+        await provider.apiService.expirePreAuthKey(apiKey.user!.id, apiKey.key,
+            serverVersion: provider.serverVersion, keyId: apiKey.id);
         if (!context.mounted) return;
         showSafeSnackBar(context,
             isFr ? 'Clé expirée avec succès.' : 'Key expired successfully.');

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/screens/client_commands_screen.dart';
+import 'package:headscalemanager/widgets/whats_new_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:eva_icons_flutter/eva_icons_flutter.dart';
@@ -22,12 +23,30 @@ class HelpScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Aide et Guide d\'Utilisation',
-                    style: Theme.of(context)
-                        .textTheme
-                        .displaySmall
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Aide et Guide d\'Utilisation',
+                          style: Theme.of(context)
+                              .textTheme
+                              .displaySmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.new_releases_rounded,
+                            color: Theme.of(context).colorScheme.primary),
+                        tooltip: 'Nouveautés',
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => const WhatsNewDialog(),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   _buildBodyText(

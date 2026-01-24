@@ -13,13 +13,13 @@ Supporter les nouveaux autogroupes et respecter les règles de validation DNS pl
     *   Ajouter une validation Regex (RFC 1123) lors de l'ajout/modification d'un alias. (Lettres, chiffres, tirets, pas de tiret au début/fin).
     *   Dans `_fetchData`, vérifier tous les alias existants chargés depuis le storage.
     *   Si un alias invalide est détecté, afficher une icône d'alerte à côté de celui-ci et suggérer une correction (ex: remplacer `_` par `-`) via un dialogue au clic.
-- [ ] **`lib/widgets/rename_node_dialog.dart`** : 
+- [x] **`lib/widgets/rename_node_dialog.dart`** : 
     *   **Validation** : Ajouter la validation RFC 1123 dans le form.
     *   **Sanitization** : Proposer une correction automatique si invalide.
     *   **Consistance ACL** : Après le succès du `renameNode`, déclencher une régénération complète des ACLs (via `NewAclGenerator` ou `Standard` selon le mode) pour s'assurer que tout est synchronisé.
-- [ ] **`lib/screens/user_detail_screen.dart`** : 
+- [x] **`lib/screens/user_detail_screen.dart`** : 
     *   **Audit Visuel** : Dans la grille des nœuds (`_NodeCard`), si le nom est invalide, afficher une icône ⚠️.
-- [ ] **`lib/screens/node_detail_screen.dart`** : 
+- [x] **`lib/screens/node_detail_screen.dart`** : 
     *   **Audit Visuel** : Dans le header, afficher un warning si le nom est invalide.
 
 ## Éléments à vérifier (Incertitude)
@@ -32,4 +32,4 @@ Supporter les nouveaux autogroupes et respecter les règles de validation DNS pl
 - [x] Mettre à jour le générateur d'ACL pour s'assurer que tous les ports sont explicites. (Vérifié : Le code actuel gère déjà correctement les ports :* par défaut)
 - [x] Mettre à jour `RenameNodeDialog` pour inclure la validation, la sanitization et le callback de régénération ACL.
 - [x] Mettre à jour `UserDetailScreen` et `NodeDetailScreen` pour signaler les nœuds aux noms invalides.
-- [ ] Vérifier l'affichage MagicDNS avec les nouveaux formats de noms.
+- [x] Vérifier l'affichage MagicDNS avec les nouveaux formats de noms.

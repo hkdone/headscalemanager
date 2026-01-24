@@ -1,6 +1,7 @@
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
+import 'package:flutter/foundation.dart';
 
 /// STANDARD ACL GENERATOR (New Engine)
 ///
@@ -147,7 +148,7 @@ class StandardAclGeneratorService {
     for (var user in users) {
       final groupName = 'group:${user.name}';
       final normalizedUser = normalizeUserName(user.name);
-      print('DEBUG: Processing user $normalizedUser');
+      debugPrint('DEBUG: Processing user $normalizedUser');
 
       final stdClientTag = 'tag:$normalizedUser-client';
       final stdExitTag = 'tag:$normalizedUser-exit-node';
@@ -226,7 +227,7 @@ class StandardAclGeneratorService {
         'dst': destinations.toList()..sort(),
       });
 
-      print(
+      debugPrint(
           'DEBUG: Done user $normalizedUser. ActiveTags: $activeUserTags. ExitNode: $hasActiveExitNodes. Dest: $destinations');
 
       // Allow User (Group) to access his own devices (SSH/Management)

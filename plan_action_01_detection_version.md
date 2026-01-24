@@ -31,7 +31,7 @@ Permettre à l'application d'identifier la version du serveur Headscale pour ada
 
 ## Points de Vérification (Beta Playstore)
 *Ces tests seront effectués après l'implémentation complète pour valider la mise en production.*
-- [ ] **Test 1** : Connexion à un serveur Headscale < v0.26. L'application doit afficher la version par défaut (0.25.0) sans erreur.
-- [ ] **Test 2** : Connexion à un serveur Headscale v0.27+. L'application doit afficher la version exacte récupérée via `/version`.
-- [ ] **Test 3** : Changement rapide entre deux serveurs de versions différentes. L'interface doit mettre à jour les informations instantanément.
-- [ ] **Test 4** : Comportement en mode hors-ligne. L'application doit afficher la dernière version connue persistée.
+- [x] **Test 1** : Connexion à un serveur Headscale < v0.26. L'application doit afficher la version par défaut (0.25.0) sans erreur.
+- [x] **Test 2** : Connexion à un serveur Headscale v0.27+. L'application doit afficher la version exacte récupérée via `/version`.
+- [x] **Test 3** : Changement rapide entre deux serveurs de versions différentes. L'interface doit mettre à jour les informations instantanément.
+- [x] **Test 4** : Comportement en mode hors-ligne. L'application doit afficher la dernière version connue persistée.

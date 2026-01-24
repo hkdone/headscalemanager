@@ -11,7 +11,9 @@ import 'package:headscalemanager/screens/help_screen.dart';
 import 'package:headscalemanager/screens/help_screen_en.dart';
 import 'package:provider/provider.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+
 import 'package:headscalemanager/widgets/legacy_migration_dialog.dart';
+import 'package:headscalemanager/widgets/whats_new_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,8 +29,36 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkForWhatsNew();
       _checkForLegacyTags();
     });
+  }
+
+  Future<void> _checkForWhatsNew() async {
+    final provider = context.read<AppProvider>();
+    // Update this version when releasing a new update with relevant "What's New" content
+    const currentVersion = '1.4.96';
+    const lastVersionKey = 'LAST_SEEN_VERSION';
+
+    try {
+      final lastSeenVersion =
+          await provider.storageService.getData(lastVersionKey);
+
+      if (lastSeenVersion != currentVersion && mounted) {
+        // Show the dialog
+        await showDialog(
+          barrierDismissible: false,
+          context: context,
+          builder: (_) => const WhatsNewDialog(),
+        );
+
+        // Update stored version after closing
+        await provider.storageService.saveData(lastVersionKey, currentVersion);
+      }
+    } catch (e) {
+      // Silent failure
+      debugPrint('Error checking for whats new: $e');
+    }
   }
 
   Future<void> _checkForLegacyTags() async {

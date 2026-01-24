@@ -232,9 +232,29 @@ class HeadscaleApiService {
     }
   }
 
-  Future<List<PreAuthKey>> getPreAuthKeys() async {
+  Future<List<PreAuthKey>> getPreAuthKeys({String? serverVersion}) async {
     final List<PreAuthKey> allPreAuthKeys = [];
 
+    // HEADSCALE v0.28+ : Endpoint global /api/v1/preauthkey
+    if (serverVersion != null &&
+        VersionInfo.checkVersionAtLeast(serverVersion, '0.28.0')) {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/v1/preauthkey'),
+        headers: _getHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<dynamic> keysJson = data['preAuthKeys'] ?? [];
+        allPreAuthKeys
+            .addAll(keysJson.map((json) => PreAuthKey.fromJson(json)).toList());
+      } else {
+        throw Exception(_handleError('charger les clés (v0.28+)', response));
+      }
+      return allPreAuthKeys;
+    }
+
+    // HEADSCALE < v0.28 : Boucle sur chaque utilisateur
     final users = await getUsers();
 
     for (final user in users) {
@@ -245,7 +265,7 @@ class HeadscaleApiService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final List<dynamic> keysJson = data['preAuthKeys'];
+        final List<dynamic> keysJson = data['preAuthKeys'] ?? [];
         allPreAuthKeys
             .addAll(keysJson.map((json) => PreAuthKey.fromJson(json)).toList());
       } else {
@@ -256,7 +276,26 @@ class HeadscaleApiService {
     return allPreAuthKeys;
   }
 
-  Future<void> expirePreAuthKey(String userId, String key) async {
+  Future<void> expirePreAuthKey(String userId, String key,
+      {String? serverVersion, String? keyId}) async {
+    // HEADSCALE v0.28+ : Expiration par ID
+    if (serverVersion != null &&
+        VersionInfo.checkVersionAtLeast(serverVersion, '0.28.0') &&
+        keyId != null) {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/v1/preauthkey/expire'),
+        headers: _getHeaders(),
+        body: jsonEncode(<String, dynamic>{
+          'id': keyId, // Nouveau paramètre v0.28
+        }),
+      );
+      if (response.statusCode != 200) {
+        throw Exception(_handleError('expirer la clé (ID $keyId)', response));
+      }
+      return;
+    }
+
+    // LEGACY / v0.27 : Expiration par User + Key
     final response = await http.post(
       Uri.parse('$_baseUrl/api/v1/preauthkey/expire'),
       headers: _getHeaders(),

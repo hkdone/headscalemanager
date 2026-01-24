@@ -63,13 +63,15 @@ String sanitizeDns1123Subdomain(String value) {
 
   // Supprime les tirets de début et de fin
   if (sanitized.startsWith('-')) sanitized = sanitized.substring(1);
-  if (sanitized.endsWith('-'))
+  if (sanitized.endsWith('-')) {
     sanitized = sanitized.substring(0, sanitized.length - 1);
+  }
 
   if (sanitized.length > 63) {
     sanitized = sanitized.substring(0, 63);
-    if (sanitized.endsWith('-'))
+    if (sanitized.endsWith('-')) {
       sanitized = sanitized.substring(0, sanitized.length - 1);
+    }
   }
 
   return sanitized;

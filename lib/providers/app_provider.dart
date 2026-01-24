@@ -47,11 +47,11 @@ class AppProvider extends ChangeNotifier {
 
         if (hasStandardTags && !hasLegacyMergedTags) {
           await setStandardAclEngineEnabled(true);
-          print(
+          debugPrint(
               'Auto-enabled Standard ACL Engine due to detected standard tags.');
         }
       } catch (e) {
-        print('Error auto-detecting ACL engine: $e');
+        debugPrint('Error auto-detecting ACL engine: $e');
       }
     }
 
@@ -193,7 +193,7 @@ class AppProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print('Erreur lors de la détection de la version : $e');
+      debugPrint('Erreur lors de la détection de la version : $e');
       // On garde la version actuelle ou le défaut s'il n'y a pas de réponse
     }
   }
