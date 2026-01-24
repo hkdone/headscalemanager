@@ -5,16 +5,19 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/new_acl_generator_service.dart';
 import 'package:headscalemanager/services/standard_acl_generator_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
+import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:provider/provider.dart';
 
 class EditTagsDialog extends StatefulWidget {
   final Node node;
   final VoidCallback onTagsUpdated;
+  final String? fallbackUser;
 
   const EditTagsDialog({
     super.key,
     required this.node,
     required this.onTagsUpdated,
+    this.fallbackUser,
   });
 
   @override
@@ -339,9 +342,51 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                 ),
             ] else ...[
-              Text(isFr
-                  ? 'Aucun tag de base de type "-client" trouvé. La modification guidée n\'est pas disponible.'
-                  : 'No base "-client" tag found. Guided editing is not available.')
+              Text(
+                  isFr
+                      ? 'Aucun tag trouvé. Pour intégrer cet appareil aux ACLs, il doit avoir un tag d\'identité.'
+                      : 'No tags found. To include this device in ACLs, it must have an identity tag.',
+                  style: const TextStyle(color: Colors.orange)),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Auto-generate tag based on User Name
+                  String rawName = widget.node.user;
+                  // Si le nom du noeud est invalide (ex: N/A sur OIDC), on utilise le fallback (nom de l'utilisateur parent)
+                  if (rawName == 'N/A' || rawName.isEmpty) {
+                    rawName = widget.fallbackUser ?? 'user';
+                  }
+
+                  // Optimize: supports email-style names (jean@domain.com -> jean)
+                  // normalizeUserName vient de string_utils.dart
+                  String userName = normalizeUserName(rawName);
+                  if (userName.isEmpty) userName = 'user';
+
+                  final defaultTag = 'tag:$userName-client';
+
+                  setState(() {
+                    _currentTags.add(defaultTag);
+                  });
+                },
+                icon: const Icon(Icons.auto_fix_high),
+                label: Builder(builder: (context) {
+                  // Calculer le nom affiché sur le bouton dynamiquement pour que l'utilisateur voit ce qu'il va obtenir
+                  String rawName = widget.node.user;
+                  if (rawName == 'N/A' || rawName.isEmpty) {
+                    rawName = widget.fallbackUser ?? 'user';
+                  }
+                  String userName = normalizeUserName(rawName);
+                  if (userName.isEmpty) userName = 'user';
+
+                  return Text(isFr
+                      ? 'Initialiser le Tag (tag:$userName-client)'
+                      : 'Initialize Tag (tag:$userName-client)');
+                }),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                ),
+              )
             ]
           ],
         ),

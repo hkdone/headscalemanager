@@ -95,14 +95,75 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('ID: ${widget.user.id}',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onPrimary)),
-          const SizedBox(height: 8),
-          Text(
-              '${isFr ? 'Créé le' : 'Created on'}: ${widget.user.createdAt?.toLocal() ?? 'N/A'}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.7))),
+          Row(
+            children: [
+              if (widget.user.profilePicUrl != null &&
+                  widget.user.profilePicUrl!.isNotEmpty)
+                CircleAvatar(
+                  radius: 32,
+                  backgroundImage: NetworkImage(widget.user.profilePicUrl!),
+                  backgroundColor: Colors.transparent,
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                      color: theme.colorScheme.onPrimary.withValues(alpha: 0.2),
+                      shape: BoxShape.circle),
+                  child: Icon(Icons.person,
+                      size: 40, color: theme.colorScheme.onPrimary),
+                ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (widget.user.provider != null &&
+                        widget.user.provider!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        margin: const EdgeInsets.only(bottom: 4),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.onPrimary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          widget.user.provider!.toUpperCase(),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    Text(
+                      widget.user.displayName ?? widget.user.name,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onPrimary),
+                    ),
+                    if (widget.user.email != null &&
+                        widget.user.email!.isNotEmpty)
+                      Text(
+                        widget.user.email!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onPrimary
+                                .withValues(alpha: 0.9)),
+                      ),
+                    const SizedBox(height: 8),
+                    Text('ID: ${widget.user.id}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimary
+                                .withValues(alpha: 0.6))),
+                    Text(
+                        '${isFr ? 'Créé le' : 'Created on'}: ${widget.user.createdAt?.toLocal() ?? 'N/A'}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimary
+                                .withValues(alpha: 0.6))),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -138,7 +199,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             }
 
             final userNodes = snapshot.data!
-                .where((node) => node.user == widget.user.name)
+                .where((node) =>
+                    node.userId == widget.user.id ||
+                    node.user == widget.user.name)
                 .toList();
 
             if (userNodes.isEmpty) {
@@ -161,7 +224,11 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               itemCount: userNodes.length,
               itemBuilder: (context, index) {
                 final node = userNodes[index];
-                return _NodeCard(node: node, onNodeUpdate: _refreshNodes);
+                return _NodeCard(
+                  node: node,
+                  onNodeUpdate: _refreshNodes,
+                  user: widget.user,
+                );
               },
             );
           },
@@ -173,9 +240,14 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
 class _NodeCard extends StatelessWidget {
   final Node node;
+  final User user;
   final VoidCallback onNodeUpdate;
 
-  const _NodeCard({required this.node, required this.onNodeUpdate});
+  const _NodeCard({
+    required this.node,
+    required this.onNodeUpdate,
+    required this.user,
+  });
 
   Future<void> _runAction(BuildContext context, Future<void> Function() action,
       String successMessage) async {
@@ -197,6 +269,7 @@ class _NodeCard extends StatelessWidget {
       context: context,
       builder: (dialogContext) => EditTagsDialog(
         node: node,
+        fallbackUser: user.name,
         onTagsUpdated: onNodeUpdate, // Passer la fonction de rafraîchissement
       ),
     );

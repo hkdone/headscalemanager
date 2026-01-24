@@ -6,6 +6,7 @@ import 'package:headscalemanager/screens/pre_auth_keys_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/widgets/create_user_dialog.dart';
 import 'package:headscalemanager/widgets/delete_user_dialog.dart';
+import 'package:headscalemanager/widgets/rename_user_dialog.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 
 /// Écran de gestion des utilisateurs Headscale.
@@ -162,18 +163,53 @@ class _UserCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Icon(Icons.person,
-                      size: 48, color: theme.colorScheme.onPrimary),
+                  if (user.profilePicUrl != null &&
+                      user.profilePicUrl!.isNotEmpty)
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundImage: NetworkImage(user.profilePicUrl!),
+                      backgroundColor: Colors.transparent,
+                    )
+                  else
+                    Icon(Icons.person,
+                        size: 48, color: theme.colorScheme.onPrimary),
                   const SizedBox(height: 12),
+                  if (user.provider != null && user.provider!.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color:
+                            theme.colorScheme.onPrimary.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        user.provider!.toUpperCase(),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onPrimary,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   Text(
                     user.name,
                     textAlign: TextAlign.center,
                     style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: theme.colorScheme.onPrimary),
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (user.email != null && user.email!.isNotEmpty)
+                    Text(
+                      user.email!,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onPrimary
+                              .withValues(alpha: 0.8)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   const SizedBox(height: 4),
                   Text(
                     '${isFr ? 'Créé le' : 'Created on'}: ${user.createdAt?.toLocal().toString().substring(0, 10) ?? 'N/A'}',
@@ -196,6 +232,12 @@ class _UserCard extends StatelessWidget {
                       builder: (ctx) => DeleteUserDialog(
                           user: user, onUserDeleted: onUserAction),
                     );
+                  } else if (value == 'rename') {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => RenameUserDialog(
+                          user: user, onUserRenamed: onUserAction),
+                    );
                   }
                 },
                 itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -212,6 +254,20 @@ class _UserCard extends StatelessWidget {
                           style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme
                                   .onSurface)), // Keep default onSurface for menu item
+                    ),
+                  ),
+                  PopupMenuItem<String>(
+                    value: 'rename',
+                    child: ListTile(
+                      leading: Icon(Icons.edit,
+                          color: theme
+                              .colorScheme.onSurface, // Standard icon color
+                          semanticLabel:
+                              isFr ? 'Renommer l\'utilisateur' : 'Rename user'),
+                      title: Text(
+                          isFr ? 'Renommer l\'utilisateur' : 'Rename user',
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: theme.colorScheme.onSurface)),
                     ),
                   ),
                 ],

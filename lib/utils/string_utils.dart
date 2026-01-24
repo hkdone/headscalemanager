@@ -50,6 +50,19 @@ bool isValidDns1123Subdomain(String value) {
   return _dns1123Regex.hasMatch(value);
 }
 
+// Basic email regex for user name validation
+final RegExp _emailRegex =
+    RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+
+bool isValidEmail(String value) {
+  return _emailRegex.hasMatch(value);
+}
+
+/// Headscale accepte soit un nom DNS (bob), soit un email (bob@domain.com) selon la config.
+bool isValidHeadscaleUser(String value) {
+  return isValidDns1123Subdomain(value) || isValidEmail(value);
+}
+
 /// Nettoie une chaîne pour la rendre conforme à la RFC 1123.
 /// Remplace les caractères invalides par des tirets et s'assure des règles de début/fin.
 String sanitizeDns1123Subdomain(String value) {

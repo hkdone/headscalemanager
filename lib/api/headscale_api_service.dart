@@ -232,6 +232,17 @@ class HeadscaleApiService {
     }
   }
 
+  Future<void> renameUser(String oldId, String newName) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/v1/user/$oldId/rename/$newName'),
+      headers: _getHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(_handleError('renommer l\'utilisateur', response));
+    }
+  }
+
   Future<List<PreAuthKey>> getPreAuthKeys({String? serverVersion}) async {
     final List<PreAuthKey> allPreAuthKeys = [];
 

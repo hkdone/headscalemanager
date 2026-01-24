@@ -8,6 +8,18 @@ class User {
   /// Date et heure de création de l'utilisateur.
   final DateTime? createdAt;
 
+  /// Email de l'utilisateur (OIDC).
+  final String? email;
+
+  /// Nom d'affichage (OIDC).
+  final String? displayName;
+
+  /// Fournisseur d'identité (ex: 'google', 'github' ou vide pour CLI/Manual).
+  final String? provider;
+
+  /// URL de l'avatar (OIDC).
+  final String? profilePicUrl;
+
   /// Constructeur de la classe User.
   ///
   /// Tous les champs sont requis pour la création d'une instance de User.
@@ -15,24 +27,26 @@ class User {
     required this.id,
     required this.name,
     this.createdAt,
+    this.email,
+    this.displayName,
+    this.provider,
+    this.profilePicUrl,
   });
 
   /// Constructeur d'usine (factory constructor) pour créer une instance de User à partir d'un Map JSON.
   ///
-  /// Cette méthode gère la désérialisation des données JSON en un objet User,
-  /// en assurant la gestion des valeurs par défaut et le parsing de la date de création.
+  /// Cette méthode gère la désérialisation des données JSON en un objet User.
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      // L'ID de l'utilisateur, avec un fallback à une chaîne vide.
       id: json['id'] ?? '',
-      // Le nom de l'utilisateur, avec un fallback à 'Unknown User'.
       name: json['name'] ?? 'Unknown User',
-      // Date de création de l'utilisateur. Si 'createdAt' est nul, utilise la date et l'heure actuelles.
-      // ATTENTION : Utiliser DateTime.now() comme fallback peut être trompeur car cela suggère
-      // que l'utilisateur vient d'être créé, alors que l'information était absente.
       createdAt: json['createdAt'] != null && json['createdAt'] is String
           ? DateTime.parse(json['createdAt'])
           : null,
+      email: json['email'] as String?,
+      displayName: json['displayName'] as String?,
+      provider: json['provider'] as String?,
+      profilePicUrl: json['profilePicUrl'] as String?,
     );
   }
 

@@ -14,6 +14,9 @@ class Node {
   /// Nom de l'utilisateur Headscale auquel ce nœud est associé.
   final String user;
 
+  /// ID de l'utilisateur Headscale (Stable pour le matching).
+  final String userId;
+
   /// Liste des adresses IP assignées à ce nœud.
   final List<String> ipAddresses;
 
@@ -55,6 +58,7 @@ class Node {
     required this.hostname,
     required this.name,
     required this.user,
+    required this.userId,
     required this.ipAddresses,
     required this.online,
     required this.lastSeen,
@@ -102,6 +106,7 @@ class Node {
       hostname: hostname,
       name: givenName.isNotEmpty ? givenName : hostname,
       user: userMap != null ? (userMap['name'] ?? 'N/A') : 'N/A',
+      userId: userMap != null ? (userMap['id'] ?? '') : '',
       ipAddresses: List<String>.from(json['ipAddresses'] ?? []),
       online: json['online'] ?? false,
       lastSeen: json['lastSeen'] != null
