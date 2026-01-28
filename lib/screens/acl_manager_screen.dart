@@ -5,6 +5,7 @@ import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/services/acl_parser_service.dart';
+import 'package:headscalemanager/utils/json_utils.dart';
 import 'package:headscalemanager/widgets/acl_graph_widget.dart';
 
 class AclManagerScreen extends StatefulWidget {
@@ -58,7 +59,9 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
       final results = await Future.wait([
         apiService.getUsers(),
         apiService.getNodes(),
-        apiService.getAclPolicy().then((p) => jsonDecode(p)),
+        apiService
+            .getAclPolicy()
+            .then((p) => jsonDecode(JsonUtils.cleanJsonComments(p))),
       ]);
 
       if (mounted) {

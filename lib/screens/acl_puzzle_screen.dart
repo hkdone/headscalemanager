@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/models/acl_puzzle_model.dart';
+import 'package:headscalemanager/utils/json_utils.dart';
 import 'package:headscalemanager/services/acl_puzzle_service.dart';
 import 'package:headscalemanager/services/new_acl_generator_service.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
@@ -48,7 +49,8 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
         final policyString = await apiService.getAclPolicy();
         if (policyString.isNotEmpty) {
           try {
-            currentPolicy = json.decode(policyString);
+            currentPolicy =
+                json.decode(JsonUtils.cleanJsonComments(policyString));
           } catch (e) {
             debugPrint('Error parsing ACL policy JSON: $e');
             // Optionally show error to user or handle HuJSON if needed
