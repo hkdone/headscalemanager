@@ -20,6 +20,7 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
   }
 
   void _refreshApiKeys() {
+    if (!mounted) return;
     setState(() {
       _apiKeysFuture = context.read<AppProvider>().apiService.listApiKeys();
     });
@@ -62,7 +63,10 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
             itemCount: apiKeys.length,
             itemBuilder: (context, index) {
               final apiKey = apiKeys[index];
-              return _ApiKeyCard(apiKey: apiKey, onAction: _refreshApiKeys);
+              return _ApiKeyCard(
+                  key: ValueKey(apiKey.prefix),
+                  apiKey: apiKey,
+                  onAction: _refreshApiKeys);
             },
           );
         },
@@ -71,7 +75,7 @@ class _ApiKeysScreenState extends State<ApiKeysScreen> {
         onPressed: _createNewApiKey,
         tooltip: isFr ? 'Créer une clé API' : 'Create API Key',
         backgroundColor: Theme.of(context).colorScheme.primary,
-        child: const Icon(Icons.add, color: Colors.white),
+        child: Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
       ),
     );
   }
@@ -121,7 +125,7 @@ class _ApiKeyCard extends StatelessWidget {
   final ApiKey apiKey;
   final VoidCallback onAction;
 
-  const _ApiKeyCard({required this.apiKey, required this.onAction});
+  const _ApiKeyCard({super.key, required this.apiKey, required this.onAction});
 
   @override
   Widget build(BuildContext context) {
@@ -129,15 +133,24 @@ class _ApiKeyCard extends StatelessWidget {
     final isFr = locale.languageCode == 'fr';
 
     return Card(
-      elevation: 0,
+      elevation: 2,
       color: Theme.of(context).cardColor,
       margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.0),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
       child: ListTile(
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         title: Text('Prefix: ${apiKey.prefix}',
-            style: Theme.of(context).textTheme.titleMedium),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                )),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -187,9 +200,10 @@ class _ApiKeyCard extends StatelessWidget {
             isFr
                 ? 'Voulez-vous vraiment faire expirer la clé API avec le préfixe ${apiKey.prefix} ?'
                 : 'Do you really want to expire the API key with prefix ${apiKey.prefix}?');
+        if (!context.mounted) return;
         if (confirm) {
           await apiService.expireApiKey(apiKey.prefix);
-          onAction();
+          if (context.mounted) onAction();
         }
         break;
       case 'delete':
@@ -199,9 +213,10 @@ class _ApiKeyCard extends StatelessWidget {
             isFr
                 ? 'Voulez-vous vraiment supprimer la clé API avec le préfixe ${apiKey.prefix} ?'
                 : 'Do you really want to delete the API key with prefix ${apiKey.prefix}?');
+        if (!context.mounted) return;
         if (confirm) {
           await apiService.deleteApiKey(apiKey.prefix);
-          onAction();
+          if (context.mounted) onAction();
         }
         break;
     }

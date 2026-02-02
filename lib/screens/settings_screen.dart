@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:headscalemanager/screens/add_edit_server_screen.dart';
 import 'package:headscalemanager/services/tag_migration_service.dart';
 import 'package:headscalemanager/widgets/server_list_tile.dart';
+import 'package:headscalemanager/screens/api_keys_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -284,6 +285,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Navigator.of(context).push(
                 MaterialPageRoute(
                     builder: (_) => const SecuritySettingsScreen()),
+              );
+            },
+          ),
+          SpeedDialChild(
+            child: const Icon(Icons.vpn_key),
+            label: isFr ? 'Clés API' : 'API Keys',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ApiKeysScreen()),
               );
             },
           ),

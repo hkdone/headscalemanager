@@ -14,6 +14,18 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '1.5.104',
+        title: isFr
+            ? 'Gestion des Clés API Restaurée'
+            : 'API Key Management Restored',
+        description: isFr
+            ? 'L\'écran de gestion des clés API est de retour ! Accessible depuis les Paramètres avec un design modernisé. Gérez vos clés d\'administration en toute sécurité.'
+            : 'The API Key management screen is back! Accessible from Settings with a modernized design. Manage your admin keys securely.',
+        verification: isFr
+            ? 'Paramètres > Bouton (+) > Clés API'
+            : 'Settings > (+) Button > API Keys',
+      ),
+      WhatsNewVersion(
         version: '1.5.103',
         title: isFr
             ? 'Support des Commentaires ACL (HuJSON)'
@@ -57,16 +69,6 @@ class WhatsNewVersion {
         verification: isFr
             ? 'Vous consultez actuellement cet écran !'
             : 'You are currently viewing this screen!',
-      ),
-      WhatsNewVersion(
-        version: '1.4.95',
-        title: isFr ? 'Transition vers v0.28' : 'Transition to v0.28',
-        description: isFr
-            ? 'Support des changements de l\'API Headscale v0.28. La génération de clés utilise désormais le nouveau système basé sur des ID. La fonctionnalité "Déplacer un nœud" a été supprimée car elle n\'est plus supportée par Headscale.'
-            : 'Support for the new Headscale v0.28 API changes. Key generation now uses the new ID-based system. The "Move Node" feature has been removed as it is no longer supported by Headscale.',
-        verification: isFr
-            ? 'Les nouvelles clés API s\'afficheront avec le préfixe confidentiel "hskey-auth-".'
-            : 'New API keys will show with the confidential prefix "hskey-auth-".',
       ),
     ];
   }
