@@ -14,6 +14,18 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '1.5.105',
+        title: isFr
+            ? 'Connexion OIDC & Corrections Importantes'
+            : 'OIDC Connection & Important Fixes',
+        description: isFr
+            ? 'Nouveau : Choix entre connexion Classique et OIDC lors de l\u2019ajout d\u2019un appareil. Correction automatique des utilisateurs OIDC créés sans nom (email utilisé comme nom). Correction d\u2019un bug d\u2019affichage du graphe ACL. Suppression des warnings de dépréciation.'
+            : 'New: Choose between Classic and OIDC connection when adding a device. Auto-fix for OIDC users created without a name (email used as name). Fixed ACL graph display bug. Removed deprecation warnings.',
+        verification: isFr
+            ? 'Écran Utilisateur > Nouvel Appareil > choisir le mode de connexion.'
+            : 'User Screen > New Device > choose connection mode.',
+      ),
+      WhatsNewVersion(
         version: '1.5.104',
         title: isFr
             ? 'Gestion des Clés API Restaurée'

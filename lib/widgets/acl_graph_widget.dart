@@ -149,7 +149,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
 
     final matrix = Matrix4.identity()
       ..setTranslationRaw(dx, dy, 0)
-      ..scale(scale, scale, 1.0);
+      ..scaleByDouble(scale, scale, 1.0, 1.0);
 
     _transformationController.value = matrix;
   }

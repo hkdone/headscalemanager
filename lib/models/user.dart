@@ -37,14 +37,26 @@ class User {
   ///
   /// Cette méthode gère la désérialisation des données JSON en un objet User.
   factory User.fromJson(Map<String, dynamic> json) {
+    final rawName = json['name'] as String?;
+    final rawEmail = json['email'] as String?;
+    final rawDisplayName = json['displayName'] as String?;
+    // Headscale OIDC peut créer un utilisateur avec name="" — on utilise
+    // l'email puis le displayName comme fallback pour éviter les ACLs invalides (group:)
+    final resolvedName = (rawName != null && rawName.isNotEmpty)
+        ? rawName
+        : (rawEmail != null && rawEmail.isNotEmpty)
+            ? rawEmail
+            : (rawDisplayName != null && rawDisplayName.isNotEmpty)
+                ? rawDisplayName
+                : 'Unknown User';
     return User(
       id: json['id'] ?? '',
-      name: json['name'] ?? 'Unknown User',
+      name: resolvedName,
       createdAt: json['createdAt'] != null && json['createdAt'] is String
           ? DateTime.parse(json['createdAt'])
           : null,
-      email: json['email'] as String?,
-      displayName: json['displayName'] as String?,
+      email: rawEmail,
+      displayName: rawDisplayName,
       provider: json['provider'] as String?,
       profilePicUrl: json['profilePicUrl'] as String?,
     );

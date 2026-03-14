@@ -68,32 +68,35 @@ class _SharedRoutesAccessDialogState extends State<SharedRoutesAccessDialog> {
 
   List<Widget> _buildChoiceRadios(bool isFr) {
     return [
-      RadioListTile<RouteAccessChoice>(
-        title: Text(isFr ? 'Accès au nœud uniquement' : 'Node access only'),
-        subtitle: Text(isFr
-            ? 'Autoriser l\'accès au nœud mais pas aux sous-réseaux partagés'
-            : 'Allow access to the node but not to shared subnets'),
-        value: RouteAccessChoice.none,
+      RadioGroup<RouteAccessChoice>(
         groupValue: _choice,
         onChanged: (value) => setState(() => _choice = value!),
-      ),
-      RadioListTile<RouteAccessChoice>(
-        title: Text(isFr ? 'Accès total' : 'Full access'),
-        subtitle: Text(isFr
-            ? 'Autoriser l\'accès au nœud et à toutes les routes partagées'
-            : 'Allow access to the node and all shared routes'),
-        value: RouteAccessChoice.full,
-        groupValue: _choice,
-        onChanged: (value) => setState(() => _choice = value!),
-      ),
-      RadioListTile<RouteAccessChoice>(
-        title: Text(isFr ? 'Accès personnalisé' : 'Custom access'),
-        subtitle: Text(isFr
-            ? 'Définir des règles spécifiques par sous-réseau'
-            : 'Define specific rules per subnet'),
-        value: RouteAccessChoice.custom,
-        groupValue: _choice,
-        onChanged: (value) => setState(() => _choice = value!),
+        child: Column(
+          children: [
+            RadioListTile<RouteAccessChoice>(
+              title:
+                  Text(isFr ? 'Accès au nœud uniquement' : 'Node access only'),
+              subtitle: Text(isFr
+                  ? 'Autoriser l\'accès au nœud mais pas aux sous-réseaux partagés'
+                  : 'Allow access to the node but not to shared subnets'),
+              value: RouteAccessChoice.none,
+            ),
+            RadioListTile<RouteAccessChoice>(
+              title: Text(isFr ? 'Accès total' : 'Full access'),
+              subtitle: Text(isFr
+                  ? 'Autoriser l\'accès au nœud et à toutes les routes partagées'
+                  : 'Allow access to the node and all shared routes'),
+              value: RouteAccessChoice.full,
+            ),
+            RadioListTile<RouteAccessChoice>(
+              title: Text(isFr ? 'Accès personnalisé' : 'Custom access'),
+              subtitle: Text(isFr
+                  ? 'Définir des règles spécifiques par sous-réseau'
+                  : 'Define specific rules per subnet'),
+              value: RouteAccessChoice.custom,
+            ),
+          ],
+        ),
       ),
     ];
   }

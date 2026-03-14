@@ -28,8 +28,47 @@ class _UsersScreenState extends State<UsersScreen> {
 
   void _refreshUsers() {
     setState(() {
-      _usersFuture = context.read<AppProvider>().apiService.getUsers();
+      _usersFuture = _loadAndFixUsers();
     });
+  }
+
+  /// Charge les utilisateurs et corrige automatiquement ceux créés par OIDC
+  /// avec un nom vide côté serveur, en utilisant leur email comme nom via l'API.
+  ///
+  /// Headscale peut créer un utilisateur OIDC avec name="" — User.fromJson applique
+  /// l'email comme fallback d'affichage (name == email), ce qui est le signal
+  /// que le serveur n'a pas de nom défini et qu'un renommage API est nécessaire.
+  Future<List<User>> _loadAndFixUsers() async {
+    final apiService = context.read<AppProvider>().apiService;
+    final users = await apiService.getUsers();
+
+    // Signal : OIDC user dont le nom a été résolu depuis l'email (server name était "")
+    // Condition : provider renseigné + email dispo + name == email (fallback appliqué dans fromJson)
+    final toFix = users
+        .where((u) =>
+            u.provider != null &&
+            u.provider!.isNotEmpty &&
+            u.email != null &&
+            u.email!.isNotEmpty &&
+            u.name == u.email)
+        .toList();
+
+    if (toFix.isNotEmpty) {
+      bool anyFixed = false;
+      for (final user in toFix) {
+        try {
+          await apiService.renameUser(user.id, user.email!);
+          anyFixed = true;
+        } catch (_) {
+          // Silencieux : si le renommage échoue (nom déjà correct côté serveur, etc.)
+        }
+      }
+      if (anyFixed) {
+        return await apiService.getUsers();
+      }
+    }
+
+    return users;
   }
 
   @override

@@ -89,10 +89,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             }
             final users = filteredNodesByUser.keys.toList();
 
+            // Détecte les nœuds dont l'utilisateur a un nom vide côté serveur
+            // (créés automatiquement par OIDC sans nom) — avant que UsersScreen
+            // ait eu le temps de corriger via renameUser.
+            final oidcUsersMissingName = allNodes
+                .where((n) => n.user.isEmpty || n.user == 'N/A')
+                .toList();
+
             return RefreshIndicator(
               onRefresh: _refreshNodes,
               child: Column(
                 children: [
+                  if (oidcUsersMissingName.isNotEmpty)
+                    _buildOidcWarningBanner(context, isFr),
                   _buildSummarySection(users.length, connectedNodesCount,
                       disconnectedNodesCount, isFr),
                   _buildFilterChips(isFr),
@@ -117,6 +126,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildOidcWarningBanner(BuildContext context, bool isFr) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.person_off_outlined, color: Colors.orange, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              isFr
+                  ? 'Un ou plusieurs nœuds OIDC ont un utilisateur sans nom. Ouvrez l\'écran Utilisateurs pour corriger automatiquement.'
+                  : 'One or more OIDC nodes have a nameless user. Open the Users screen to auto-fix.',
+              style: const TextStyle(color: Colors.orange, fontSize: 13),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -105,7 +105,15 @@ class Node {
       machineKey: json['machineKey'] ?? '',
       hostname: hostname,
       name: givenName.isNotEmpty ? givenName : hostname,
-      user: userMap != null ? (userMap['name'] ?? 'N/A') : 'N/A',
+      user: userMap != null
+          ? () {
+              final n = userMap['name'] as String?;
+              if (n != null && n.isNotEmpty) return n;
+              final e = userMap['email'] as String?;
+              if (e != null && e.isNotEmpty) return e;
+              return 'N/A';
+            }()
+          : 'N/A',
       userId: userMap != null ? (userMap['id'] ?? '') : '',
       ipAddresses: List<String>.from(json['ipAddresses'] ?? []),
       online: json['online'] ?? false,

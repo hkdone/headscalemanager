@@ -1,3 +1,15 @@
 {
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "cSpell.enabled": false,
+    "cSpell.words": [
+        "actif",
+        "actuel",
+        "adresses",
+        "affichée",
+        "Ajout",
+        "annoncées",
+        "approuvables",
+        "approuvé",
+        "approuvées"
+    ]
 }
