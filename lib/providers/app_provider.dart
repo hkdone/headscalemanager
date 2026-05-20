@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/api/headscale_api_service.dart';
 import 'package:headscalemanager/models/server.dart';
+import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/services/notification_service.dart';
 import 'package:headscalemanager/services/storage_service.dart';
 
@@ -14,6 +15,7 @@ class AppProvider extends ChangeNotifier {
   Locale _locale = const Locale('fr');
   List<Server> _servers = [];
   Server? _activeServer;
+  List<TaildriveShare> _taildriveShares = [];
 
   AppProvider() {
     _initializeServices();
@@ -24,6 +26,7 @@ class AppProvider extends ChangeNotifier {
     await _loadLocale();
     await _loadServers();
     await _loadAclEnginePreference();
+    await _loadTaildriveShares();
 
     // Auto-detect if we should benefit from Standard ACL Engine
     if (_activeServer != null && !_useStandardAclEngine) {
@@ -79,6 +82,35 @@ class AppProvider extends ChangeNotifier {
   List<Server> get servers => _servers;
   Server? get activeServer => _activeServer;
   String get serverVersion => _activeServer?.version ?? '0.25.0';
+  List<TaildriveShare> get taildriveShares => _taildriveShares;
+
+  Future<void> _loadTaildriveShares() async {
+    if (_activeServer == null) {
+      _taildriveShares = [];
+      return;
+    }
+    final sharesJson =
+        await _storageService.getTaildriveShares(_activeServer!.id);
+    _taildriveShares =
+        sharesJson.map((j) => TaildriveShare.fromJson(j)).toList();
+    notifyListeners();
+  }
+
+  Future<void> addTaildriveShare(TaildriveShare share) async {
+    if (_activeServer == null) return;
+    _taildriveShares.add(share);
+    await _storageService.saveTaildriveShares(
+        _activeServer!.id, _taildriveShares.map((s) => s.toJson()).toList());
+    notifyListeners();
+  }
+
+  Future<void> deleteTaildriveShare(String shareId) async {
+    if (_activeServer == null) return;
+    _taildriveShares.removeWhere((s) => s.id == shareId);
+    await _storageService.saveTaildriveShares(
+        _activeServer!.id, _taildriveShares.map((s) => s.toJson()).toList());
+    notifyListeners();
+  }
 
   Future<void> _loadLocale() async {
     final languageCode = await _storageService.getLanguage();
@@ -172,6 +204,7 @@ class AppProvider extends ChangeNotifier {
       apiKey: _activeServer!.apiKey,
       baseUrl: _activeServer!.url,
     );
+    await _loadTaildriveShares();
     notifyListeners();
     _detectServerVersion(); // Détecter la version après le changement
   }

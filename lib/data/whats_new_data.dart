@@ -14,6 +14,18 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '1.6.0',
+        title: isFr
+            ? 'Partage de fichiers (Taildrive)'
+            : 'File Sharing (Taildrive)',
+        description: isFr
+            ? 'Intégration de Taildrive ! Partagez des dossiers entre vos appareils directement via les ACL. Inclut un filtre de connectivité intelligent pour ne proposer que des partages fonctionnels.'
+            : 'Taildrive Integration! Share folders between your devices directly via ACLs. Includes an intelligent connectivity filter to only suggest functional shares.',
+        verification: isFr
+            ? 'Écran ACL > Bouton (+) > Partages Taildrive'
+            : 'User Screen > (+) Button > Taildrive Shares',
+      ),
+      WhatsNewVersion(
         version: '1.5.105',
         title: isFr
             ? 'Connexion OIDC & Corrections Importantes'

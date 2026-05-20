@@ -1,4 +1,5 @@
 import 'package:headscalemanager/models/node.dart';
+import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 
@@ -10,12 +11,14 @@ class NewAclGeneratorService {
   /// [users] : Liste des utilisateurs Headscale.
   /// [nodes] : Liste des nœuds Headscale.
   /// [temporaryRules] : Liste des règles d'exception manuelles (tag-à-tag).
+  /// [taildriveShares] : Liste des partages Taildrive.
   ///
   /// Retourne un [Map<String, dynamic>] représentant la politique ACL générée.
   Map<String, dynamic> generatePolicy({
     required List<User> users,
     required List<Node> nodes,
     List<Map<String, dynamic>> temporaryRules = const [],
+    List<TaildriveShare> taildriveShares = const [],
   }) {
     // --- Étape 1: Création des groupes et pré-déclaration des tagOwners de base ---
     final groups = <String, List<String>>{};
@@ -211,13 +214,109 @@ class NewAclGeneratorService {
       }
     }
 
-    // --- Étape 4: Assemblage final ---
-    return {
+    // --- Étape 4: Taildrive (nodeAttrs & grants) ---
+    final nodeAttrs = <Map<String, dynamic>>[];
+    final grants = <Map<String, dynamic>>[];
+
+    if (taildriveShares.isNotEmpty) {
+      // 4.1: Identifier les nœuds sources uniques pour nodeAttrs
+      final sourceNodeIds = taildriveShares.map((s) => s.sourceNodeId).toSet();
+      for (var nodeId in sourceNodeIds) {
+        final node = nodes.firstWhere((n) => n.id == nodeId,
+            orElse: () => Node(
+                id: '',
+                machineKey: '',
+                hostname: '',
+                name: '',
+                user: '',
+                userId: '',
+                ipAddresses: [],
+                online: false,
+                lastSeen: DateTime.now(),
+                sharedRoutes: [],
+                availableRoutes: [],
+                isExitNode: false,
+                isLanSharer: false,
+                tags: [],
+                baseDomain: '',
+                endpoint: ''));
+
+        if (node.id.isNotEmpty) {
+          // Utiliser les tags si présents, sinon le groupe utilisateur
+          final targets = node.tags.isNotEmpty
+              ? node.tags
+              : ['group:${normalizeUserName(node.user)}'];
+
+          nodeAttrs.add({
+            'target': targets,
+            'attr': ['cap:taildrive'],
+          });
+        }
+      }
+
+      // 4.2: Créer les grants
+      for (var share in taildriveShares) {
+        final sourceNode = nodes.firstWhere((n) => n.id == share.sourceNodeId,
+            orElse: () => Node(
+                id: '',
+                machineKey: '',
+                hostname: '',
+                name: '',
+                user: '',
+                userId: '',
+                ipAddresses: [],
+                online: false,
+                lastSeen: DateTime.now(),
+                sharedRoutes: [],
+                availableRoutes: [],
+                isExitNode: false,
+                isLanSharer: false,
+                tags: [],
+                baseDomain: '',
+                endpoint: ''));
+
+        if (sourceNode.id.isNotEmpty) {
+          final dstTargets = sourceNode.tags.isNotEmpty
+              ? sourceNode.tags
+              : ['group:${normalizeUserName(sourceNode.user)}'];
+
+          // Source can be a group name (already prefixed) or a user name (add prefix)
+          final src = share.recipient.startsWith('group:')
+              ? share.recipient
+              : 'group:${normalizeUserName(share.recipient)}';
+
+          grants.add({
+            'src': [src],
+            'dst': dstTargets,
+            'app': {
+              'tailscale.com/cap/taildrive': [
+                {
+                  'share': share.shareName,
+                  'access': share.accessMode == TaildriveAccessMode.rw ? 'rw' : 'ro',
+                }
+              ]
+            }
+          });
+        }
+      }
+    }
+
+    // --- Étape 5: Assemblage final ---
+    final policy = {
       'groups': groups,
       'tagOwners': tagOwners,
       'autoApprovers': autoApprovers,
       'acls': acls,
       'hosts': <String, dynamic>{},
     };
+
+    if (nodeAttrs.isNotEmpty) {
+      policy['nodeAttrs'] = nodeAttrs;
+    }
+    if (grants.isNotEmpty) {
+      policy['grants'] = grants;
+    }
+
+    return policy;
   }
 }

@@ -121,6 +121,30 @@ class StorageService {
   }
 
   static const _aclEngineKey = 'ACL_ENGINE_STANDARD_ENABLED';
+  static const _taildriveSharesPrefix = 'TAILDRIVE_SHARES_';
+
+  Future<void> saveTaildriveShares(
+      String serverId, List<Map<String, dynamic>> shares) async {
+    final String sharesJson = json.encode(shares);
+    await _storage.write(
+        key: '$_taildriveSharesPrefix$serverId', value: sharesJson);
+  }
+
+  Future<List<Map<String, dynamic>>> getTaildriveShares(String serverId) async {
+    final String? sharesJson =
+        await _storage.read(key: '$_taildriveSharesPrefix$serverId');
+    if (sharesJson != null && sharesJson.isNotEmpty) {
+      try {
+        final List<dynamic> decodedList = json.decode(sharesJson);
+        return decodedList
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  }
 
   Future<void> setStandardAclEngineEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();

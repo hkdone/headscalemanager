@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/acl_manager_screen.dart';
+import 'package:headscalemanager/models/version_info.dart';
+import 'package:headscalemanager/screens/taildrive_manager_screen.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -117,6 +119,7 @@ class _AclScreenState extends State<AclScreen> {
   @override
   Widget build(BuildContext context) {
     final locale = context.watch<AppProvider>().locale;
+    final appProvider = context.watch<AppProvider>();
     final isFr = locale.languageCode == 'fr';
 
     return Scaffold(
@@ -185,6 +188,22 @@ class _AclScreenState extends State<AclScreen> {
               );
             },
           ),
+          if (VersionInfo.checkVersionAtLeast(
+              appProvider.serverVersion, '0.27.0'))
+            SpeedDialChild(
+              child: const Icon(Icons.folder_shared),
+              label: isFr ? 'Partages Taildrive' : 'Taildrive Shares',
+              backgroundColor: Colors.orange,
+              labelBackgroundColor: Colors.orange,
+              labelStyle: const TextStyle(color: Colors.white),
+              foregroundColor: Colors.white,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (_) => const TaildriveManagerScreen()),
+                );
+              },
+            ),
           SpeedDialChild(
             child: const Icon(Icons.settings_backup_restore),
             label: isFr ? 'Générer Politique' : 'Generate Policy',
@@ -843,6 +862,7 @@ class _AclScreenState extends State<AclScreen> {
           users: users,
           nodes: nodes,
           temporaryRules: _temporaryRules,
+          taildriveShares: appProvider.taildriveShares,
         );
       }
 
