@@ -351,9 +351,9 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
               ElevatedButton.icon(
                 onPressed: () {
                   // Auto-generate tag based on User Name
-                  String rawName = widget.node.user;
-                  // Si le nom du noeud est invalide (ex: N/A sur OIDC), on utilise le fallback (nom de l'utilisateur parent)
-                  if (rawName == 'N/A' || rawName.isEmpty) {
+                  String rawName = widget.node.getNormalizedOwner();
+                  // Si le nom du noeud est invalide (ex: N/A sur OIDC ou tagged-devices sur v0.28), on utilise le fallback (nom de l'utilisateur parent)
+                  if (rawName == 'N/A' || rawName.isEmpty || rawName == 'tagged-devices' || rawName == 'n-a' || rawName == 'na') {
                     rawName = widget.fallbackUser ?? 'user';
                   }
 
@@ -371,8 +371,8 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
                 icon: const Icon(Icons.auto_fix_high),
                 label: Builder(builder: (context) {
                   // Calculer le nom affiché sur le bouton dynamiquement pour que l'utilisateur voit ce qu'il va obtenir
-                  String rawName = widget.node.user;
-                  if (rawName == 'N/A' || rawName.isEmpty) {
+                  String rawName = widget.node.getNormalizedOwner();
+                  if (rawName == 'N/A' || rawName.isEmpty || rawName == 'tagged-devices' || rawName == 'n-a' || rawName == 'na') {
                     rawName = widget.fallbackUser ?? 'user';
                   }
                   String userName = normalizeUserName(rawName);

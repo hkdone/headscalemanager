@@ -191,7 +191,7 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog>
                       (t) => t.contains('-client'),
                       orElse: () => '');
                   if (clientTag.isNotEmpty) {
-                    final normUser = widget.node.user;
+                    final normUser = widget.node.getNormalizedOwner();
                     final capTag = 'tag:$normUser-exit-node';
                     if (!currentTags.contains(capTag)) {
                       newTags = [...currentTags, capTag];

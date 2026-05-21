@@ -1,6 +1,5 @@
 import 'package:headscalemanager/api/headscale_api_service.dart';
 import 'package:headscalemanager/models/node.dart';
-import 'package:headscalemanager/utils/string_utils.dart';
 
 class MigrationResult {
   final int successCount;
@@ -91,7 +90,7 @@ class TagMigrationService {
     List<String> newTags = [];
     final oldTags = node.tags;
     // Use normalizeUserName to ensure we match ACL generator expectations (lowercase, no domain)
-    final userName = normalizeUserName(node.user);
+    final userName = node.getNormalizedOwner();
 
     for (final tag in oldTags) {
       if (tag.contains(';')) {
@@ -150,7 +149,7 @@ class TagMigrationService {
       // No client tag found to merge onto.
       // We synthesize a default client tag based on the user name
       // This handles cases where a node might only have capability tags in the new system
-      String primary = 'tag:${normalizeUserName(node.user)}-client';
+      String primary = 'tag:${node.getNormalizedOwner()}-client';
       StringBuffer merged = StringBuffer(primary);
 
       if (hasExitNode) merged.write(';exit-node');

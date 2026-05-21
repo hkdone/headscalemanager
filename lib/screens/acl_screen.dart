@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/acl_manager_screen.dart';
-import 'package:headscalemanager/models/version_info.dart';
-import 'package:headscalemanager/screens/taildrive_manager_screen.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -119,7 +117,6 @@ class _AclScreenState extends State<AclScreen> {
   @override
   Widget build(BuildContext context) {
     final locale = context.watch<AppProvider>().locale;
-    final appProvider = context.watch<AppProvider>();
     final isFr = locale.languageCode == 'fr';
 
     return Scaffold(
@@ -188,22 +185,40 @@ class _AclScreenState extends State<AclScreen> {
               );
             },
           ),
-          if (VersionInfo.checkVersionAtLeast(
-              appProvider.serverVersion, '0.27.0'))
-            SpeedDialChild(
-              child: const Icon(Icons.folder_shared),
-              label: isFr ? 'Partages Taildrive' : 'Taildrive Shares',
-              backgroundColor: Colors.orange,
-              labelBackgroundColor: Colors.orange,
-              labelStyle: const TextStyle(color: Colors.white),
-              foregroundColor: Colors.white,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                      builder: (_) => const TaildriveManagerScreen()),
-                );
-              },
-            ),
+          // Indique que cette fonctionnalité masquée est en attente d'implémentation stable dans Headscale
+          SpeedDialChild(
+            child: const Icon(Icons.folder_shared),
+            label: isFr ? 'Partages Taildrive (En attente)' : 'Taildrive Shares (Pending)',
+            backgroundColor: Colors.grey,
+            labelBackgroundColor: Colors.grey.shade700,
+            labelStyle: const TextStyle(color: Colors.white),
+            foregroundColor: Colors.white70,
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text(isFr ? 'Fonctionnalité en attente' : 'Feature Pending'),
+                    ],
+                  ),
+                  content: Text(
+                    isFr
+                        ? 'La gestion des partages Taildrive (via nodeAttrs et grants) est actuellement en attente d\'intégration stable dans Headscale. Une pull request amont (PR #3245) est en cours de discussion pour intégrer nativement ce support.\n\nEn attendant sa finalisation et son intégration officielle dans une version stable de Headscale, cette fonctionnalité est désactivée pour éviter des erreurs serveur (HTTP 500).'
+                        : 'Taildrive share management (via nodeAttrs and grants) is currently pending stable implementation in Headscale. An upstream pull request (PR #3245) is under discussion to natively support this.\n\nUntil it is finalized and officially integrated into a stable Headscale release, this feature is disabled to prevent server errors (HTTP 500).',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(isFr ? 'Fermer' : 'Close'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
           SpeedDialChild(
             child: const Icon(Icons.settings_backup_restore),
             label: isFr ? 'Générer Politique' : 'Generate Policy',
@@ -372,7 +387,7 @@ class _AclScreenState extends State<AclScreen> {
                         _selectedDestinationNode = null;
                         if (node != null) {
                           _destinationNodes = _allNodes
-                              .where((n) => n.user != node.user)
+                              .where((n) => n.getNormalizedOwner() != node.getNormalizedOwner())
                               .toList();
                         } else {
                           _destinationNodes = List.from(_allNodes);
@@ -856,13 +871,14 @@ class _AclScreenState extends State<AclScreen> {
           users: users,
           nodes: nodes,
           temporaryRules: _temporaryRules,
+          taildriveShares: const [],
         );
       } else {
         _currentAclPolicy = _newAclGeneratorService.generatePolicy(
           users: users,
           nodes: nodes,
           temporaryRules: _temporaryRules,
-          taildriveShares: appProvider.taildriveShares,
+          taildriveShares: const [],
         );
       }
 

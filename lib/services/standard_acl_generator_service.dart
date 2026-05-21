@@ -1,4 +1,5 @@
 import 'package:headscalemanager/models/node.dart';
+import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:flutter/foundation.dart';
@@ -17,13 +18,14 @@ class StandardAclGeneratorService {
     required List<User> users,
     required List<Node> nodes,
     List<Map<String, dynamic>> temporaryRules = const [],
+    List<TaildriveShare> taildriveShares = const [],
   }) {
     // --- Step 1: Groups & Tag Owners ---
     final groups = <String, List<String>>{};
     final tagOwners = <String, List<String>>{};
 
     for (var user in users) {
-      final groupName = 'group:${user.name}';
+      final groupName = 'group:${normalizeUserName(user.name)}';
       groups[groupName] = [user.name];
 
       // Define standard tags for this user
@@ -44,7 +46,7 @@ class StandardAclGeneratorService {
     };
 
     for (var node in nodes) {
-      final normalizedUser = normalizeUserName(node.user);
+      final normalizedUser = node.getNormalizedOwner();
       final stdExit = 'tag:$normalizedUser-exit-node';
       final stdLan = 'tag:$normalizedUser-lan-sharer';
 
@@ -146,7 +148,7 @@ class StandardAclGeneratorService {
 
     // 3.2: Base User Rules
     for (var user in users) {
-      final groupName = 'group:${user.name}';
+      final groupName = 'group:${normalizeUserName(user.name)}';
       final normalizedUser = normalizeUserName(user.name);
       debugPrint('DEBUG: Processing user $normalizedUser');
 
@@ -154,7 +156,11 @@ class StandardAclGeneratorService {
       final stdExitTag = 'tag:$normalizedUser-exit-node';
       final stdLanTag = 'tag:$normalizedUser-lan-sharer';
 
-      final userNodes = nodes.where((node) => node.user == user.name).toList();
+      final userNodes = nodes
+          .where((node) =>
+              node.user == user.name ||
+              node.getNormalizedOwner() == normalizeUserName(user.name))
+          .toList();
 
       final activeUserTags = <String>{};
       bool hasActiveExitNodes = false;
@@ -239,14 +245,106 @@ class StandardAclGeneratorService {
       });
     }
 
-    // --- Step 4: Final Assembly ---
-    return {
+    // --- Step 4: Taildrive (nodeAttrs & grants) ---
+    final nodeAttrs = <Map<String, dynamic>>[];
+    final grants = <Map<String, dynamic>>[];
+
+    if (taildriveShares.isNotEmpty) {
+      final sourceNodeIds = taildriveShares.map((s) => s.sourceNodeId).toSet();
+      for (var nodeId in sourceNodeIds) {
+        final node = nodes.firstWhere((n) => n.id == nodeId,
+            orElse: () => Node(
+                id: '',
+                machineKey: '',
+                hostname: '',
+                name: '',
+                user: '',
+                userId: '',
+                ipAddresses: [],
+                online: false,
+                lastSeen: DateTime.now(),
+                sharedRoutes: [],
+                availableRoutes: [],
+                isExitNode: false,
+                isLanSharer: false,
+                tags: [],
+                baseDomain: '',
+                endpoint: ''));
+
+        if (node.id.isNotEmpty) {
+          final targets = node.tags.isNotEmpty
+              ? node.tags
+              : ['group:${node.getNormalizedOwner()}'];
+
+          nodeAttrs.add({
+            'target': targets,
+            'attr': ['cap:taildrive'],
+          });
+        }
+      }
+
+      for (var share in taildriveShares) {
+        final sourceNode = nodes.firstWhere((n) => n.id == share.sourceNodeId,
+            orElse: () => Node(
+                id: '',
+                machineKey: '',
+                hostname: '',
+                name: '',
+                user: '',
+                userId: '',
+                ipAddresses: [],
+                online: false,
+                lastSeen: DateTime.now(),
+                sharedRoutes: [],
+                availableRoutes: [],
+                isExitNode: false,
+                isLanSharer: false,
+                tags: [],
+                baseDomain: '',
+                endpoint: ''));
+
+        if (sourceNode.id.isNotEmpty) {
+          final dstTargets = sourceNode.tags.isNotEmpty
+              ? sourceNode.tags
+              : ['group:${sourceNode.getNormalizedOwner()}'];
+
+          final src = share.recipient.startsWith('group:')
+              ? share.recipient
+              : 'group:${normalizeUserName(share.recipient)}';
+
+          grants.add({
+            'src': [src],
+            'dst': dstTargets,
+            'app': {
+              'tailscale.com/cap/taildrive': [
+                {
+                  'share': share.shareName,
+                  'access': share.accessMode == TaildriveAccessMode.rw ? 'rw' : 'ro',
+                }
+              ]
+            }
+          });
+        }
+      }
+    }
+
+    // --- Step 5: Final Assembly ---
+    final policy = {
       'groups': groups,
       'tagOwners': tagOwners,
       'autoApprovers': autoApprovers,
       'acls': acls,
       'hosts': <String, dynamic>{},
     };
+
+    if (nodeAttrs.isNotEmpty) {
+      policy['nodeAttrs'] = nodeAttrs;
+    }
+    if (grants.isNotEmpty) {
+      policy['grants'] = grants;
+    }
+
+    return policy;
   }
 
   void _addTagOwner(

@@ -105,7 +105,7 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
                       (t) => t.contains('-client'),
                       orElse: () => '');
                   if (clientTag.isNotEmpty) {
-                    final normUser = widget.node.user;
+                    final normUser = widget.node.getNormalizedOwner();
                     final capTag = 'tag:$normUser-lan-sharer';
                     if (!currentTags.contains(capTag)) {
                       newTags = [...currentTags, capTag];

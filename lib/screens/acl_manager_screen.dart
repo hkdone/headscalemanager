@@ -6,6 +6,7 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/services/acl_parser_service.dart';
 import 'package:headscalemanager/utils/json_utils.dart';
+import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:headscalemanager/widgets/acl_graph_widget.dart';
 
 class AclManagerScreen extends StatefulWidget {
@@ -160,8 +161,11 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
         itemCount: _users.length,
         itemBuilder: (context, index) {
           final user = _users[index];
-          final userNodes =
-              _nodes.where((node) => node.user == user.name).toList();
+          final userNodes = _nodes
+              .where((node) =>
+                  node.user == user.name ||
+                  node.getNormalizedOwner() == normalizeUserName(user.name))
+              .toList();
 
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -237,6 +241,14 @@ class _AclManagerScreenState extends State<AclManagerScreen> {
           ports: '*',
           source: e.sourceNode?.name ?? (isFr ? 'Direct' : 'Direct'),
         )));
+
+    rows.addAll(
+        permissions.allowedTaildriveShares.map((t) => _PermissionRowData(
+              destination: t.shareName,
+              type: 'Taildrive',
+              ports: t.access,
+              source: t.sourceNodes.map((n) => n.name).join(', '),
+            )));
 
     if (rows.isEmpty) {
       return [

@@ -186,8 +186,10 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
                       : 'Failed to load users: ${snapshot.error}');
                 }
                 final users = snapshot.data ?? [];
-                final otherUsers =
-                    users.where((u) => u.name != widget.node.user).toList();
+                final selectedOwner = widget.node.getNormalizedOwner();
+                final otherUsers = users
+                    .where((u) => normalizeUserName(u.name) != selectedOwner)
+                    .toList();
 
                 if (otherUsers.isEmpty) {
                   return Text(isFr

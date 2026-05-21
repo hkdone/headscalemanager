@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:headscalemanager/models/version_info.dart';
+import 'package:headscalemanager/utils/string_utils.dart';
 
 class TaildriveManagerScreen extends StatefulWidget {
   const TaildriveManagerScreen({super.key});
@@ -45,66 +48,228 @@ class _TaildriveManagerScreenState extends State<TaildriveManagerScreen> {
     final isFr = appProvider.locale.languageCode == 'fr';
     final shares = appProvider.taildriveShares;
 
+    final supportsTaildrive = VersionInfo.checkVersionAtLeast(
+        appProvider.serverVersion, '0.28.0');
+
     return Scaffold(
       appBar: AppBar(
         title: Text(isFr ? 'Partages Taildrive' : 'Taildrive Shares'),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : shares.isEmpty
-              ? _buildEmptyState(isFr)
-              : ListView.builder(
-                  itemCount: shares.length,
-                  itemBuilder: (context, index) {
-                    final share = shares[index];
-                    final sourceNode = _allNodes.firstWhere(
-                      (n) => n.id == share.sourceNodeId,
-                      orElse: () => Node(
-                        id: '',
-                        machineKey: '',
-                        hostname: '',
-                        name: isFr ? 'Nœud inconnu' : 'Unknown Node',
-                        user: '',
-                        userId: '',
-                        ipAddresses: [],
-                        online: false,
-                        lastSeen: DateTime.now(),
-                        sharedRoutes: [],
-                        availableRoutes: [],
-                        isExitNode: false,
-                        isLanSharer: false,
-                        tags: [],
-                        baseDomain: '',
-                        endpoint: '',
-                      ),
-                    );
+      body: Column(
+        children: [
+          if (!supportsTaildrive)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.shade900.withAlpha(51),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.red.shade900, width: 1.5),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isFr ? 'Version de Headscale incompatible' : 'Incompatible Headscale Version',
+                          style: const TextStyle(
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isFr 
+                              ? 'Votre serveur tourne sous la version ${appProvider.serverVersion}. Les partages Taildrive nécessitent Headscale 0.28.0+ pour fonctionner. Les règles d\'accès ACL ne seront pas appliquées.'
+                              : 'Your server is running version ${appProvider.serverVersion}. Taildrive shares require Headscale 0.28.0+ to function. Access rules will not be active on the server.',
+                          style: TextStyle(
+                            color: Colors.red.shade100,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : shares.isEmpty
+                    ? _buildEmptyState(isFr)
+                    : ListView.builder(
+                        itemCount: shares.length,
+                        itemBuilder: (context, index) {
+                          final share = shares[index];
+                          final sourceNode = _allNodes.firstWhere(
+                            (n) => n.id == share.sourceNodeId,
+                            orElse: () => Node(
+                              id: '',
+                              machineKey: '',
+                              hostname: '',
+                              name: isFr ? 'Nœud inconnu' : 'Unknown Node',
+                              user: '',
+                              userId: '',
+                              ipAddresses: [],
+                              online: false,
+                              lastSeen: DateTime.now(),
+                              sharedRoutes: [],
+                              availableRoutes: [],
+                              isExitNode: false,
+                              isLanSharer: false,
+                              tags: [],
+                              baseDomain: '',
+                              endpoint: '',
+                            ),
+                          );
 
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        leading: const Icon(Icons.folder, color: Colors.orange),
-                        title: Text(share.shareName,
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                                '${isFr ? 'Source' : 'Source'}: ${sourceNode.name}'),
-                            Text(
-                                '${isFr ? 'Bénéficiaire' : 'Recipient'}: ${share.recipient}'),
-                            Text(
-                                '${isFr ? 'Mode' : 'Mode'}: ${share.accessMode == TaildriveAccessMode.rw ? (isFr ? 'Lecture/Écriture' : 'Read/Write') : (isFr ? 'Lecture seule' : 'Read-only')}'),
-                          ],
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _confirmDelete(share.id, isFr),
-                        ),
+                          final domain = sourceNode.baseDomain.isNotEmpty ? sourceNode.baseDomain : 'tailnet';
+                          final clientUrl = 'http://100.100.100.100:8080/$domain/${sourceNode.name}/${share.shareName}';
+                          final hostCommand = 'tailscale drive share ${share.shareName} "${share.localPath}"';
+
+                          return Card(
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    left: BorderSide(
+                                      color: share.accessMode == TaildriveAccessMode.rw 
+                                          ? const Color(0xFF10B981) 
+                                          : const Color(0xFF3B82F6),
+                                      width: 5,
+                                    ),
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.folder, color: Colors.amber, size: 28),
+                                              const SizedBox(width: 10),
+                                              Text(
+                                                share.shareName,
+                                                style: const TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  letterSpacing: 0.5,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: (share.accessMode == TaildriveAccessMode.rw 
+                                                      ? const Color(0xFF10B981).withValues(alpha: 0.15) 
+                                                      : const Color(0xFF3B82F6).withValues(alpha: 0.15)),
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                child: Text(
+                                                  share.accessMode == TaildriveAccessMode.rw 
+                                                      ? (isFr ? 'Lecture/Écriture' : 'Read/Write')
+                                                      : (isFr ? 'Lecture seule' : 'Read-only'),
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: share.accessMode == TaildriveAccessMode.rw 
+                                                        ? const Color(0xFF10B981) 
+                                                        : const Color(0xFF3B82F6),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              IconButton(
+                                                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                                                onPressed: () => _confirmDelete(share.id, isFr),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _buildDetailRow(
+                                        icon: Icons.computer,
+                                        label: isFr ? 'Machine Source' : 'Source Machine',
+                                        value: sourceNode.name,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      _buildDetailRow(
+                                        icon: Icons.person_outline,
+                                        label: isFr ? 'Bénéficiaire' : 'Recipient',
+                                        value: share.recipient,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      _buildDetailRow(
+                                        icon: Icons.folder_open_outlined,
+                                        label: isFr ? 'Dossier partagé' : 'Shared folder',
+                                        value: share.localPath,
+                                        isPath: true,
+                                      ),
+                                      const Divider(height: 24, thickness: 1),
+                                      Text(
+                                        isFr 
+                                            ? '1. Lancer ce partage sur la machine Windows/Linux/Mac :' 
+                                            : '1. Start this share on the Windows/Linux/Mac machine:',
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      _buildCliBox(
+                                        context: context,
+                                        text: hostCommand,
+                                        isFr: isFr,
+                                        snackbarMsg: isFr 
+                                            ? 'Commande de partage copiée !' 
+                                            : 'Share command copied!',
+                                      ),
+                                      const SizedBox(height: 14),
+                                      Text(
+                                        isFr 
+                                            ? '2. URL de connexion WebDAV pour les clients (Android, VLC...) :' 
+                                            : '2. WebDAV connection URL for clients (Android, VLC...):',
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      _buildCliBox(
+                                        context: context,
+                                        text: clientUrl,
+                                        isFr: isFr,
+                                        isLink: true,
+                                        snackbarMsg: isFr 
+                                            ? 'URL de connexion WebDAV copiée !' 
+                                            : 'WebDAV connection URL copied!',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddShareDialog(isFr),
         child: const Icon(Icons.add),
@@ -176,6 +341,101 @@ class _TaildriveManagerScreenState extends State<TaildriveManagerScreen> {
       ),
     );
   }
+
+  Widget _buildDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    bool isPath = false,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: Colors.grey.shade600),
+        const SizedBox(width: 8),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+              children: [
+                TextSpan(
+                  text: '$label : ',
+                  style: TextStyle(fontWeight: FontWeight.w500, color: Colors.grey.shade600),
+                ),
+                TextSpan(
+                  text: value,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontFamily: isPath ? 'monospace' : null,
+                    color: isPath ? Colors.deepOrange.shade700 : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCliBox({
+    required BuildContext context,
+    required String text,
+    required bool isFr,
+    required String snackbarMsg,
+    bool isLink = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade900,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Text(
+                text,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  color: Colors.lightGreenAccent,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            constraints: const BoxConstraints(),
+            padding: EdgeInsets.zero,
+            icon: const Icon(Icons.copy, size: 18, color: Colors.lightGreenAccent),
+            tooltip: isFr ? 'Copier' : 'Copy',
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: text));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.check_circle_outline, color: Colors.lightGreenAccent),
+                      const SizedBox(width: 10),
+                      Text(snackbarMsg),
+                    ],
+                  ),
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _AddTaildriveShareDialog extends StatefulWidget {
@@ -202,31 +462,7 @@ class __AddTaildriveShareDialogState extends State<_AddTaildriveShareDialog> {
   String? _selectedRecipient;
   TaildriveAccessMode _accessMode = TaildriveAccessMode.ro;
 
-  List<String> _getAccessibleRecipients(Node sourceNode) {
-    final recipients = <String>{};
 
-    // 1. Same user (owner)
-    recipients.add(sourceNode.user);
-
-    // 2. Nodes/Users with explicit ACL rules (temporaryRules)
-    // We can't easily parse all ACLs from here, but we can check the temporaryRules stored in Storage
-    // However, Tailscale's standard is often to share with groups or specific users.
-    // For simplicity and following user request: same user + manual check.
-
-    // Let's also add all other users but we could mark them or filter them.
-    // The user specifically asked to filter.
-    // To filter perfectly, we'd need to simulate the ACL generator.
-
-    // For now, let's include the source node's user and any other user that has a node
-    // that the source node can see according to temporaryRules.
-    // BUT temporaryRules are src/dst pairs.
-    final appProvider = context.read<AppProvider>();
-    // We need temporary rules. Let's assume we can get them or they are global.
-    // Actually, they are in AclScreen state. This is tricky.
-    // Let's load them from storage again.
-
-    return recipients.toList();
-  }
 
   // To properly implement the filter, I need the temporary rules.
   List<String> _filteredRecipients = [];
@@ -256,8 +492,12 @@ class __AddTaildriveShareDialogState extends State<_AddTaildriveShareDialog> {
     }
 
     final accessibleUsers = <String>{};
-    // 1. Toujours accessible pour soi-même (même utilisateur)
-    accessibleUsers.add(_selectedSourceNode!.user);
+    final selectedOwner = _selectedSourceNode!.getNormalizedOwner();
+    final matchedUser = widget.allUsers.firstWhere(
+      (u) => normalizeUserName(u.name) == selectedOwner,
+      orElse: () => User(id: '', name: selectedOwner),
+    );
+    accessibleUsers.add(matchedUser.name);
 
     // 2. Analyser les règles spécifiques pour trouver d'autres bénéficiaires valides
     for (var rule in rules) {
@@ -268,7 +508,8 @@ class __AddTaildriveShareDialogState extends State<_AddTaildriveShareDialog> {
       bool isSourceInRule = false;
       
       // Match par utilisateur/groupe
-      if (src == 'group:${_selectedSourceNode!.user}' || src == _selectedSourceNode!.user) {
+      final selectedOwner = _selectedSourceNode!.getNormalizedOwner();
+      if (src == 'group:$selectedOwner' || src == selectedOwner) {
         isSourceInRule = true;
       }
       // Match par IP
@@ -294,7 +535,7 @@ class __AddTaildriveShareDialogState extends State<_AddTaildriveShareDialog> {
       // Comme les règles de tags sont bidirectionnelles dans notre générateur, 
       // on vérifie aussi si notre nœud est la destination de la règle
       bool isDestInRule = false;
-      if (dst == 'group:${_selectedSourceNode!.user}' || dst == _selectedSourceNode!.user) {
+      if (dst == 'group:$selectedOwner' || dst == selectedOwner) {
         isDestInRule = true;
       }
       for (var ip in _selectedSourceNode!.ipAddresses) {
@@ -318,20 +559,35 @@ class __AddTaildriveShareDialogState extends State<_AddTaildriveShareDialog> {
     // On transforme les noms d'utilisateurs en liste triée
     _filteredRecipients = accessibleUsers.toList();
     _filteredRecipients.sort((a, b) {
-      if (a == _selectedSourceNode!.user) return -1;
-      if (b == _selectedSourceNode!.user) return 1;
+      final selectedOwner = _selectedSourceNode!.getNormalizedOwner();
+      final matchedUser = widget.allUsers.firstWhere(
+        (u) => normalizeUserName(u.name) == selectedOwner,
+        orElse: () => User(id: '', name: selectedOwner),
+      );
+      if (a == matchedUser.name) return -1;
+      if (b == matchedUser.name) return 1;
       return a.compareTo(b);
     });
   }
 
   void _addRecipientFromRuleTarget(String target, Set<String> recipients) {
     if (target.startsWith('group:')) {
-      recipients.add(target.replaceFirst('group:', ''));
+      final groupName = target.replaceFirst('group:', '');
+      final matchedUser = widget.allUsers.firstWhere(
+        (u) => normalizeUserName(u.name) == groupName,
+        orElse: () => User(id: '', name: groupName),
+      );
+      recipients.add(matchedUser.name);
     } else if (target.startsWith('tag:')) {
       // Pour les tags, on cherche l'utilisateur propriétaire du tag
       for (var node in widget.allNodes) {
         if (node.tags.contains(target)) {
-          recipients.add(node.user);
+          final owner = node.getNormalizedOwner();
+          final matchedUser = widget.allUsers.firstWhere(
+            (u) => normalizeUserName(u.name) == owner,
+            orElse: () => User(id: '', name: owner),
+          );
+          recipients.add(matchedUser.name);
         }
       }
     } else {
@@ -339,7 +595,12 @@ class __AddTaildriveShareDialogState extends State<_AddTaildriveShareDialog> {
       for (var node in widget.allNodes) {
         for (var ip in node.ipAddresses) {
           if (target.contains(ip)) {
-            recipients.add(node.user);
+            final owner = node.getNormalizedOwner();
+            final matchedUser = widget.allUsers.firstWhere(
+              (u) => normalizeUserName(u.name) == owner,
+              orElse: () => User(id: '', name: owner),
+            );
+            recipients.add(matchedUser.name);
             break;
           }
         }
@@ -358,7 +619,7 @@ class __AddTaildriveShareDialogState extends State<_AddTaildriveShareDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<Node>(
-                value: _selectedSourceNode,
+                initialValue: _selectedSourceNode,
                 decoration: InputDecoration(
                   labelText: widget.isFr ? 'Nœud Source' : 'Source Node',
                 ),
@@ -379,7 +640,7 @@ class __AddTaildriveShareDialogState extends State<_AddTaildriveShareDialog> {
               const SizedBox(height: 16),
               if (_selectedSourceNode != null) ...[
                 DropdownButtonFormField<String>(
-                  value: _selectedRecipient,
+                  initialValue: _selectedRecipient,
                   decoration: InputDecoration(
                     labelText: widget.isFr ? 'Bénéficiaire' : 'Recipient',
                     helperText: widget.isFr
@@ -387,7 +648,7 @@ class __AddTaildriveShareDialogState extends State<_AddTaildriveShareDialog> {
                         : 'Users allowed to see the share',
                   ),
                   items: _filteredRecipients.map((u) {
-                    final isSameUser = u == _selectedSourceNode!.user;
+                    final isSameUser = normalizeUserName(u) == _selectedSourceNode!.getNormalizedOwner();
                     return DropdownMenuItem(
                       value: u,
                       child: Text(isSameUser ? '$u (${widget.isFr ? 'Propriétaire' : 'Owner'})' : u),
@@ -422,7 +683,7 @@ class __AddTaildriveShareDialogState extends State<_AddTaildriveShareDialog> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<TaildriveAccessMode>(
-                  value: _accessMode,
+                  initialValue: _accessMode,
                   decoration: InputDecoration(
                     labelText: widget.isFr ? 'Permissions' : 'Permissions',
                   ),

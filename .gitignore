@@ -36,6 +36,7 @@ migrate_working_dir/
 # Sensitive files
 android/key.properties
 *.jks
+GEMINI.md
 
 # Symbolication related
 app.*.symbols

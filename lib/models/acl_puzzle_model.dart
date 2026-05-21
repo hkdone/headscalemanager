@@ -48,6 +48,12 @@ class PuzzleRule {
     this.action = 'accept',
   }) : id = id ?? const Uuid().v4();
 
+  String get signature {
+    final srcValues = sources.map((e) => e.value).toList()..sort();
+    final dstValues = destinations.map((e) => e.value).toList()..sort();
+    return 'src:${srcValues.join(",")}|dst:${dstValues.join(",")}';
+  }
+
   factory PuzzleRule.fromJson(Map<String, dynamic> json) {
     return PuzzleRule(
       id: json['id'],
@@ -70,3 +76,4 @@ class PuzzleRule {
     };
   }
 }
+

@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
+import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/new_acl_generator_service.dart';
 import 'package:headscalemanager/services/route_conflict_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
+import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/screens/node_detail_screen.dart';
 
@@ -16,7 +18,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  late Future<List<Node>> _nodesFuture;
+  late Future<({List<Node> nodes, List<User> users})> _dataFuture;
   String _filterStatus = 'all'; // 'all', 'online', 'offline'
 
   @override
@@ -28,11 +30,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _refreshNodes() async {
     if (mounted) {
       setState(() {
-        _nodesFuture = context.read<AppProvider>().apiService.getNodes();
+        _dataFuture = _fetchData();
       });
     }
     // Return a completed future to satisfy RefreshIndicator
     return Future.value();
+  }
+
+  Future<({List<Node> nodes, List<User> users})> _fetchData() async {
+    final api = context.read<AppProvider>().apiService;
+    final results = await Future.wait([
+      api.getNodes(),
+      api.getUsers(),
+    ]);
+    return (
+      nodes: results[0] as List<Node>,
+      users: results[1] as List<User>,
+    );
   }
 
   @override
@@ -43,8 +57,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: FutureBuilder<List<Node>>(
-          future: _nodesFuture,
+        child: FutureBuilder<({List<Node> nodes, List<User> users})>(
+          future: _dataFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting &&
                 !snapshot.hasData) {
@@ -55,7 +69,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child:
                       Text('${isFr ? 'Erreur' : 'Error'}: ${snapshot.error}'));
             }
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            if (!snapshot.hasData || snapshot.data!.nodes.isEmpty) {
               return RefreshIndicator(
                 onRefresh: _refreshNodes,
                 child: ListView(
@@ -71,7 +85,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               );
             }
 
-            final allNodes = snapshot.data!;
+            final allNodes = snapshot.data!.nodes;
+            final allUsers = snapshot.data!.users;
             final connectedNodesCount =
                 allNodes.where((node) => node.online).length;
             final disconnectedNodesCount =
@@ -84,9 +99,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
             }).toList();
 
             final filteredNodesByUser = <String, List<Node>>{};
+            final orphanNodes = <Node>[];
+
             for (var node in filteredNodes) {
-              (filteredNodesByUser[node.user] ??= []).add(node);
+              final owner = node.getNormalizedOwner();
+              User? matchedUser;
+              for (var u in allUsers) {
+                if (normalizeUserName(u.name) == owner) {
+                  matchedUser = u;
+                  break;
+                }
+              }
+              if (matchedUser != null) {
+                (filteredNodesByUser[matchedUser.name] ??= []).add(node);
+              } else {
+                orphanNodes.add(node);
+              }
             }
+
+            if (orphanNodes.isNotEmpty) {
+              final orphanKey = isFr ? 'Nœuds Orphelins' : 'Orphan Nodes';
+              filteredNodesByUser[orphanKey] = orphanNodes;
+            }
+
             final users = filteredNodesByUser.keys.toList();
 
             // Détecte les nœuds dont l'utilisateur a un nom vide côté serveur

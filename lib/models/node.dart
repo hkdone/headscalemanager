@@ -1,3 +1,5 @@
+import 'package:headscalemanager/utils/string_utils.dart';
+
 class Node {
   /// Identifiant unique du nœud.
   final String id;
@@ -142,6 +144,42 @@ class Node {
   ///
   /// Construit le FQDN en utilisant le nom du nœud et le domaine de base du serveur.
   String get fqdn => '$name.$baseDomain'; // Utilisation du nouveau champ
+
+  /// Extrait le nom d'utilisateur normalisé propriétaire de la machine.
+  /// 
+  /// Dans Headscale >= 0.28, dès qu'un tag est attribué à un nœud, Headscale remplace
+  /// son propriétaire par l'utilisateur système "tagged-devices". Cette fonction
+  /// permet de récupérer le véritable utilisateur humain propriétaire en l'extrayant
+  /// des tags assignés au nœud.
+  String getNormalizedOwner() {
+    final normalizedUser = normalizeUserName(user);
+    if (normalizedUser != 'tagged-devices' &&
+        normalizedUser != 'n-a' &&
+        normalizedUser != 'na' &&
+        normalizedUser.isNotEmpty) {
+      return normalizedUser;
+    }
+
+    // Récupération depuis les tags d'identité
+    for (var tag in tags) {
+      if (tag.startsWith('tag:')) {
+        final content = tag.substring(4); // Supprime 'tag:'
+        if (content.endsWith('-client')) {
+          return content.substring(0, content.length - 7);
+        } else if (content.endsWith('-exit-node')) {
+          return content.substring(0, content.length - 10);
+        } else if (content.endsWith('-lan-sharer')) {
+          return content.substring(0, content.length - 11);
+        } else if (content.contains(';exit-node')) {
+          return content.split(';exit-node').first;
+        } else if (content.contains(';lan-sharer')) {
+          return content.split(';lan-sharer').first;
+        }
+      }
+    }
+
+    return normalizedUser;
+  }
 
   @override
   bool operator ==(Object other) =>

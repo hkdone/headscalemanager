@@ -6,6 +6,7 @@ import 'package:headscalemanager/models/node.dart' as headscale_node;
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/services/acl_parser_service.dart';
 import 'package:headscalemanager/widgets/diamond_painter.dart';
+import 'package:headscalemanager/utils/string_utils.dart';
 
 // Renderer vide car on gère l'affichage des nœuds via le builder de GraphView
 class _NoOpEdgeRenderer extends EdgeRenderer {
@@ -172,10 +173,12 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
       }
     }
 
-    // 2. FORCER les symboles LAN et Exit à rester sous leur PROPRIÉTAIRE (Source)
+    // 2. FORCER les symboles LAN, Exit et Taildrive à rester sous leur PROPRIÉTAIRE (Source)
     final symbolNodes = graph.nodes.where((n) {
       final id = n.key?.value as String;
-      return id.startsWith('lan_symbol_') || id.startsWith('internet_symbol_');
+      return id.startsWith('lan_symbol_') ||
+          id.startsWith('internet_symbol_') ||
+          id.startsWith('taildrive_symbol_');
     }).toList();
 
     for (var symbolNode in symbolNodes) {
@@ -186,6 +189,12 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
       if (symbolId.startsWith('internet_symbol_')) {
         final ownerId = symbolId.substring(16);
         ownerNode = _idToNodeMap[ownerId];
+      } else if (symbolId.startsWith('taildrive_symbol_')) {
+        final parts = symbolId.split('_');
+        if (parts.length >= 4) {
+          final ownerId = parts[3];
+          ownerNode = _idToNodeMap[ownerId];
+        }
       } else if (symbolId.startsWith('lan_symbol_')) {
         // Nouveau format: lan_symbol_nodeId_192.168.1.0_24
         final parts = symbolId.substring(11).split('_');
@@ -261,7 +270,15 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
       machineNodeMap[machine.id] = machineNode;
       graph.addNode(machineNode);
 
-      final userNode = userNodeMap[machine.user];
+      final owner = machine.getNormalizedOwner();
+      User? matchedUser;
+      for (var u in widget.users) {
+        if (normalizeUserName(u.name) == owner) {
+          matchedUser = u;
+          break;
+        }
+      }
+      final userNode = matchedUser != null ? userNodeMap[matchedUser.name] : null;
       if (userNode != null) {
         graph.addEdge(userNode, machineNode,
             paint: Paint()..color = structureColor);
@@ -321,7 +338,8 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
           }
           final permissionSourceNode = subnetPermission.sourceNode;
           final color = (permissionSourceNode != null &&
-                  machine.user == permissionSourceNode.user)
+                  machine.getNormalizedOwner() ==
+                      permissionSourceNode.getNormalizedOwner())
               ? intraUserColor
               : interUserColor;
 
@@ -346,7 +364,8 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
               e.destination == routeSymbolNode)) {
             continue;
           }
-          final color = (machine.user == permissionSourceNode.user)
+          final color = (machine.getNormalizedOwner() ==
+                  permissionSourceNode.getNormalizedOwner())
               ? intraUserColor
               : interUserColor;
 
@@ -363,7 +382,8 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
         final destMachineNode = machineNodeMap[destMachine.id];
         if (destMachineNode == null) continue;
 
-        if (machine.user == destMachine.user) {
+        if (machine.getNormalizedOwner() ==
+            destMachine.getNormalizedOwner()) {
           if (graph.edges.every((edge) => !(edge.source == destMachineNode &&
               edge.destination == sourceMachineNode))) {
             graph.addEdge(sourceMachineNode, destMachineNode,
@@ -400,18 +420,61 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
           }
         }
       }
+
+      for (var tdGrant in permissions.allowedTaildriveShares) {
+        for (var sourceNode in tdGrant.sourceNodes) {
+          final symbolId =
+              'taildrive_symbol_${tdGrant.shareName}_${sourceNode.id}';
+
+          Node tdSymbolNode;
+          if (routeSymbolMap.containsKey(symbolId)) {
+            tdSymbolNode = routeSymbolMap[symbolId]!;
+          } else {
+            tdSymbolNode = Node.Id(symbolId);
+            routeSymbolMap[symbolId] = tdSymbolNode;
+            graph.addNode(tdSymbolNode);
+
+            // Lien structurel (Nœud source -> Symbole Taildrive)
+            final targetMachineNode = machineNodeMap[sourceNode.id];
+            if (targetMachineNode != null) {
+              graph.addEdge(targetMachineNode, tdSymbolNode,
+                  paint: Paint()
+                    ..color = Colors.orange
+                    ..strokeWidth = 4
+                    ..style = PaintingStyle.stroke);
+            }
+          }
+
+          // Lien de permission (Nœud recipient -> Symbole Taildrive)
+          final color = (machine.getNormalizedOwner() ==
+                  sourceNode.getNormalizedOwner())
+              ? intraUserColor
+              : interUserColor;
+
+          if (!graph.edges.any((e) =>
+              e.source == sourceMachineNode && e.destination == tdSymbolNode)) {
+            graph.addEdge(sourceMachineNode, tdSymbolNode,
+                paint: Paint()
+                  ..color = color
+                  ..strokeWidth = 2.0
+                  ..style = PaintingStyle.stroke);
+          }
+        }
+      }
     }
 
     // --- Pass 3: Implicit Intra-user Exit Node ---
     final userExitNodes = <String, List<headscale_node.Node>>{};
     for (var node in widget.nodes) {
       if (node.isExitNode) {
-        userExitNodes.putIfAbsent(node.user, () => []).add(node);
+        userExitNodes
+            .putIfAbsent(node.getNormalizedOwner(), () => [])
+            .add(node);
       }
     }
 
     for (var machine in widget.nodes) {
-      final exitNodesForUser = userExitNodes[machine.user];
+      final exitNodesForUser = userExitNodes[machine.getNormalizedOwner()];
       if (exitNodesForUser == null) continue;
 
       final sourceMachineNode = machineNodeMap[machine.id]!;
@@ -481,6 +544,13 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
       final machine = _idToNodeMap[machineId];
       return {'type': 'internet', 'machine': machine};
     }
+    if (prefixedId.startsWith('taildrive_symbol_')) {
+      final parts = prefixedId.split('_');
+      final shareName = parts[2];
+      final machineId = parts[3];
+      final machine = _idToNodeMap[machineId];
+      return {'type': 'taildrive', 'share': shareName, 'machine': machine};
+    }
     if (prefixedId.startsWith('lan_symbol_')) {
       // Nouveau format: lan_symbol_nodeId_192.168.1.0_24
       final parts = prefixedId.substring(11).split('_');
@@ -513,8 +583,10 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
 
         if (itemData is User) {
           title = 'Utilisateur : ${itemData.name}';
-          final nodeCount =
-              widget.nodes.where((n) => n.user == itemData.name).length;
+          final normalizedName = normalizeUserName(itemData.name);
+          final nodeCount = widget.nodes
+              .where((n) => n.getNormalizedOwner() == normalizedName)
+              .length;
           content.add(Text('Cet utilisateur gère $nodeCount machine(s).'));
           content.add(const SizedBox(height: 8));
           content.add(Text('ID : ${itemData.id}',
@@ -522,7 +594,15 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
         } else if (itemData is headscale_node.Node) {
           title = 'Machine : ${itemData.name}';
           content.addAll([
-            _buildDetailRow('Propriétaire', itemData.user),
+            (() {
+              final owner = itemData.getNormalizedOwner();
+              final matchedUser = widget.users.firstWhere(
+                (u) => normalizeUserName(u.name) == owner,
+                orElse: () =>
+                    User(id: '', name: owner, createdAt: DateTime.now()),
+              );
+              return _buildDetailRow('Propriétaire', matchedUser.name);
+            }()),
             _buildDetailRow('IPs', itemData.ipAddresses.join('\n')),
             _buildDetailRow('Exit Node', itemData.isExitNode ? 'Oui' : 'Non'),
             if (itemData.tags.isNotEmpty)
@@ -546,6 +626,53 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
             content.add(Text(
                 'Le trafic passe par la machine "${machine?.name ?? 'Inconnue'}" qui agit comme passerelle de sortie.',
                 style: const TextStyle(fontWeight: FontWeight.bold)));
+          } else if (itemData['type'] == 'taildrive') {
+            final machine = itemData['machine'] as headscale_node.Node?;
+            final shareName = itemData['share'] as String;
+            title = 'Partage Taildrive';
+            content.add(Text('Nom du partage : $shareName',
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold)));
+            content.add(const SizedBox(height: 10));
+            content.add(Text(
+                'Ce dossier est partagé par la machine "${machine?.name ?? 'Inconnue'}".'));
+
+            content.add(const Divider());
+            content.add(const Text('Accès autorisés :',
+                style: TextStyle(fontWeight: FontWeight.bold)));
+            content.add(const SizedBox(height: 8));
+
+            final accessingNodes = <Widget>[];
+            for (var node in widget.nodes) {
+              final perms = _parser.getPermissionsForNode(node);
+              final matchingPerms = perms.allowedTaildriveShares
+                  .where((s) => s.shareName == shareName)
+                  .toList();
+
+              if (matchingPerms.isNotEmpty) {
+                for (var p in matchingPerms) {
+                  accessingNodes.add(Padding(
+                    padding: const EdgeInsets.only(bottom: 4.0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle_outline,
+                            size: 16, color: Colors.green),
+                        const SizedBox(width: 8),
+                        Text('${node.name} (${p.access})',
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ));
+                }
+              }
+            }
+            if (accessingNodes.isEmpty) {
+              content.add(const Text('Aucun accès distant configuré.',
+                  style: TextStyle(fontStyle: FontStyle.italic)));
+            } else {
+              content.addAll(accessingNodes);
+            }
           } else if (itemData['type'] == 'lan') {
             // --- DÉTAILS LAN (AVEC ANALYSE DES PERMISSIONS) ---
             final routeCidr = itemData['route'] as String;
@@ -688,6 +815,8 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
         final machine = itemData['machine'] as headscale_node.Node?;
         return _buildSymbolNode(
             Icons.public, 'Exit via\n${machine?.name ?? ''}');
+      } else if (itemData['type'] == 'taildrive') {
+        return _buildSymbolNode(Icons.folder_shared, itemData['share']);
       } else if (itemData['type'] == 'lan') {
         return _buildSymbolNode(Icons.lan, itemData['route']);
       } else if (itemData['type'] == 'shared_peer') {
@@ -904,6 +1033,7 @@ class FiberCurvedEdgePainter extends EdgeRenderer {
     if (nodeId.startsWith('user_')) return 60.0; // Largeur 120 -> centre 60
     if (nodeId.startsWith('lan_symbol_') ||
         nodeId.startsWith('internet_symbol_') ||
+        nodeId.startsWith('taildrive_symbol_') ||
         nodeId.startsWith('shared_peer_')) {
       return 18.0; // Ajustement spécifique symboles bas
     }

@@ -70,7 +70,8 @@ class AclPainter extends CustomPainter {
           destLocalOffset.dy + destRenderBox.size.height / 2,
         );
 
-        final isExternal = sourceNode.user != destNode.user;
+        final isExternal =
+            sourceNode.getNormalizedOwner() != destNode.getNormalizedOwner();
         final paint = isExternal ? paintExternal : paintInternal;
 
         canvas.drawLine(sourcePoint, destPoint, paint);

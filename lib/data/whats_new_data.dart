@@ -14,6 +14,18 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '1.7.0',
+        title: isFr
+            ? 'Couleurs ACL Puzzle & Stabilité'
+            : 'ACL Puzzle Colors & Stability',
+        description: isFr
+            ? 'Personnalisation riche des couleurs et icônes d\'en-têtes de blocs du Puzzle ACL. Adaptation automatique des contrastes (luminance) pour une lisibilité parfaite. Passage à la ligne intelligent pour les noms longs. Désactivation préventive et explicative de Taildrive en attente de support stable Headscale pour éviter les erreurs HTTP 500.'
+            : 'Rich color and icon customization for ACL Puzzle block headers. Automatic contrast adjustment (luminance) for perfect readability. Smart text wrapping for long names. Preventive and informative disabling of Taildrive pending stable Headscale support to avoid HTTP 500 errors.',
+        verification: isFr
+            ? 'Écran ACL > Puzzle View > Bouton de réglages (tune) sur chaque bloc'
+            : 'ACL Screen > Puzzle View > settings button (tune) on each block',
+      ),
+      WhatsNewVersion(
         version: '1.6.0',
         title: isFr
             ? 'Partage de fichiers (Taildrive)'

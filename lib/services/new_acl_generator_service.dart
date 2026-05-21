@@ -25,7 +25,7 @@ class NewAclGeneratorService {
     final tagOwners = <String, List<String>>{};
 
     for (var user in users) {
-      final groupName = 'group:${user.name}';
+      final groupName = 'group:${normalizeUserName(user.name)}';
       groups[groupName] = [user.name];
 
       final baseTag = 'tag:${normalizeUserName(user.name)}-client';
@@ -43,7 +43,7 @@ class NewAclGeneratorService {
     };
 
     for (var node in nodes) {
-      final groupName = 'group:${node.user}';
+      final groupName = 'group:${node.getNormalizedOwner()}';
 
       for (var tag in node.tags) {
         if (!tagOwners.containsKey(tag)) {
@@ -117,12 +117,16 @@ class NewAclGeneratorService {
     // 3.2: Construire les règles de base et de service pour chaque utilisateur
     final tagsByUser = <String, Set<String>>{};
     for (var node in nodes) {
-      tagsByUser.putIfAbsent(node.user, () => <String>{}).addAll(node.tags);
+      tagsByUser.putIfAbsent(node.getNormalizedOwner(), () => <String>{}).addAll(node.tags);
     }
 
     for (var user in users) {
-      final groupName = 'group:${user.name}';
-      final userNodes = nodes.where((node) => node.user == user.name).toList();
+      final groupName = 'group:${normalizeUserName(user.name)}';
+      final userNodes = nodes
+          .where((node) =>
+              node.user == user.name ||
+              node.getNormalizedOwner() == normalizeUserName(user.name))
+          .toList();
       final userTags = userNodes
           .expand((node) => node.tags)
           .toSet(); // Tous les tags des nœuds de l'utilisateur
@@ -245,7 +249,7 @@ class NewAclGeneratorService {
           // Utiliser les tags si présents, sinon le groupe utilisateur
           final targets = node.tags.isNotEmpty
               ? node.tags
-              : ['group:${normalizeUserName(node.user)}'];
+              : ['group:${node.getNormalizedOwner()}'];
 
           nodeAttrs.add({
             'target': targets,
@@ -278,7 +282,7 @@ class NewAclGeneratorService {
         if (sourceNode.id.isNotEmpty) {
           final dstTargets = sourceNode.tags.isNotEmpty
               ? sourceNode.tags
-              : ['group:${normalizeUserName(sourceNode.user)}'];
+              : ['group:${sourceNode.getNormalizedOwner()}'];
 
           // Source can be a group name (already prefixed) or a user name (add prefix)
           final src = share.recipient.startsWith('group:')

@@ -155,4 +155,69 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_aclEngineKey) ?? false;
   }
+
+  Future<void> savePuzzleEntityAliases(
+      String serverId, Map<String, String> aliases) async {
+    final String aliasesJson = json.encode(aliases);
+    await _storage.write(
+        key: 'PUZZLE_ENTITY_ALIASES_$serverId', value: aliasesJson);
+  }
+
+  Future<Map<String, String>> getPuzzleEntityAliases(String serverId) async {
+    final String? aliasesJson =
+        await _storage.read(key: 'PUZZLE_ENTITY_ALIASES_$serverId');
+    if (aliasesJson != null && aliasesJson.isNotEmpty) {
+      try {
+        final Map<String, dynamic> decodedMap = json.decode(aliasesJson);
+        return decodedMap.map((key, value) => MapEntry(key, value.toString()));
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
+  }
+
+  Future<void> savePuzzleBlocksMeta(
+      String serverId, Map<String, Map<String, dynamic>> meta) async {
+    final String metaJson = json.encode(meta);
+    await _storage.write(
+        key: 'PUZZLE_BLOCKS_META_$serverId', value: metaJson);
+  }
+
+  Future<Map<String, Map<String, dynamic>>> getPuzzleBlocksMeta(
+      String serverId) async {
+    final String? metaJson =
+        await _storage.read(key: 'PUZZLE_BLOCKS_META_$serverId');
+    if (metaJson != null && metaJson.isNotEmpty) {
+      try {
+        final Map<String, dynamic> decodedMap = json.decode(metaJson);
+        return decodedMap.map((key, value) =>
+            MapEntry(key, Map<String, dynamic>.from(value)));
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
+  }
+
+  Future<void> savePuzzleVisualOrder(
+      String serverId, List<String> order) async {
+    final String orderJson = json.encode(order);
+    await _storage.write(
+        key: 'PUZZLE_VISUAL_ORDER_$serverId', value: orderJson);
+  }
+
+  Future<List<String>> getPuzzleVisualOrder(String serverId) async {
+    final String? orderJson =
+        await _storage.read(key: 'PUZZLE_VISUAL_ORDER_$serverId');
+    if (orderJson != null && orderJson.isNotEmpty) {
+      try {
+        final List<dynamic> decodedList = json.decode(orderJson);
+        return decodedList.map((e) => e.toString()).toList();
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  }
 }

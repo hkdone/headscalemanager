@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
@@ -8,6 +9,9 @@ import 'package:headscalemanager/widgets/create_user_dialog.dart';
 import 'package:headscalemanager/widgets/delete_user_dialog.dart';
 import 'package:headscalemanager/widgets/rename_user_dialog.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+
 
 /// Écran de gestion des utilisateurs Headscale.
 class UsersScreen extends StatefulWidget {
@@ -104,13 +108,17 @@ class _UsersScreenState extends State<UsersScreen> {
 
             final users = snapshot.data!;
 
+            final double screenWidth = MediaQuery.of(context).size.width;
+            final int crossAxisCount = screenWidth < 600 ? 2 : 3;
+            final double childAspectRatio = screenWidth < 600 ? 0.88 : 1.0;
+
             return GridView.builder(
               padding: const EdgeInsets.all(16.0),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 1,
+                childAspectRatio: childAspectRatio,
               ),
               itemCount: users.length,
               itemBuilder: (context, index) {
@@ -176,11 +184,117 @@ class _UserCard extends StatelessWidget {
 
   const _UserCard({required this.user, required this.onUserAction});
 
+  void _showIconPickerDialog(BuildContext context, AppProvider provider) {
+    final theme = Theme.of(context);
+    final locale = provider.locale;
+    final isFr = locale.languageCode == 'fr';
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: theme.dialogTheme.backgroundColor ?? theme.colorScheme.surface,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isFr ? 'Personnaliser l\'icône' : 'Customize Icon',
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: 280,
+                  height: 280,
+                  child: GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: userIconsPalette.length,
+                    itemBuilder: (context, index) {
+                      final key = userIconsPalette.keys.elementAt(index);
+                      final iconData = userIconsPalette[key]!;
+                      final isSelected = provider.getUserIcon(user.id) == key;
+
+                      return InkWell(
+                        onTap: () {
+                          provider.setUserIcon(user.id, key);
+                          Navigator.of(dialogContext).pop();
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: isSelected
+                                ? Border.all(color: theme.colorScheme.onPrimary, width: 2)
+                                : null,
+                          ),
+                          child: Icon(
+                            iconData,
+                            color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.primary,
+                            size: 28,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final picker = ImagePicker();
+                    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+                    if (picked != null) {
+                      final appDir = await getApplicationDocumentsDirectory();
+                      final String extension = picked.path.split('.').last;
+                      final String newPath = '${appDir.path}/custom_avatar_${user.id}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+                      await File(picked.path).copy(newPath);
+                      await provider.setUserIcon(user.id, newPath);
+                      if (dialogContext.mounted) {
+                        Navigator.of(dialogContext).pop();
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.photo_library),
+                  label: Text(isFr ? 'Importer une photo' : 'Import a photo'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    minimumSize: const Size(double.infinity, 44),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(isFr ? 'Annuler' : 'Cancel'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final locale = context.watch<AppProvider>().locale;
+    final provider = context.watch<AppProvider>();
+    final locale = provider.locale;
     final isFr = locale.languageCode == 'fr';
+
+    final iconKey = provider.getUserIcon(user.id);
+    final isCustomImage = iconKey.contains('/') || iconKey.contains('\\');
+    final customImageExists = isCustomImage && File(iconKey).existsSync();
+
     return GestureDetector(
       onTap: () {
         Navigator.of(context)
@@ -196,67 +310,81 @@ class _UserCard extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  if (user.profilePicUrl != null &&
-                      user.profilePicUrl!.isNotEmpty)
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundImage: NetworkImage(user.profilePicUrl!),
-                      backgroundColor: Colors.transparent,
-                    )
-                  else
-                    Icon(Icons.person,
-                        size: 48, color: theme.colorScheme.onPrimary),
-                  const SizedBox(height: 12),
-                  if (user.provider != null && user.provider!.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color:
-                            theme.colorScheme.onPrimary.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    if (user.profilePicUrl != null &&
+                        user.profilePicUrl!.isNotEmpty)
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundImage: NetworkImage(user.profilePicUrl!),
+                        backgroundColor: Colors.transparent,
+                      )
+                    else if (customImageExists)
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundImage: FileImage(File(iconKey)),
+                        backgroundColor: Colors.transparent,
+                      )
+                    else
+                      Icon(userIconsPalette[iconKey] ?? Icons.person,
+                          size: 36, color: theme.colorScheme.onPrimary),
+                    const SizedBox(height: 6),
+                    if (user.provider != null && user.provider!.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color:
+                              theme.colorScheme.onPrimary.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          user.provider!.toUpperCase(),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 8),
+                        ),
                       ),
-                      child: Text(
-                        user.provider!.toUpperCase(),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onPrimary,
-                            fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  Text(
-                    user.name,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onPrimary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (user.email != null && user.email!.isNotEmpty)
                     Text(
-                      user.email!,
+                      user.name,
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onPrimary
-                              .withValues(alpha: 0.8)),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onPrimary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${isFr ? 'Créé le' : 'Created on'}: ${user.createdAt?.toLocal().toString().substring(0, 10) ?? 'N/A'}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                        color:
-                            theme.colorScheme.onPrimary.withValues(alpha: 0.7)),
-                  ),
-                ],
+                    if (user.email != null && user.email!.isNotEmpty)
+                      Text(
+                        user.email!,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimary
+                                .withValues(alpha: 0.8),
+                            fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${isFr ? 'Créé le' : 'Created on'}: ${user.createdAt?.toLocal().toString().substring(0, 10) ?? 'N/A'}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color:
+                              theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+                          fontSize: 10),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
             ),
             Positioned(
@@ -277,9 +405,24 @@ class _UserCard extends StatelessWidget {
                       builder: (ctx) => RenameUserDialog(
                           user: user, onUserRenamed: onUserAction),
                     );
+                  } else if (value == 'change_icon') {
+                    _showIconPickerDialog(context, provider);
                   }
                 },
                 itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                  if (user.provider == null || user.provider!.isEmpty)
+                    PopupMenuItem<String>(
+                      value: 'change_icon',
+                      child: ListTile(
+                        leading: Icon(Icons.image,
+                            color: theme.colorScheme.onSurface,
+                            semanticLabel: isFr ? 'Personnaliser l\'icône' : 'Customize icon'),
+                        title: Text(
+                            isFr ? 'Personnaliser l\'icône' : 'Customize icon',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface)),
+                      ),
+                    ),
                   PopupMenuItem<String>(
                     value: 'delete',
                     child: ListTile(
@@ -291,16 +434,14 @@ class _UserCard extends StatelessWidget {
                       title: Text(
                           isFr ? 'Supprimer l\'utilisateur' : 'Delete user',
                           style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme
-                                  .onSurface)), // Keep default onSurface for menu item
+                              color: theme.colorScheme.onSurface)),
                     ),
                   ),
                   PopupMenuItem<String>(
                     value: 'rename',
                     child: ListTile(
                       leading: Icon(Icons.edit,
-                          color: theme
-                              .colorScheme.onSurface, // Standard icon color
+                          color: theme.colorScheme.onSurface,
                           semanticLabel:
                               isFr ? 'Renommer l\'utilisateur' : 'Rename user'),
                       title: Text(
@@ -318,3 +459,4 @@ class _UserCard extends StatelessWidget {
     );
   }
 }
+

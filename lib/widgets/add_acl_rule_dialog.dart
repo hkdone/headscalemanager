@@ -61,7 +61,7 @@ class _AddAclRuleDialogState extends State<AddAclRuleDialog> {
                     _selectedDestinationNode = null;
                     if (node != null) {
                       _destinationNodes = widget.allNodes
-                          .where((n) => n.user != node.user)
+                          .where((n) => n.id != node.id)
                           .toList();
                     } else {
                       _destinationNodes = List.from(widget.allNodes);

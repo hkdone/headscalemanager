@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
+
 import 'package:headscalemanager/widgets/edit_tags_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/widgets/registration_dialogs.dart';
@@ -97,23 +99,38 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         children: [
           Row(
             children: [
-              if (widget.user.profilePicUrl != null &&
-                  widget.user.profilePicUrl!.isNotEmpty)
-                CircleAvatar(
-                  radius: 32,
-                  backgroundImage: NetworkImage(widget.user.profilePicUrl!),
-                  backgroundColor: Colors.transparent,
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                      color: theme.colorScheme.onPrimary.withValues(alpha: 0.2),
-                      shape: BoxShape.circle),
-                  child: Icon(Icons.person,
-                      size: 40, color: theme.colorScheme.onPrimary),
-                ),
+              (() {
+                final provider = context.watch<AppProvider>();
+                final iconKey = provider.getUserIcon(widget.user.id);
+                final isCustomImage = iconKey.contains('/') || iconKey.contains('\\');
+                final customImageExists = isCustomImage && File(iconKey).existsSync();
+
+                if (widget.user.profilePicUrl != null &&
+                    widget.user.profilePicUrl!.isNotEmpty) {
+                  return CircleAvatar(
+                    radius: 32,
+                    backgroundImage: NetworkImage(widget.user.profilePicUrl!),
+                    backgroundColor: Colors.transparent,
+                  );
+                } else if (customImageExists) {
+                  return CircleAvatar(
+                    radius: 32,
+                    backgroundImage: FileImage(File(iconKey)),
+                    backgroundColor: Colors.transparent,
+                  );
+                } else {
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                        color: theme.colorScheme.onPrimary.withValues(alpha: 0.2),
+                        shape: BoxShape.circle),
+                    child: Icon(userIconsPalette[iconKey] ?? Icons.person,
+                        size: 40, color: theme.colorScheme.onPrimary),
+                  );
+                }
+              })(),
               const SizedBox(width: 16),
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,7 +218,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             final userNodes = snapshot.data!
                 .where((node) =>
                     node.userId == widget.user.id ||
-                    node.user == widget.user.name)
+                    node.user == widget.user.name ||
+                    node.getNormalizedOwner() == normalizeUserName(widget.user.name))
                 .toList();
 
             if (userNodes.isEmpty) {
@@ -213,13 +231,17 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       style: theme.textTheme.bodyMedium));
             }
 
+            final double screenWidth = MediaQuery.of(context).size.width;
+            final int crossAxisCount = screenWidth < 600 ? 2 : 3;
+            final double childAspectRatio = screenWidth < 600 ? 0.76 : 0.85;
+
             return GridView.builder(
               padding: const EdgeInsets.all(16.0),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 0.8,
+                childAspectRatio: childAspectRatio,
               ),
               itemCount: userNodes.length,
               itemBuilder: (context, index) {
@@ -296,32 +318,49 @@ class _NodeCard extends StatelessWidget {
             : null,
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.circle, color: onlineColor, size: 12),
-                _buildPopupMenu(context, provider),
+                Row(
+                  children: [
+                    Icon(Icons.circle, color: onlineColor, size: 8),
+                    const SizedBox(width: 4),
+                    Text(
+                      node.online ? (isFr ? 'En ligne' : 'Online') : (isFr ? 'Hors ligne' : 'Offline'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onPrimary.withValues(alpha: 0.8),
+                        fontSize: 9,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: _buildPopupMenu(context, provider),
+                ),
               ],
             ),
-            const Spacer(),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
                   child: Text(node.name,
-                      style: theme.textTheme.titleMedium?.copyWith(
+                      style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onPrimary),
-                      maxLines: 2,
+                          color: theme.colorScheme.onPrimary,
+                          fontSize: 13),
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis),
                 ),
                 if (!isValidDns1123Subdomain(node.name))
                   IconButton(
                     icon: const Icon(Icons.warning_amber_rounded,
-                        color: Colors.orange, size: 20),
+                        color: Colors.orange, size: 16),
                     tooltip: isFr
                         ? 'Nom invalide (v0.27+)'
                         : 'Invalid name (v0.27+)',
@@ -337,49 +376,61 @@ class _NodeCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            Text(node.ipAddresses.join('\n'),
+            Text(node.ipAddresses.join(', '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.7))),
-            const Spacer(),
+                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+                    fontSize: 10)),
+            const SizedBox(height: 6),
             if (isExitNode)
               Row(
                 children: [
                   Icon(Icons.exit_to_app,
-                      size: 14, color: theme.colorScheme.onPrimary),
+                      size: 12, color: theme.colorScheme.onPrimary),
                   const SizedBox(width: 4),
                   Text('Exit Node',
                       style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onPrimary,
-                          fontWeight: FontWeight.bold)),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10)),
                 ],
               ),
             if (hasSharedRoutes)
               Padding(
-                padding: const EdgeInsets.only(top: 4.0),
+                padding: const EdgeInsets.only(top: 2.0),
                 child: Row(
                   children: [
                     Icon(Icons.router_outlined,
-                        size: 14, color: theme.colorScheme.onPrimary),
+                        size: 12, color: theme.colorScheme.onPrimary),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         node.sharedRoutes.join(", "),
                         style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onPrimary
-                                .withValues(alpha: 0.7)),
+                                .withValues(alpha: 0.7),
+                            fontSize: 10),
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
               ),
-            const Spacer(),
+            const Expanded(child: SizedBox(height: 4)),
             Text(isFr ? 'Dernière connexion:' : 'Last seen:',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.7))),
-            Text(node.lastSeen.toLocal().toString(),
+                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.6),
+                    fontSize: 9)),
+            Text(node.lastSeen.toLocal().toString().substring(0, 19),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.7))),
+                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+                    fontSize: 10)),
           ],
         ),
       ),

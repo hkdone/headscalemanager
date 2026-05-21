@@ -2,22 +2,25 @@ import 'dart:collection';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/utils/ip_utils.dart';
+import 'package:headscalemanager/utils/string_utils.dart';
 
 // Models to represent parsed permissions
 class NodePermission {
   final List<AllowedPeer> allowedPeers;
   final List<AllowedSubnet> allowedSubnets;
   final List<AllowedExitNode> allowedExitNodes;
+  final List<TaildriveGrant> allowedTaildriveShares;
 
   NodePermission({
     required this.allowedPeers,
     required this.allowedSubnets,
     required this.allowedExitNodes,
+    this.allowedTaildriveShares = const [],
   });
 
   @override
   String toString() {
-    return 'Permissions:\n  Peers: ${allowedPeers.join(', ')}\n  Subnets: ${allowedSubnets.join(', ')}\n  Exit Nodes: ${allowedExitNodes.join(', ')}';
+    return 'Permissions:\n  Peers: ${allowedPeers.join(', ')}\n  Subnets: ${allowedSubnets.join(', ')}\n  Exit Nodes: ${allowedExitNodes.join(', ')}\n  Taildrive: ${allowedTaildriveShares.join(', ')}';
   }
 }
 
@@ -57,6 +60,22 @@ class AllowedExitNode {
 
   @override
   String toString() => '${node.name} (via ${sourceNode?.name ?? "direct"})';
+}
+
+class TaildriveGrant {
+  final String shareName;
+  final String access; // 'ro' or 'rw'
+  final List<Node> sourceNodes; // The nodes providing the share
+
+  TaildriveGrant({
+    required this.shareName,
+    required this.access,
+    required this.sourceNodes,
+  });
+
+  @override
+  String toString() =>
+      '$shareName ($access) via ${sourceNodes.map((n) => n.name).join(', ')}';
 }
 
 class AclParserService {
@@ -102,7 +121,9 @@ class AclParserService {
           final user = allUsers.firstWhere((u) => u.name == ownerAlias,
               orElse: () => User(id: '', name: '', createdAt: DateTime.now()));
           if (user.id.isNotEmpty) {
-            final userNodes = allNodes.where((n) => n.user == user.name);
+            final userNodes = allNodes.where((n) =>
+                n.user == user.name ||
+                n.getNormalizedOwner() == normalizeUserName(user.name));
             _aliases[tag] = userNodes.expand((n) => n.ipAddresses).toList();
           }
         }
@@ -154,7 +175,9 @@ class AclParserService {
         orElse: () => User(id: '', name: '', createdAt: DateTime.now()));
     if (user.id.isNotEmpty) {
       return allNodes
-          .where((n) => n.user == user.name)
+          .where((n) =>
+              n.user == user.name ||
+              n.getNormalizedOwner() == normalizeUserName(user.name))
           .expand((n) => n.ipAddresses)
           .toList();
     }
@@ -287,10 +310,54 @@ class AclParserService {
       }
     }
 
+    // --- Parsing Taildrive Grants ---
+    final allowedTaildriveShares = <TaildriveGrant>[];
+    if (aclPolicy.containsKey('grants')) {
+      final List<dynamic> grants = aclPolicy['grants'];
+      for (var grant in grants) {
+        final List<String> sources = (grant['src'] as List).cast<String>();
+        final sourceIps = sources.expand((s) => _resolveAlias(s, node)).toSet();
+
+        // Vérifie si le nœud actuel est concerné par la source du grant
+        bool isSource = sourceIps.any((ip) => node.ipAddresses.contains(ip));
+        if (!isSource && !sources.contains('*')) {
+          continue;
+        }
+
+        final List<String> destinations = (grant['dst'] as List).cast<String>();
+        final Map<String, dynamic> app = grant['app'] ?? {};
+        final List<dynamic> taildriveCaps =
+            app['tailscale.com/cap/taildrive'] ?? [];
+
+        if (taildriveCaps.isNotEmpty) {
+          final List<Node> targetNodes = [];
+          for (var dest in destinations) {
+            final destIps = _resolveAlias(dest, node);
+            for (var dip in destIps) {
+              if (_nodeIpMap.containsKey(dip)) {
+                targetNodes.add(_nodeIpMap[dip]!);
+              }
+            }
+          }
+
+          if (targetNodes.isNotEmpty) {
+            for (var cap in taildriveCaps) {
+              allowedTaildriveShares.add(TaildriveGrant(
+                shareName: cap['share'] ?? 'unknown',
+                access: cap['access'] ?? 'ro',
+                sourceNodes: targetNodes,
+              ));
+            }
+          }
+        }
+      }
+    }
+
     return NodePermission(
       allowedPeers: uniquePeers.values.toList(),
       allowedSubnets: allowedSubnets,
       allowedExitNodes: uniqueExitNodes.values.toList(),
+      allowedTaildriveShares: allowedTaildriveShares,
     );
   }
 
