@@ -4,7 +4,7 @@ import 'package:headscalemanager/models/server.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class StorageService {
-  final _storage = const FlutterSecureStorage();
+  final _storage = _SafeSecureStorage();
 
   static const _oldApiKey = 'HEADSCALE_API_KEY';
   static const _oldServerUrl = 'HEADSCALE_SERVER_URL';
@@ -219,5 +219,34 @@ class StorageService {
       }
     }
     return [];
+  }
+}
+
+class _SafeSecureStorage {
+  final _storage = const FlutterSecureStorage();
+
+  Future<String?> read({required String key}) async {
+    try {
+      return await _storage.read(key: key);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> write({required String key, required String value}) async {
+    try {
+      await _storage.write(key: key, value: value);
+    } catch (e) {
+      try {
+        await _storage.delete(key: key);
+        await _storage.write(key: key, value: value);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> delete({required String key}) async {
+    try {
+      await _storage.delete(key: key);
+    } catch (_) {}
   }
 }

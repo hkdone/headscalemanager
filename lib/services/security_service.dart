@@ -11,16 +11,41 @@ class SecurityService {
   static const _pinKey = 'APP_PIN_HASH';
   static const _biometricsEnabledKey = 'APP_BIOMETRICS_ENABLED';
 
+  Future<String?> _safeRead(String key) async {
+    try {
+      return await _storage.read(key: key);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> _safeWrite(String key, String value) async {
+    try {
+      await _storage.write(key: key, value: value);
+    } catch (e) {
+      try {
+        await _storage.delete(key: key);
+        await _storage.write(key: key, value: value);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _safeDelete(String key) async {
+    try {
+      await _storage.delete(key: key);
+    } catch (_) {}
+  }
+
   // --- PIN Management ---
 
   Future<void> savePin(String pin) async {
     final bytes = utf8.encode(pin);
     final digest = sha256.convert(bytes);
-    await _storage.write(key: _pinKey, value: digest.toString());
+    await _safeWrite(_pinKey, digest.toString());
   }
 
   Future<bool> verifyPin(String pin) async {
-    final storedHash = await _storage.read(key: _pinKey);
+    final storedHash = await _safeRead(_pinKey);
     if (storedHash == null) {
       return false; // No PIN configured
     }
@@ -30,12 +55,12 @@ class SecurityService {
   }
 
   Future<bool> isPinConfigured() async {
-    final pinHash = await _storage.read(key: _pinKey);
+    final pinHash = await _safeRead(_pinKey);
     return pinHash != null && pinHash.isNotEmpty;
   }
 
   Future<void> clearPin() async {
-    await _storage.delete(key: _pinKey);
+    await _safeDelete(_pinKey);
     // Also disable biometrics if PIN is cleared
     await saveBiometricsEnabled(false);
   }
@@ -43,11 +68,11 @@ class SecurityService {
   // --- Biometrics Management ---
 
   Future<void> saveBiometricsEnabled(bool enabled) async {
-    await _storage.write(key: _biometricsEnabledKey, value: enabled.toString());
+    await _safeWrite(_biometricsEnabledKey, enabled.toString());
   }
 
   Future<bool> isBiometricsEnabled() async {
-    final isEnabled = await _storage.read(key: _biometricsEnabledKey);
+    final isEnabled = await _safeRead(_biometricsEnabledKey);
     return isEnabled == 'true';
   }
 

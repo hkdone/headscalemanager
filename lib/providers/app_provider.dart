@@ -29,51 +29,57 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> _initializeServices() async {
-    await _storageService.init();
-    await _loadLocale();
-    await _loadServers();
-    await _loadAclEnginePreference();
-    await _loadTaildriveShares();
-    await _loadUserIcons();
-    await _loadPuzzleMetadata();
+    try {
+      await _storageService.init();
+      await _loadLocale();
+      await _loadServers();
+      await _loadAclEnginePreference();
+      await _loadTaildriveShares();
+      await _loadUserIcons();
+      await _loadPuzzleMetadata();
 
-    // Auto-detect if we should benefit from Standard ACL Engine
-    if (_activeServer != null && !_useStandardAclEngine) {
-      try {
-        final nodes = await _apiService!.getNodes();
-        bool hasStandardTags = false;
-        bool hasLegacyMergedTags = false;
+      // Auto-detect if we should benefit from Standard ACL Engine
+      if (_activeServer != null && !_useStandardAclEngine) {
+        try {
+          final nodes = await _apiService!.getNodes();
+          bool hasStandardTags = false;
+          bool hasLegacyMergedTags = false;
 
-        for (var node in nodes) {
-          for (var tag in node.tags) {
-            if (tag.contains(';') &&
-                (tag.contains('exit-node') || tag.contains('lan-sharer'))) {
-              hasLegacyMergedTags = true;
-            }
-            if (!tag.contains(';') &&
-                (tag.endsWith('-exit-node') || tag.endsWith('-lan-sharer'))) {
-              hasStandardTags = true;
+          for (var node in nodes) {
+            for (var tag in node.tags) {
+              if (tag.contains(';') &&
+                  (tag.contains('exit-node') || tag.contains('lan-sharer'))) {
+                hasLegacyMergedTags = true;
+              }
+              if (!tag.contains(';') &&
+                  (tag.endsWith('-exit-node') || tag.endsWith('-lan-sharer'))) {
+                hasStandardTags = true;
+              }
             }
           }
-        }
 
-        if (hasStandardTags && !hasLegacyMergedTags) {
-          await setStandardAclEngineEnabled(true);
-          debugPrint(
-              'Auto-enabled Standard ACL Engine due to detected standard tags.');
+          if (hasStandardTags && !hasLegacyMergedTags) {
+            await setStandardAclEngineEnabled(true);
+            debugPrint(
+                'Auto-enabled Standard ACL Engine due to detected standard tags.');
+          }
+        } catch (e) {
+          debugPrint('Error auto-detecting ACL engine: $e');
         }
-      } catch (e) {
-        debugPrint('Error auto-detecting ACL engine: $e');
+      }
+
+      await NotificationService.initialize();
+
+      if (_activeServer != null) {
+        _detectServerVersion(); // Détection asynchrone au démarrage
+      }
+    } catch (e) {
+      debugPrint('CRITICAL: Error during services initialization: $e');
+    } finally {
+      if (!_initializationCompleter.isCompleted) {
+        _initializationCompleter.complete();
       }
     }
-
-    await NotificationService.initialize();
-
-    if (_activeServer != null) {
-      _detectServerVersion(); // Détection asynchrone au démarrage
-    }
-
-    _initializationCompleter.complete();
   }
 
   Future<void> get isInitialized => _initializationCompleter.future;
