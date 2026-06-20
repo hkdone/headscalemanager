@@ -251,9 +251,15 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
 
   Future<void> _applyPolicy() async {
     final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
+    final appProvider = context.read<AppProvider>();
     // 1. Generate Base Policy (Infrastructure)
     final basePolicy =
-        _baseGenerator.generatePolicy(users: _users, nodes: _nodes);
+        _baseGenerator.generatePolicy(
+          users: _users,
+          nodes: _nodes,
+          taildriveShares: appProvider.taildriveShares,
+          serverVersion: appProvider.serverVersion,
+        );
 
     // 2. Merge with Puzzle Rules
     final finalPolicy = _puzzleService.convertPuzzleToJson(

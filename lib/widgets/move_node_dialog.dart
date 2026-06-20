@@ -113,7 +113,11 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
               await provider.storageService.getTemporaryRules(serverId);
           final aclGenerator = NewAclGeneratorService();
           final newPolicyMap = aclGenerator.generatePolicy(
-              users: allUsers, nodes: allNodes, temporaryRules: tempRules);
+              users: allUsers,
+              nodes: allNodes,
+              temporaryRules: tempRules,
+              taildriveShares: provider.taildriveShares,
+              serverVersion: provider.serverVersion);
           final newPolicyJson = jsonEncode(newPolicyMap);
           await provider.apiService.setAclPolicy(newPolicyJson);
 

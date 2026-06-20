@@ -1,17 +1,97 @@
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/models/user.dart';
+import 'package:headscalemanager/models/version_info.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 
 /// Service dédié à la génération des politiques ACL (Access Control List) Headscale
 /// avec la logique d'isolation des exit-nodes corrigée.
 class NewAclGeneratorService {
+  static const _taildriveMinVersion = '0.29.0';
+
+  /// Génère la configuration Taildrive UNIQUEMENT si version >= 0.29.0
+  /// Retourne null si version incompatible ou pas de partages
+  static Map<String, dynamic>? _buildTaildriveConfig({
+    required List<TaildriveShare> shares,
+    required List<Node> nodes,
+    String? serverVersion,
+  }) {
+    // Si version < 0.29.0, on retourne null (rien n'est ajouté)
+    if (serverVersion == null ||
+        !VersionInfo.checkVersionAtLeast(serverVersion, _taildriveMinVersion)) {
+      return null;
+    }
+
+    if (shares.isEmpty) return null;
+
+    final nodeAttrs = <Map<String, dynamic>>[];
+    final grants = <Map<String, dynamic>>[];
+
+    // 1. nodeAttrs: drive:share pour les nœuds sources
+    final sourceNodeIds = shares.map((s) => s.sourceNodeId).toSet();
+    for (var nodeId in sourceNodeIds) {
+      final matchingNodes = nodes.where((n) => n.id == nodeId);
+      final node = matchingNodes.isNotEmpty ? matchingNodes.first : null;
+      if (node != null) {
+        final targets = node.tags.isNotEmpty
+            ? node.tags
+            : ['group:${node.getNormalizedOwner()}'];
+        nodeAttrs.add({
+          'target': targets,
+          'attr': ['drive:share'],
+        });
+      }
+    }
+
+    // 2. nodeAttrs: drive:access pour les bénéficiaires
+    final recipientGroups = shares.map((s) => 
+      s.recipient.startsWith('group:') 
+        ? s.recipient 
+        : 'group:${normalizeUserName(s.recipient)}'
+    ).toSet();
+    
+    for (var group in recipientGroups) {
+      nodeAttrs.add({
+        'target': [group],
+        'attr': ['drive:access'],
+      });
+    }
+
+    // 3. grants: pour chaque partage
+    for (var share in shares) {
+      final matchingNodes = nodes.where((n) => n.id == share.sourceNodeId);
+      final sourceNode = matchingNodes.isNotEmpty ? matchingNodes.first : null;
+      if (sourceNode == null) continue;
+
+      final dstTargets = sourceNode.tags.isNotEmpty
+          ? sourceNode.tags
+          : ['group:${sourceNode.getNormalizedOwner()}'];
+
+      final src = share.recipient.startsWith('group:')
+          ? share.recipient
+          : 'group:${normalizeUserName(share.recipient)}';
+
+      grants.add({
+        'src': [src],
+        'dst': dstTargets,
+        'app': {
+          'tailscale.com/cap/drive': [{
+            'shares': [share.shareName],
+            'access': share.accessMode == TaildriveAccessMode.rw ? 'rw' : 'ro',
+          }]
+        }
+      });
+    }
+
+    return {'nodeAttrs': nodeAttrs, 'grants': grants};
+  }
   /// Génère une politique ACL Headscale optimisée.
   ///
   /// [users] : Liste des utilisateurs Headscale.
   /// [nodes] : Liste des nœuds Headscale.
   /// [temporaryRules] : Liste des règles d'exception manuelles (tag-à-tag).
   /// [taildriveShares] : Liste des partages Taildrive.
+  /// [serverVersion] : Version du serveur Headscale pour la compatibilité.
   ///
   /// Retourne un [Map<String, dynamic>] représentant la politique ACL générée.
   Map<String, dynamic> generatePolicy({
@@ -19,6 +99,7 @@ class NewAclGeneratorService {
     required List<Node> nodes,
     List<Map<String, dynamic>> temporaryRules = const [],
     List<TaildriveShare> taildriveShares = const [],
+    String? serverVersion,
   }) {
     // --- Étape 1: Création des groupes et pré-déclaration des tagOwners de base ---
     final groups = <String, List<String>>{};
@@ -219,91 +300,15 @@ class NewAclGeneratorService {
     }
 
     // --- Étape 4: Taildrive (nodeAttrs & grants) ---
-    final nodeAttrs = <Map<String, dynamic>>[];
-    final grants = <Map<String, dynamic>>[];
-
-    if (taildriveShares.isNotEmpty) {
-      // 4.1: Identifier les nœuds sources uniques pour nodeAttrs
-      final sourceNodeIds = taildriveShares.map((s) => s.sourceNodeId).toSet();
-      for (var nodeId in sourceNodeIds) {
-        final node = nodes.firstWhere((n) => n.id == nodeId,
-            orElse: () => Node(
-                id: '',
-                machineKey: '',
-                hostname: '',
-                name: '',
-                user: '',
-                userId: '',
-                ipAddresses: [],
-                online: false,
-                lastSeen: DateTime.now(),
-                sharedRoutes: [],
-                availableRoutes: [],
-                isExitNode: false,
-                isLanSharer: false,
-                tags: [],
-                baseDomain: '',
-                endpoint: ''));
-
-        if (node.id.isNotEmpty) {
-          // Utiliser les tags si présents, sinon le groupe utilisateur
-          final targets = node.tags.isNotEmpty
-              ? node.tags
-              : ['group:${node.getNormalizedOwner()}'];
-
-          nodeAttrs.add({
-            'target': targets,
-            'attr': ['cap:taildrive'],
-          });
-        }
-      }
-
-      // 4.2: Créer les grants
-      for (var share in taildriveShares) {
-        final sourceNode = nodes.firstWhere((n) => n.id == share.sourceNodeId,
-            orElse: () => Node(
-                id: '',
-                machineKey: '',
-                hostname: '',
-                name: '',
-                user: '',
-                userId: '',
-                ipAddresses: [],
-                online: false,
-                lastSeen: DateTime.now(),
-                sharedRoutes: [],
-                availableRoutes: [],
-                isExitNode: false,
-                isLanSharer: false,
-                tags: [],
-                baseDomain: '',
-                endpoint: ''));
-
-        if (sourceNode.id.isNotEmpty) {
-          final dstTargets = sourceNode.tags.isNotEmpty
-              ? sourceNode.tags
-              : ['group:${sourceNode.getNormalizedOwner()}'];
-
-          // Source can be a group name (already prefixed) or a user name (add prefix)
-          final src = share.recipient.startsWith('group:')
-              ? share.recipient
-              : 'group:${normalizeUserName(share.recipient)}';
-
-          grants.add({
-            'src': [src],
-            'dst': dstTargets,
-            'app': {
-              'tailscale.com/cap/taildrive': [
-                {
-                  'share': share.shareName,
-                  'access': share.accessMode == TaildriveAccessMode.rw ? 'rw' : 'ro',
-                }
-              ]
-            }
-          });
-        }
-      }
-    }
+    // Utilise la fonction helper qui gère la compatibilité version
+    final taildriveConfig = _buildTaildriveConfig(
+      shares: taildriveShares,
+      nodes: nodes,
+      serverVersion: serverVersion,
+    );
+    
+    final nodeAttrs = taildriveConfig?['nodeAttrs'] as List<Map<String, dynamic>>? ?? [];
+    final grants = taildriveConfig?['grants'] as List<Map<String, dynamic>>? ?? [];
 
     // --- Étape 5: Assemblage final ---
     final policy = {

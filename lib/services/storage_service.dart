@@ -220,6 +220,48 @@ class StorageService {
     }
     return [];
   }
+
+  static const _usersViewModeKey = 'USERS_VIEW_MODE';
+
+  Future<void> saveUsersViewMode(String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_usersViewModeKey, mode);
+  }
+
+  Future<String> getUsersViewMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_usersViewModeKey) ?? 'grid';
+  }
+
+  Future<void> saveUserNotes(String serverId, String userId, String notes) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('USER_NOTES_${serverId}_$userId', notes);
+  }
+
+  Future<String> getUserNotes(String serverId, String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('USER_NOTES_${serverId}_$userId') ?? '';
+  }
+
+  Future<void> saveDeviceTypeIcon(String serverId, String nodeId, String deviceType) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('DEVICE_TYPE_ICON_${serverId}_$nodeId', deviceType);
+  }
+
+  Future<String?> getDeviceTypeIcon(String serverId, String nodeId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('DEVICE_TYPE_ICON_${serverId}_$nodeId');
+  }
+
+  Future<void> savePingLatencyThreshold(String serverId, String nodeId, double threshold) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('PING_LATENCY_THRESHOLD_${serverId}_$nodeId', threshold);
+  }
+
+  Future<double> getPingLatencyThreshold(String serverId, String nodeId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble('PING_LATENCY_THRESHOLD_${serverId}_$nodeId') ?? 100.0;
+  }
 }
 
 class _SafeSecureStorage {

@@ -120,6 +120,8 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
         users: users,
         nodes: nodes,
         temporaryRules: _temporaryRules,
+        taildriveShares: appProvider.taildriveShares,
+        serverVersion: appProvider.serverVersion,
       );
 
       const encoder = JsonEncoder.withIndent('  ');

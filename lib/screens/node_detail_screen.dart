@@ -192,6 +192,31 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           const SizedBox(height: 16),
           Row(
             children: [
+              GestureDetector(
+                onTap: () => _showDeviceIconPickerDialog(context),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: theme.colorScheme.onPrimary.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Tooltip(
+                    message: isFr 
+                        ? 'Changer le type d\'appareil' 
+                        : 'Change device type',
+                    child: Icon(
+                      context.watch<AppProvider>().getDeviceIcon(_currentNode),
+                      color: theme.colorScheme.onPrimary,
+                      size: 28,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
               Flexible(
                 child: Text(_currentNode.hostname,
                     style: theme.textTheme.headlineSmall?.copyWith(
@@ -238,6 +263,106 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                   color: theme.colorScheme.onPrimary.withValues(alpha: 0.7))),
         ],
       ),
+    );
+  }
+
+  void _showDeviceIconPickerDialog(BuildContext context) {
+    final theme = Theme.of(context);
+    final provider = context.read<AppProvider>();
+    final isFr = provider.locale.languageCode == 'fr';
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: theme.dialogTheme.backgroundColor ?? theme.colorScheme.surface,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isFr ? 'Sélectionner le type d\'appareil' : 'Select Device Type',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: 280,
+                  height: 160,
+                  child: GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: deviceIconsPalette.length,
+                    itemBuilder: (context, index) {
+                      final key = deviceIconsPalette.keys.elementAt(index);
+                      final iconData = deviceIconsPalette[key]!;
+                      final isSelected = provider.getDeviceIconKey(_currentNode) == key;
+
+                      String label = key;
+                      if (isFr) {
+                        if (key == 'generic') label = 'Générique';
+                        if (key == 'server') label = 'Serveur';
+                      }
+
+                      return InkWell(
+                        onTap: () async {
+                          await provider.setDeviceTypeIcon(_currentNode.id, key);
+                          if (dialogContext.mounted) {
+                            Navigator.of(dialogContext).pop();
+                          }
+                          setState(() {});
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: isSelected
+                                ? Border.all(color: theme.colorScheme.onPrimary, width: 2)
+                                : null,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                iconData,
+                                color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.primary,
+                                size: 24,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                label.toUpperCase(),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(isFr ? 'Annuler' : 'Cancel'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -515,7 +640,11 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
 
       final aclGenerator = NewAclGeneratorService();
       final newPolicyMap = aclGenerator.generatePolicy(
-          users: allUsers, nodes: updatedNodes, temporaryRules: tempRules);
+          users: allUsers,
+          nodes: updatedNodes,
+          temporaryRules: tempRules,
+          taildriveShares: appProvider.taildriveShares,
+          serverVersion: appProvider.serverVersion);
       final newPolicyJson = jsonEncode(newPolicyMap);
       await apiService.setAclPolicy(newPolicyJson);
 
@@ -577,6 +706,55 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 12),
+                (() {
+                  final provider = context.watch<AppProvider>();
+                  final threshold = provider.getPingLatencyThresholdSync(_currentNode.id);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            isFr ? "Seuil d'alerte latence" : "Latency alert threshold",
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            "${threshold.round()} ms",
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          activeTrackColor: theme.colorScheme.onPrimary,
+                          inactiveTrackColor: theme.colorScheme.onPrimary.withValues(alpha: 0.2),
+                          thumbColor: theme.colorScheme.onPrimary,
+                          overlayColor: theme.colorScheme.onPrimary.withValues(alpha: 0.1),
+                          valueIndicatorColor: theme.colorScheme.secondary,
+                          valueIndicatorTextStyle: TextStyle(color: theme.colorScheme.onSecondary),
+                        ),
+                        child: Slider(
+                          value: threshold,
+                          min: 10.0,
+                          max: 500.0,
+                          divisions: 49,
+                          label: "${threshold.round()} ms",
+                          onChanged: (val) {
+                            provider.setPingLatencyThreshold(_currentNode.id, val);
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                })(),
                 const SizedBox(height: 10),
                 if (_isPingingContinuously)
                   _buildContinuousPingResults(context),
@@ -644,12 +822,16 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
             itemCount: _pingResponses.length,
             itemBuilder: (context, index) {
               final data = _pingResponses.reversed.toList()[index];
+              final threshold = context.read<AppProvider>().getPingLatencyThresholdSync(_currentNode.id);
               if (data.response != null) {
+                final latency = data.response!.time?.inMilliseconds ?? 0;
+                final isExceeded = latency > threshold;
                 return Text(
-                    "${isFr ? 'Réponse de' : 'Reply from'} ${data.response!.ip}: ${isFr ? 'temps' : 'time'}=${data.response!.time?.inMilliseconds}ms",
+                    "${isFr ? 'Réponse de' : 'Reply from'} ${data.response!.ip}: ${isFr ? 'temps' : 'time'}=${latency}ms${isExceeded ? ' (⚠️)' : ''}",
                     style: theme.textTheme.bodySmall?.copyWith(
                         fontFamily: 'monospace',
-                        color: theme.colorScheme.onPrimary));
+                        fontWeight: isExceeded ? FontWeight.bold : FontWeight.normal,
+                        color: isExceeded ? Colors.orangeAccent : theme.colorScheme.onPrimary));
               } else if (data.error != null) {
                 return Text(
                     "${isFr ? 'Erreur' : 'Error'}: ${data.error!.error.toString()}",
@@ -724,7 +906,21 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
               color: theme.colorScheme.secondary,
               barWidth: 3,
               isStrokeCapRound: true,
-              dotData: const FlDotData(show: false),
+              dotData: FlDotData(
+                show: true,
+                checkToShowDot: (spot, barData) {
+                  final threshold = context.read<AppProvider>().getPingLatencyThresholdSync(_currentNode.id);
+                  return spot.y > threshold;
+                },
+                getDotPainter: (spot, percent, barData, index) {
+                  return FlDotCirclePainter(
+                    radius: 4,
+                    color: Colors.orangeAccent,
+                    strokeWidth: 1.5,
+                    strokeColor: Colors.white,
+                  );
+                },
+              ),
               belowBarData: BarAreaData(
                   show: true,
                   color: theme.colorScheme.secondary.withValues(alpha: 0.3)),

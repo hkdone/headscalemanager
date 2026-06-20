@@ -265,7 +265,11 @@ class _LegacyMigrationDialogState extends State<LegacyMigrationDialog> {
       }
 
       final policy = standardAclGen.generatePolicy(
-          users: users, nodes: freshNodes, temporaryRules: tempRules);
+          users: users,
+          nodes: freshNodes,
+          temporaryRules: tempRules,
+          taildriveShares: appProvider.taildriveShares,
+          serverVersion: appProvider.serverVersion);
 
       // 4. Push to Server
       log("Envoi de la configuration au serveur...",

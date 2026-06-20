@@ -607,7 +607,9 @@ class _UserNodeCard extends StatelessWidget {
                     final newPolicyMap = aclGenerator.generatePolicy(
                         users: allUsers,
                         nodes: updatedNodes,
-                        temporaryRules: tempRules);
+                        temporaryRules: tempRules,
+                        taildriveShares: appProvider.taildriveShares,
+                        serverVersion: appProvider.serverVersion);
                     final newPolicyJson = jsonEncode(newPolicyMap);
                     await appProvider.apiService.setAclPolicy(newPolicyJson);
 
@@ -742,7 +744,9 @@ class _UserNodeCard extends StatelessWidget {
                     final newPolicyMap = aclGenerator.generatePolicy(
                         users: allUsers,
                         nodes: updatedNodes,
-                        temporaryRules: tempRules);
+                        temporaryRules: tempRules,
+                        taildriveShares: appProvider.taildriveShares,
+                        serverVersion: appProvider.serverVersion);
                     final newPolicyJson = jsonEncode(newPolicyMap);
                     await appProvider.apiService.setAclPolicy(newPolicyJson);
 

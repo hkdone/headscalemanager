@@ -1,6 +1,7 @@
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/models/user.dart';
+import 'package:headscalemanager/models/version_info.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:flutter/foundation.dart';
 
@@ -13,12 +14,91 @@ import 'package:flutter/foundation.dart';
 /// - Identity: 'tag:username-client'
 /// - Capabilities: 'tag:username-exit-node', 'tag:username-lan-sharer'
 class StandardAclGeneratorService {
+  static const _taildriveMinVersion = '0.29.0';
+
+  /// Génère la configuration Taildrive UNIQUEMENT si version >= 0.29.0
+  /// Retourne null si version incompatible ou pas de partages
+  static Map<String, dynamic>? _buildTaildriveConfig({
+    required List<TaildriveShare> shares,
+    required List<Node> nodes,
+    String? serverVersion,
+  }) {
+    // Si version < 0.29.0, on retourne null (rien n'est ajouté)
+    if (serverVersion == null ||
+        !VersionInfo.checkVersionAtLeast(serverVersion, _taildriveMinVersion)) {
+      return null;
+    }
+
+    if (shares.isEmpty) return null;
+
+    final nodeAttrs = <Map<String, dynamic>>[];
+    final grants = <Map<String, dynamic>>[];
+
+    // 1. nodeAttrs: drive:share pour les nœuds sources
+    final sourceNodeIds = shares.map((s) => s.sourceNodeId).toSet();
+    for (var nodeId in sourceNodeIds) {
+      final matchingNodes = nodes.where((n) => n.id == nodeId);
+      final node = matchingNodes.isNotEmpty ? matchingNodes.first : null;
+      if (node != null) {
+        final targets = node.tags.isNotEmpty
+            ? node.tags
+            : ['group:${node.getNormalizedOwner()}'];
+        nodeAttrs.add({
+          'target': targets,
+          'attr': ['drive:share'],
+        });
+      }
+    }
+
+    // 2. nodeAttrs: drive:access pour les bénéficiaires
+    final recipientGroups = shares.map((s) => 
+      s.recipient.startsWith('group:') 
+        ? s.recipient 
+        : 'group:${normalizeUserName(s.recipient)}'
+    ).toSet();
+    
+    for (var group in recipientGroups) {
+      nodeAttrs.add({
+        'target': [group],
+        'attr': ['drive:access'],
+      });
+    }
+
+    // 3. grants: pour chaque partage
+    for (var share in shares) {
+      final matchingNodes = nodes.where((n) => n.id == share.sourceNodeId);
+      final sourceNode = matchingNodes.isNotEmpty ? matchingNodes.first : null;
+      if (sourceNode == null) continue;
+
+      final dstTargets = sourceNode.tags.isNotEmpty
+          ? sourceNode.tags
+          : ['group:${sourceNode.getNormalizedOwner()}'];
+
+      final src = share.recipient.startsWith('group:')
+          ? share.recipient
+          : 'group:${normalizeUserName(share.recipient)}';
+
+      grants.add({
+        'src': [src],
+        'dst': dstTargets,
+        'app': {
+          'tailscale.com/cap/drive': [{
+            'shares': [share.shareName],
+            'access': share.accessMode == TaildriveAccessMode.rw ? 'rw' : 'ro',
+          }]
+        }
+      });
+    }
+
+    return {'nodeAttrs': nodeAttrs, 'grants': grants};
+  }
   /// Generates an optimized Headscale ACL policy using standard tags.
   Map<String, dynamic> generatePolicy({
     required List<User> users,
     required List<Node> nodes,
     List<Map<String, dynamic>> temporaryRules = const [],
     List<TaildriveShare> taildriveShares = const [],
+    String? serverVersion,
   }) {
     // --- Step 1: Groups & Tag Owners ---
     final groups = <String, List<String>>{};
@@ -246,87 +326,15 @@ class StandardAclGeneratorService {
     }
 
     // --- Step 4: Taildrive (nodeAttrs & grants) ---
-    final nodeAttrs = <Map<String, dynamic>>[];
-    final grants = <Map<String, dynamic>>[];
-
-    if (taildriveShares.isNotEmpty) {
-      final sourceNodeIds = taildriveShares.map((s) => s.sourceNodeId).toSet();
-      for (var nodeId in sourceNodeIds) {
-        final node = nodes.firstWhere((n) => n.id == nodeId,
-            orElse: () => Node(
-                id: '',
-                machineKey: '',
-                hostname: '',
-                name: '',
-                user: '',
-                userId: '',
-                ipAddresses: [],
-                online: false,
-                lastSeen: DateTime.now(),
-                sharedRoutes: [],
-                availableRoutes: [],
-                isExitNode: false,
-                isLanSharer: false,
-                tags: [],
-                baseDomain: '',
-                endpoint: ''));
-
-        if (node.id.isNotEmpty) {
-          final targets = node.tags.isNotEmpty
-              ? node.tags
-              : ['group:${node.getNormalizedOwner()}'];
-
-          nodeAttrs.add({
-            'target': targets,
-            'attr': ['cap:taildrive'],
-          });
-        }
-      }
-
-      for (var share in taildriveShares) {
-        final sourceNode = nodes.firstWhere((n) => n.id == share.sourceNodeId,
-            orElse: () => Node(
-                id: '',
-                machineKey: '',
-                hostname: '',
-                name: '',
-                user: '',
-                userId: '',
-                ipAddresses: [],
-                online: false,
-                lastSeen: DateTime.now(),
-                sharedRoutes: [],
-                availableRoutes: [],
-                isExitNode: false,
-                isLanSharer: false,
-                tags: [],
-                baseDomain: '',
-                endpoint: ''));
-
-        if (sourceNode.id.isNotEmpty) {
-          final dstTargets = sourceNode.tags.isNotEmpty
-              ? sourceNode.tags
-              : ['group:${sourceNode.getNormalizedOwner()}'];
-
-          final src = share.recipient.startsWith('group:')
-              ? share.recipient
-              : 'group:${normalizeUserName(share.recipient)}';
-
-          grants.add({
-            'src': [src],
-            'dst': dstTargets,
-            'app': {
-              'tailscale.com/cap/taildrive': [
-                {
-                  'share': share.shareName,
-                  'access': share.accessMode == TaildriveAccessMode.rw ? 'rw' : 'ro',
-                }
-              ]
-            }
-          });
-        }
-      }
-    }
+    // Utilise la fonction helper qui gère la compatibilité version
+    final taildriveConfig = _buildTaildriveConfig(
+      shares: taildriveShares,
+      nodes: nodes,
+      serverVersion: serverVersion,
+    );
+    
+    final nodeAttrs = taildriveConfig?['nodeAttrs'] as List<Map<String, dynamic>>? ?? [];
+    final grants = taildriveConfig?['grants'] as List<Map<String, dynamic>>? ?? [];
 
     // --- Step 5: Final Assembly ---
     final policy = {

@@ -430,7 +430,35 @@ routes:
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),
-                    _buildSubTitle(context, '3.5. Network Overview'),
+                    _buildSubTitle(context, '3.5. Taildrive Shares (v0.29.0+)'),
+                    const SizedBox(height: 8),
+                    _buildBodyText(context,
+                        'Taildrive allows you to share folders between your devices directly via your Headscale network. This feature requires Headscale v0.29.0 or higher.'),
+                    const SizedBox(height: 8),
+                    _buildBodyText(context, '**How it works:**',
+                        isBold: true),
+                    const SizedBox(height: 4),
+                    _buildBodyText(
+                      context,
+                      '- **Automatic activation:** If your server is v0.29.0+, the Taildrive option appears in the ACL menu (📁 icon).\n'
+                      '- **Create a share:** Select a source node, recipient, share name, local path, and permissions (read-only or read/write).\n'
+                      '- **Automatic ACL generation:** The necessary ACL rules (nodeAttrs and grants) are automatically added to your policy.\n'
+                      '- **Full integration:** Generated policies include `drive:share` for sources and `drive:access` for recipients, with `tailscale.com/cap/drive` permissions.',
+                      isSmall: true,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildBodyText(context, '**Requirements:**',
+                        isBold: true),
+                    const SizedBox(height: 4),
+                    _buildBodyText(
+                      context,
+                      '- Headscale server **v0.29.0 or higher**\n'
+                      '- Tailscale clients with Taildrive support\n'
+                      '- ACL policy generated and applied to the server',
+                      isSmall: true,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildSubTitle(context, '3.6. Network Overview'),
                     const SizedBox(height: 8),
                     _buildBodyText(context,
                         'This screen, accessible from the navigation bar, offers a dynamic, real-time view of your network topology from the perspective of the current device. It is particularly useful for diagnosing connections and checking which `exit node` is being used.'),

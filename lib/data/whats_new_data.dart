@@ -14,6 +14,30 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '1.9.0',
+        title: isFr
+            ? 'Support Officiel Taildrive (Headscale v0.29.0+)'
+            : 'Official Taildrive Support (Headscale v0.29.0+)',
+        description: isFr
+            ? 'Taildrive est désormais pleinement supporté ! Intégration complète avec les nodeAttrs (drive:share, drive:access) et les grants (tailscale.com/cap/drive). La fonctionnalité est activée automatiquement pour les serveurs Headscale v0.29.0 et supérieurs. Accédez directement à la gestion des partages depuis le menu ACL (icône dossier partagé).'
+            : 'Taildrive is now fully supported! Complete integration with nodeAttrs (drive:share, drive:access) and grants (tailscale.com/cap/drive). The feature is automatically enabled for Headscale servers v0.29.0 and above. Access share management directly from the ACL menu (shared folder icon).',
+        verification: isFr
+            ? 'Menu ACL > icône dossier partagé (📁). Nécessite Headscale v0.29.0+.'
+            : 'ACL Menu > shared folder icon (📁). Requires Headscale v0.29.0+.',
+      ),
+      WhatsNewVersion(
+        version: '1.8.0',
+        title: isFr
+            ? 'Personnalisation Utilisateurs & Appareils'
+            : 'User & Device Personalization',
+        description: isFr
+            ? 'Affichage en Liste ou Grille persistant pour les utilisateurs. Mémos d\'administration persistants avec sauvegarde automatique intelligente dans le détail utilisateur. Auto-détection intelligente et sélecteur d\'icônes d\'appareils. Curseur de seuil de latence ping avec coloration dynamique des alertes dans les logs et graphique épuré.'
+            : 'Persistent Grid/List toggle for the users screen. Administration notes with smart auto-save in user details. Default device icon auto-detection & manual selection override. Ping latency threshold slider with reactive visual highlights in logs and graphs.',
+        verification: isFr
+            ? 'Écran Utilisateurs > changer de vue ; Détails Utilisateur > zone mémos ; Détail Appareil > clic icône ou outils de diagnostic.'
+            : 'Users Screen > toggle view; User Details > notes area; Device Details > click icon or diagnostic tools.',
+      ),
+      WhatsNewVersion(
         version: '1.7.1',
         title: isFr
             ? 'Stabilité Android & Puzzle ACL'

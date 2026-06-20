@@ -435,7 +435,35 @@ routes:
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),
-                    _buildSubTitle(context, '3.5. Vue d\'overview du réseau'),
+                    _buildSubTitle(context, '3.5. Partages Taildrive (v0.29.0+)'),
+                    const SizedBox(height: 8),
+                    _buildBodyText(context,
+                        'Taildrive permet de partager des dossiers entre vos appareils directement via votre réseau Headscale. Cette fonctionnalité nécessite Headscale v0.29.0 ou supérieur.'),
+                    const SizedBox(height: 8),
+                    _buildBodyText(context, '**Fonctionnement :**',
+                        isBold: true),
+                    const SizedBox(height: 4),
+                    _buildBodyText(
+                      context,
+                      '- **Activer automatiquement** : Si votre serveur est en v0.29.0+, l\'option Taildrive apparaît dans le menu ACL (icône 📁).\n'
+                      '- **Créer un partage** : Sélectionnez un nœud source, un bénéficiaire, un nom de partage, un chemin local et les permissions (lecture seule ou lecture/écriture).\n'
+                      '- **Génération ACL automatique** : Les règles ACL nécessaires (nodeAttrs et grants) sont automatiquement ajoutées à votre politique.\n'
+                      '- **Intégration complète** : Les politiques générées incluent `drive:share` pour les sources et `drive:access` pour les destinataires, avec les permissions `tailscale.com/cap/drive`.',
+                      isSmall: true,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildBodyText(context, '**Requirements :**',
+                        isBold: true),
+                    const SizedBox(height: 4),
+                    _buildBodyText(
+                      context,
+                      '- Serveur Headscale **v0.29.0 ou supérieur**\n'
+                      '- Clients Tailscale avec support Taildrive\n'
+                      '- Politique ACL générée et appliquée au serveur',
+                      isSmall: true,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildSubTitle(context, '3.6. Vue d\'overview du réseau'),
                     const SizedBox(height: 8),
                     _buildBodyText(context,
                         'Cet écran, accessible depuis la barre de navigation, offre une vue dynamique et en temps réel de votre topologie réseau du point de vue de l\'appareil actuel. Il est particulièrement utile pour diagnostiquer les connexions et vérifier quel `exit node` est utilisé.'),

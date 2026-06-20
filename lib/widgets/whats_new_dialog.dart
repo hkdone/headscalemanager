@@ -49,8 +49,8 @@ class WhatsNewDialog extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(
                 isFr
-                    ? 'Cette mise à jour inclut d\'importants changements pour assurer la compatibilité avec les serveurs Headscale v0.25 à v0.28.'
-                    : 'This update includes important changes to ensure compatibility with Headscale servers v0.25 to v0.28.',
+                    ? 'Cette mise à jour inclut d\'importants changements pour assurer la compatibilité avec les serveurs Headscale v0.25 à v0.29.1, avec support complet de Taildrive !'
+                    : 'This update includes important changes to ensure compatibility with Headscale servers v0.25 to v0.29.1, with full Taildrive support!',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontStyle: FontStyle.italic,
                   color: theme.colorScheme.onSurfaceVariant,

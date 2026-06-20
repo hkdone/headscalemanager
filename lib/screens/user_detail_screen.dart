@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
@@ -28,12 +29,63 @@ class UserDetailScreen extends StatefulWidget {
 
 class _UserDetailScreenState extends State<UserDetailScreen> {
   late ValueNotifier<Future<List<Node>>> _nodesFutureNotifier;
+  late TextEditingController _notesController;
+  late FocusNode _notesFocusNode;
+  Timer? _notesDebounceTimer;
+  bool _isNotesSaved = true;
 
   @override
   void initState() {
     super.initState();
+    final provider = context.read<AppProvider>();
     _nodesFutureNotifier =
-        ValueNotifier(context.read<AppProvider>().apiService.getNodes());
+        ValueNotifier(provider.apiService.getNodes());
+    _notesController = TextEditingController(text: provider.getUserNotesSync(widget.user.id));
+    _notesFocusNode = FocusNode();
+    _notesFocusNode.addListener(_onNotesFocusChange);
+  }
+
+  void _onNotesFocusChange() {
+    if (!_notesFocusNode.hasFocus) {
+      _saveNotesNow();
+    }
+  }
+
+  void _saveNotesNow() {
+    _notesDebounceTimer?.cancel();
+    final text = _notesController.text;
+    final provider = context.read<AppProvider>();
+    if (provider.getUserNotesSync(widget.user.id) != text) {
+      setState(() {
+        _isNotesSaved = false;
+      });
+      provider.setUserNotes(widget.user.id, text).then((_) {
+        if (mounted) {
+          setState(() {
+            _isNotesSaved = true;
+          });
+        }
+      });
+    }
+  }
+
+  void _onNotesChanged(String val) {
+    setState(() {
+      _isNotesSaved = false;
+    });
+    _notesDebounceTimer?.cancel();
+    _notesDebounceTimer = Timer(const Duration(milliseconds: 1000), () {
+      _saveNotesNow();
+    });
+  }
+
+  @override
+  void dispose() {
+    _notesDebounceTimer?.cancel();
+    _notesFocusNode.removeListener(_onNotesFocusChange);
+    _notesFocusNode.dispose();
+    _notesController.dispose();
+    super.dispose();
   }
 
   void _refreshNodes() {
@@ -59,9 +111,10 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildUserInfoCard(context),
+            _buildAdminNotesCard(context),
             Padding(
               padding:
-                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                  const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
               child: Text(isFr ? 'Appareils' : 'Devices',
                   style: theme.textTheme.headlineSmall
                       ?.copyWith(fontWeight: FontWeight.bold)),
@@ -180,6 +233,117 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdminNotesCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final isFr = context.watch<AppProvider>().locale.languageCode == 'fr';
+    
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(
+          color: theme.colorScheme.onPrimary.withValues(alpha: 0.15),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.sticky_note_2_rounded, 
+                  color: theme.colorScheme.onPrimary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                isFr ? 'Mémos d\'administration' : 'Admin Notes',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onPrimary,
+                ),
+              ),
+              const Spacer(),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: _isNotesSaved
+                    ? Row(
+                        key: const ValueKey('saved'),
+                        children: [
+                          Icon(Icons.check_circle_outline_rounded,
+                              color: Colors.greenAccent.withValues(alpha: 0.8), size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            isFr ? 'Enregistré' : 'Saved',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        key: const ValueKey('saving'),
+                        children: [
+                          SizedBox(
+                            width: 10,
+                            height: 10,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              color: theme.colorScheme.onPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isFr ? 'Enregistrement...' : 'Saving...',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onPrimary.withValues(alpha: 0.7),
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _notesController,
+            focusNode: _notesFocusNode,
+            onChanged: _onNotesChanged,
+            maxLines: 2,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onPrimary,
+            ),
+            decoration: InputDecoration(
+              hintText: isFr 
+                  ? 'Ajouter des notes d\'administration pour cet utilisateur...' 
+                  : 'Add administration notes for this user...',
+              hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onPrimary.withValues(alpha: 0.5),
+              ),
+              filled: true,
+              fillColor: theme.colorScheme.onPrimary.withValues(alpha: 0.1),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.55),
+                  width: 1.5,
+                ),
+              ),
+              contentPadding: const EdgeInsets.all(12.0),
+            ),
           ),
         ],
       ),
@@ -348,6 +512,12 @@ class _NodeCard extends StatelessWidget {
             const SizedBox(height: 6),
             Row(
               children: [
+                Icon(
+                  provider.getDeviceIcon(node),
+                  size: 18,
+                  color: theme.colorScheme.onPrimary,
+                ),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(node.name,
                       style: theme.textTheme.bodyMedium?.copyWith(

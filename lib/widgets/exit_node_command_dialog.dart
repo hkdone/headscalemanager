@@ -264,13 +264,17 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog>
                       newPolicyMap = aclGenerator.generatePolicy(
                           users: allUsers,
                           nodes: allNodes,
-                          temporaryRules: tempRules);
+                          temporaryRules: tempRules,
+                          taildriveShares: appProvider.taildriveShares,
+                          serverVersion: appProvider.serverVersion);
                     } else {
                       final aclGenerator = NewAclGeneratorService();
                       newPolicyMap = aclGenerator.generatePolicy(
                           users: allUsers,
                           nodes: allNodes,
-                          temporaryRules: tempRules);
+                          temporaryRules: tempRules,
+                          taildriveShares: appProvider.taildriveShares,
+                          serverVersion: appProvider.serverVersion);
                     }
 
                     final newPolicyJson = jsonEncode(newPolicyMap);

@@ -6,6 +6,8 @@ import 'package:headscalemanager/models/server.dart';
 import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/services/notification_service.dart';
 import 'package:headscalemanager/services/storage_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:headscalemanager/models/node.dart';
 
 class AppProvider extends ChangeNotifier {
 
@@ -24,6 +26,11 @@ class AppProvider extends ChangeNotifier {
   Map<String, Map<String, dynamic>> _puzzleBlocksMeta = {};
   List<String> _puzzleVisualOrder = [];
 
+  String _usersViewMode = 'grid';
+  final Map<String, String> _userNotesCache = {};
+  final Map<String, String> _deviceCustomIcons = {};
+  final Map<String, double> _pingLatencyThresholds = {};
+
   AppProvider() {
     _initializeServices();
   }
@@ -37,6 +44,8 @@ class AppProvider extends ChangeNotifier {
       await _loadTaildriveShares();
       await _loadUserIcons();
       await _loadPuzzleMetadata();
+      await _loadUsersViewMode();
+      await _loadCustomDeviceData();
 
       // Auto-detect if we should benefit from Standard ACL Engine
       if (_activeServer != null && !_useStandardAclEngine) {
@@ -113,6 +122,117 @@ class AppProvider extends ChangeNotifier {
     _puzzleEntityAliases = await _storageService.getPuzzleEntityAliases(_activeServer!.id);
     _puzzleBlocksMeta = await _storageService.getPuzzleBlocksMeta(_activeServer!.id);
     _puzzleVisualOrder = await _storageService.getPuzzleVisualOrder(_activeServer!.id);
+    notifyListeners();
+  }
+
+  String get usersViewMode => _usersViewMode;
+
+  Future<void> _loadUsersViewMode() async {
+    _usersViewMode = await _storageService.getUsersViewMode();
+    notifyListeners();
+  }
+
+  Future<void> setUsersViewMode(String mode) async {
+    _usersViewMode = mode;
+    await _storageService.saveUsersViewMode(mode);
+    notifyListeners();
+  }
+
+  Future<void> _loadCustomDeviceData() async {
+    if (_activeServer == null) {
+      _deviceCustomIcons.clear();
+      _pingLatencyThresholds.clear();
+      _userNotesCache.clear();
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final serverId = _activeServer!.id;
+    
+    final keys = prefs.getKeys();
+    for (var key in keys) {
+      if (key.startsWith('DEVICE_TYPE_ICON_${serverId}_')) {
+        final nodeId = key.substring('DEVICE_TYPE_ICON_${serverId}_'.length);
+        _deviceCustomIcons[nodeId] = prefs.getString(key) ?? 'generic';
+      } else if (key.startsWith('PING_LATENCY_THRESHOLD_${serverId}_')) {
+        final nodeId = key.substring('PING_LATENCY_THRESHOLD_${serverId}_'.length);
+        _pingLatencyThresholds[nodeId] = prefs.getDouble(key) ?? 100.0;
+      } else if (key.startsWith('USER_NOTES_${serverId}_')) {
+        final userId = key.substring('USER_NOTES_${serverId}_'.length);
+        _userNotesCache[userId] = prefs.getString(key) ?? '';
+      }
+    }
+    notifyListeners();
+  }
+
+  String getUserNotesSync(String userId) {
+    return _userNotesCache[userId] ?? '';
+  }
+
+  Future<void> setUserNotes(String userId, String notes) async {
+    if (_activeServer == null) return;
+    _userNotesCache[userId] = notes;
+    await _storageService.saveUserNotes(_activeServer!.id, userId, notes);
+    notifyListeners();
+  }
+
+  String getDeviceIconKey(Node node) {
+    if (_deviceCustomIcons.containsKey(node.id)) {
+      return _deviceCustomIcons[node.id]!;
+    }
+    final nameLower = node.name.toLowerCase();
+    final hostLower = node.hostname.toLowerCase();
+    
+    if (hostLower.contains('win') || nameLower.contains('win')) {
+      return 'windows';
+    }
+    if (hostLower.contains('android') || nameLower.contains('android')) {
+      return 'android';
+    }
+    if (hostLower.contains('iphone') || nameLower.contains('iphone') || 
+        hostLower.contains('ipad') || nameLower.contains('ipad') ||
+        hostLower.contains('ios') || nameLower.contains('ios')) {
+      return 'iphone';
+    }
+    if (hostLower.contains('mac') || nameLower.contains('mac') ||
+        hostLower.contains('darwin') || nameLower.contains('darwin') ||
+        hostLower.contains('apple') || nameLower.contains('apple')) {
+      return 'mac';
+    }
+    if (hostLower.contains('server') || nameLower.contains('server') ||
+        hostLower.contains('nas') || nameLower.contains('nas') ||
+        hostLower.contains('dns') || nameLower.contains('dns')) {
+      return 'server';
+    }
+    if (hostLower.contains('ubuntu') || nameLower.contains('ubuntu') ||
+        hostLower.contains('debian') || nameLower.contains('debian') ||
+        hostLower.contains('centos') || nameLower.contains('centos') ||
+        hostLower.contains('linux') || nameLower.contains('linux')) {
+      return 'linux';
+    }
+    
+    return 'generic';
+  }
+
+  IconData getDeviceIcon(Node node) {
+    final key = getDeviceIconKey(node);
+    return deviceIconsPalette[key] ?? Icons.devices;
+  }
+
+  Future<void> setDeviceTypeIcon(String nodeId, String deviceType) async {
+    if (_activeServer == null) return;
+    _deviceCustomIcons[nodeId] = deviceType;
+    await _storageService.saveDeviceTypeIcon(_activeServer!.id, nodeId, deviceType);
+    notifyListeners();
+  }
+
+  double getPingLatencyThresholdSync(String nodeId) {
+    return _pingLatencyThresholds[nodeId] ?? 100.0;
+  }
+
+  Future<void> setPingLatencyThreshold(String nodeId, double threshold) async {
+    if (_activeServer == null) return;
+    _pingLatencyThresholds[nodeId] = threshold;
+    await _storageService.savePingLatencyThreshold(_activeServer!.id, nodeId, threshold);
     notifyListeners();
   }
 
@@ -307,6 +427,7 @@ class AppProvider extends ChangeNotifier {
     );
     await _loadTaildriveShares();
     await _loadPuzzleMetadata();
+    await _loadCustomDeviceData();
     notifyListeners();
     _detectServerVersion(); // Détecter la version après le changement
   }
@@ -347,6 +468,16 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+const Map<String, IconData> deviceIconsPalette = {
+  'windows': Icons.laptop_windows,
+  'mac': Icons.laptop_mac,
+  'linux': Icons.terminal,
+  'android': Icons.phone_android,
+  'iphone': Icons.phone_iphone,
+  'server': Icons.dns,
+  'generic': Icons.devices,
+};
 
 const Map<String, IconData> userIconsPalette = {
   'person': Icons.person,

@@ -37,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _checkForWhatsNew() async {
     final provider = context.read<AppProvider>();
     // Update this version when releasing a new update with relevant "What's New" content
-    const currentVersion = '1.7.1';
+    const currentVersion = '1.8.0';
     const lastVersionKey = 'LAST_SEEN_VERSION';
 
     try {
@@ -123,6 +123,22 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(titles[_selectedIndex]),
         actions: [
+          if (_selectedIndex == 1) // Users Screen tab
+            IconButton(
+              icon: Icon(
+                context.watch<AppProvider>().usersViewMode == 'grid'
+                    ? Icons.list_rounded
+                    : Icons.grid_view_rounded,
+                color: theme.colorScheme.primary,
+              ),
+              onPressed: () {
+                final provider = context.read<AppProvider>();
+                provider.setUsersViewMode(
+                  provider.usersViewMode == 'grid' ? 'list' : 'grid',
+                );
+              },
+              tooltip: isFr ? 'Changer l\'affichage' : 'Change layout',
+            ),
           IconButton(
             icon: Icon(Icons.help_outline, color: theme.colorScheme.primary),
             onPressed: () {

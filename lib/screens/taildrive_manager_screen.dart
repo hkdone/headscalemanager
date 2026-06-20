@@ -49,7 +49,7 @@ class _TaildriveManagerScreenState extends State<TaildriveManagerScreen> {
     final shares = appProvider.taildriveShares;
 
     final supportsTaildrive = VersionInfo.checkVersionAtLeast(
-        appProvider.serverVersion, '0.28.0');
+        appProvider.serverVersion, '0.29.0');
 
     return Scaffold(
       appBar: AppBar(
@@ -86,8 +86,8 @@ class _TaildriveManagerScreenState extends State<TaildriveManagerScreen> {
                         const SizedBox(height: 4),
                         Text(
                           isFr 
-                              ? 'Votre serveur tourne sous la version ${appProvider.serverVersion}. Les partages Taildrive nécessitent Headscale 0.28.0+ pour fonctionner. Les règles d\'accès ACL ne seront pas appliquées.'
-                              : 'Your server is running version ${appProvider.serverVersion}. Taildrive shares require Headscale 0.28.0+ to function. Access rules will not be active on the server.',
+                              ? 'Votre serveur tourne sous la version ${appProvider.serverVersion}. Les partages Taildrive nécessitent Headscale 0.29.0+ pour fonctionner. Les règles d\'accès ACL ne seront pas appliquées.'
+                              : 'Your server is running version ${appProvider.serverVersion}. Taildrive shares require Headscale 0.29.0+ to function. Access rules will not be active on the server.',
                           style: TextStyle(
                             color: Colors.red.shade100,
                             fontSize: 12,

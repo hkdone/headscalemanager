@@ -133,7 +133,9 @@ class _RenameNodeDialogState extends State<RenameNodeDialog> {
                   final newPolicyMap = aclGenerator.generatePolicy(
                       users: allUsers,
                       nodes: allNodes,
-                      temporaryRules: tempRules);
+                      temporaryRules: tempRules,
+                      taildriveShares: appProvider.taildriveShares,
+                      serverVersion: appProvider.serverVersion);
 
                   await apiService.setAclPolicy(jsonEncode(newPolicyMap));
                 }

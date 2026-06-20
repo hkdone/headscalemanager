@@ -232,12 +232,20 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
             // Use New Standard Engine
             final aclGenerator = StandardAclGeneratorService();
             newPolicyMap = aclGenerator.generatePolicy(
-                users: allUsers, nodes: allNodes, temporaryRules: tempRules);
+                users: allUsers,
+                nodes: allNodes,
+                temporaryRules: tempRules,
+                taildriveShares: appProvider.taildriveShares,
+                serverVersion: appProvider.serverVersion);
           } else {
             // Use Legacy Engine
             final aclGenerator = NewAclGeneratorService();
             newPolicyMap = aclGenerator.generatePolicy(
-                users: allUsers, nodes: allNodes, temporaryRules: tempRules);
+                users: allUsers,
+                nodes: allNodes,
+                temporaryRules: tempRules,
+                taildriveShares: appProvider.taildriveShares,
+                serverVersion: appProvider.serverVersion);
           }
 
           final newPolicyJson = jsonEncode(newPolicyMap);
