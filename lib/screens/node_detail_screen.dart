@@ -637,11 +637,14 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       }
       final tempRules =
           await appProvider.storageService.getTemporaryRules(serverId);
+      
+      // Clean up obsolete lan-sharer tags before ACL generation
+      final cleanedNodes = await _cleanupObsoleteLanSharerTags(updatedNodes);
 
       final aclGenerator = NewAclGeneratorService();
       final newPolicyMap = aclGenerator.generatePolicy(
           users: allUsers,
-          nodes: updatedNodes,
+          nodes: cleanedNodes,
           temporaryRules: tempRules,
           taildriveShares: appProvider.taildriveShares,
           serverVersion: appProvider.serverVersion);
@@ -930,6 +933,67 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       ),
     );
   }
+
+  List<String> _removeCapabilities(List<String> tags,
+      {bool removeExitNode = false, bool removeLanSharer = false}) {
+    List<String> newTags = List.from(tags);
+    int clientTagIndex = newTags.indexWhere((t) => t.contains('-client'));
+
+    if (clientTagIndex != -1) {
+      final oldClientTag = newTags[clientTagIndex];
+      final parts = oldClientTag
+          .replaceFirst('tag:', '')
+          .split(';')
+          .where((p) => p.isNotEmpty)
+          .toSet();
+
+      if (removeExitNode) parts.remove('exit-node');
+      if (removeLanSharer) parts.remove('lan-sharer');
+
+      final clientPart =
+          parts.firstWhere((p) => p.contains('-client'), orElse: () => '');
+      if (clientPart.isEmpty) return newTags;
+
+      final otherParts = parts.where((p) => p != clientPart).toList()..sort();
+
+      final newClientTagBuilder = StringBuffer('tag:$clientPart');
+      if (otherParts.isNotEmpty) {
+        newClientTagBuilder.write(';${otherParts.join(';')}');
+      }
+      newTags[clientTagIndex] = newClientTagBuilder.toString();
+    } else {
+      if (removeExitNode) newTags.remove('tag:exit-node');
+      if (removeLanSharer) newTags.remove('tag:lan-sharer');
+    }
+    return newTags;
+  }
+
+  /// Clean up obsolete lan-sharer tags from nodes that no longer have shared routes
+  /// This prevents orphaned route warnings and VPN disconnections
+  Future<List<Node>> _cleanupObsoleteLanSharerTags(List<Node> nodes) async {
+    if (!mounted) return nodes;
+    final appProvider = context.read<AppProvider>();
+    final apiService = appProvider.apiService;
+    
+    // Find nodes with lan-sharer tags but no shared routes
+    final nodesToCleanup = nodes.where((node) {
+      final hasLanSharerTag = node.tags.any((tag) => 
+        tag.contains(';lan-sharer') || 
+        tag == 'tag:lan-sharer' ||
+        (tag.startsWith('tag:') && tag.contains('lan-sharer'))
+      );
+      return hasLanSharerTag && node.sharedRoutes.isEmpty;
+    }).toList();
+    
+    // Clean up each affected node
+    for (final node in nodesToCleanup) {
+      final newTags = _removeCapabilities(List.from(node.tags), removeLanSharer: true);
+      await apiService.setTags(node.id, newTags);
+    }
+    
+    // Return refreshed nodes list
+    return await apiService.getNodes();
+  }
 }
 
 class _SectionCard extends StatelessWidget {
@@ -1004,3 +1068,4 @@ class _DetailRowWithCopy extends StatelessWidget {
     );
   }
 }
+

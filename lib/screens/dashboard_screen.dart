@@ -270,6 +270,111 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
+// Helper functions for tag management - accessible by all classes in this file
+List<String> _addCapabilities(List<String> tags,
+    {bool addExitNode = false, bool addLanSharer = false}) {
+  List<String> newTags = List.from(tags);
+  int clientTagIndex = newTags.indexWhere((t) => t.contains('-client'));
+
+  if (clientTagIndex != -1) {
+    final oldClientTag = newTags[clientTagIndex];
+    final parts = oldClientTag
+        .replaceFirst('tag:', '')
+        .split(';')
+        .where((p) => p.isNotEmpty)
+        .toSet();
+
+    if (addExitNode) parts.add('exit-node');
+    if (addLanSharer) parts.add('lan-sharer');
+
+    final clientPart =
+        parts.firstWhere((p) => p.contains('-client'), orElse: () => '');
+    if (clientPart.isEmpty) return newTags; // Should not happen
+
+    final otherParts = parts.where((p) => p != clientPart).toList()..sort();
+
+    final newClientTagBuilder = StringBuffer('tag:$clientPart');
+    if (otherParts.isNotEmpty) {
+      newClientTagBuilder.write(';${otherParts.join(';')}');
+    }
+    newTags[clientTagIndex] = newClientTagBuilder.toString();
+
+    // Remove standalone tags if they exist, as they are now consolidated
+    if (addExitNode) newTags.removeWhere((t) => t == 'tag:exit-node');
+    if (addLanSharer) newTags.removeWhere((t) => t == 'tag:lan-sharer');
+  } else {
+    if (addExitNode && !newTags.contains('tag:exit-node')) {
+      newTags.add('tag:exit-node');
+    }
+    if (addLanSharer && !newTags.contains('tag:lan-sharer')) {
+      newTags.add('tag:lan-sharer');
+    }
+  }
+  return newTags;
+}
+
+List<String> _removeCapabilities(List<String> tags,
+    {bool removeExitNode = false, bool removeLanSharer = false}) {
+  List<String> newTags = List.from(tags);
+  int clientTagIndex = newTags.indexWhere((t) => t.contains('-client'));
+
+  if (clientTagIndex != -1) {
+    final oldClientTag = newTags[clientTagIndex];
+    final parts = oldClientTag
+        .replaceFirst('tag:', '')
+        .split(';')
+        .where((p) => p.isNotEmpty)
+        .toSet();
+
+    if (removeExitNode) parts.remove('exit-node');
+    if (removeLanSharer) parts.remove('lan-sharer');
+
+    final clientPart =
+        parts.firstWhere((p) => p.contains('-client'), orElse: () => '');
+    if (clientPart.isEmpty) return newTags;
+
+    final otherParts = parts.where((p) => p != clientPart).toList()..sort();
+
+    final newClientTagBuilder = StringBuffer('tag:$clientPart');
+    if (otherParts.isNotEmpty) {
+      newClientTagBuilder.write(';${otherParts.join(';')}');
+    }
+    newTags[clientTagIndex] = newClientTagBuilder.toString();
+  } else {
+    if (removeExitNode) newTags.remove('tag:exit-node');
+    if (removeLanSharer) newTags.remove('tag:lan-sharer');
+  }
+  return newTags;
+}
+
+/// Clean up obsolete lan-sharer tags from nodes that no longer have shared routes
+/// This prevents orphaned route warnings and VPN disconnections
+/// This function needs to be called from a State class with access to mounted and context
+Future<List<Node>> _cleanupObsoleteLanSharerTags(
+    BuildContext context, List<Node> nodes) async {
+  final appProvider = context.read<AppProvider>();
+  final apiService = appProvider.apiService;
+  
+  // Find nodes with lan-sharer tags but no shared routes
+  final nodesToCleanup = nodes.where((node) {
+    final hasLanSharerTag = node.tags.any((tag) => 
+      tag.contains(';lan-sharer') || 
+      tag == 'tag:lan-sharer' ||
+      (tag.startsWith('tag:') && tag.contains('lan-sharer'))
+    );
+    return hasLanSharerTag && node.sharedRoutes.isEmpty;
+  }).toList();
+  
+  // Clean up each affected node
+  for (final node in nodesToCleanup) {
+    final newTags = _removeCapabilities(List.from(node.tags), removeLanSharer: true);
+    await apiService.setTags(node.id, newTags);
+  }
+  
+  // Return refreshed nodes list
+  return await apiService.getNodes();
+}
+
 class _StatItem extends StatelessWidget {
   const _StatItem({
     required this.title,
@@ -603,10 +708,17 @@ class _UserNodeCard extends StatelessWidget {
                     }
                     final tempRules = await appProvider.storageService
                         .getTemporaryRules(serverId);
+                    
+                    if (!context.mounted) return;
+                    // Clean up obsolete lan-sharer tags before ACL generation
+                    final cleanedNodes = await _cleanupObsoleteLanSharerTags(context, updatedNodes);
+                    
+                    if (!context.mounted) return;
+                    
                     final aclGenerator = NewAclGeneratorService();
                     final newPolicyMap = aclGenerator.generatePolicy(
                         users: allUsers,
-                        nodes: updatedNodes,
+                        nodes: cleanedNodes,
                         temporaryRules: tempRules,
                         taildriveShares: appProvider.taildriveShares,
                         serverVersion: appProvider.serverVersion);
@@ -740,10 +852,17 @@ class _UserNodeCard extends StatelessWidget {
                     }
                     final tempRules = await appProvider.storageService
                         .getTemporaryRules(serverId);
+                    
+                    if (!context.mounted) return;
+                    // Clean up obsolete lan-sharer tags before ACL generation
+                    final cleanedNodes = await _cleanupObsoleteLanSharerTags(context, updatedNodes);
+                    
+                    if (!context.mounted) return;
+                    
                     final aclGenerator = NewAclGeneratorService();
                     final newPolicyMap = aclGenerator.generatePolicy(
                         users: allUsers,
-                        nodes: updatedNodes,
+                        nodes: cleanedNodes,
                         temporaryRules: tempRules,
                         taildriveShares: appProvider.taildriveShares,
                         serverVersion: appProvider.serverVersion);
@@ -780,81 +899,5 @@ class _UserNodeCard extends StatelessWidget {
         );
       },
     );
-  }
-
-  List<String> _addCapabilities(List<String> tags,
-      {bool addExitNode = false, bool addLanSharer = false}) {
-    List<String> newTags = List.from(tags);
-    int clientTagIndex = newTags.indexWhere((t) => t.contains('-client'));
-
-    if (clientTagIndex != -1) {
-      final oldClientTag = newTags[clientTagIndex];
-      final parts = oldClientTag
-          .replaceFirst('tag:', '')
-          .split(';')
-          .where((p) => p.isNotEmpty)
-          .toSet();
-
-      if (addExitNode) parts.add('exit-node');
-      if (addLanSharer) parts.add('lan-sharer');
-
-      final clientPart =
-          parts.firstWhere((p) => p.contains('-client'), orElse: () => '');
-      if (clientPart.isEmpty) return newTags; // Should not happen
-
-      final otherParts = parts.where((p) => p != clientPart).toList()..sort();
-
-      final newClientTagBuilder = StringBuffer('tag:$clientPart');
-      if (otherParts.isNotEmpty) {
-        newClientTagBuilder.write(';${otherParts.join(';')}');
-      }
-      newTags[clientTagIndex] = newClientTagBuilder.toString();
-
-      // Remove standalone tags if they exist, as they are now consolidated
-      if (addExitNode) newTags.removeWhere((t) => t == 'tag:exit-node');
-      if (addLanSharer) newTags.removeWhere((t) => t == 'tag:lan-sharer');
-    } else {
-      if (addExitNode && !newTags.contains('tag:exit-node')) {
-        newTags.add('tag:exit-node');
-      }
-      if (addLanSharer && !newTags.contains('tag:lan-sharer')) {
-        newTags.add('tag:lan-sharer');
-      }
-    }
-    return newTags;
-  }
-
-  List<String> _removeCapabilities(List<String> tags,
-      {bool removeExitNode = false, bool removeLanSharer = false}) {
-    List<String> newTags = List.from(tags);
-    int clientTagIndex = newTags.indexWhere((t) => t.contains('-client'));
-
-    if (clientTagIndex != -1) {
-      final oldClientTag = newTags[clientTagIndex];
-      final parts = oldClientTag
-          .replaceFirst('tag:', '')
-          .split(';')
-          .where((p) => p.isNotEmpty)
-          .toSet();
-
-      if (removeExitNode) parts.remove('exit-node');
-      if (removeLanSharer) parts.remove('lan-sharer');
-
-      final clientPart =
-          parts.firstWhere((p) => p.contains('-client'), orElse: () => '');
-      if (clientPart.isEmpty) return newTags;
-
-      final otherParts = parts.where((p) => p != clientPart).toList()..sort();
-
-      final newClientTagBuilder = StringBuffer('tag:$clientPart');
-      if (otherParts.isNotEmpty) {
-        newClientTagBuilder.write(';${otherParts.join(';')}');
-      }
-      newTags[clientTagIndex] = newClientTagBuilder.toString();
-    } else {
-      if (removeExitNode) newTags.remove('tag:exit-node');
-      if (removeLanSharer) newTags.remove('tag:lan-sharer');
-    }
-    return newTags;
   }
 }
