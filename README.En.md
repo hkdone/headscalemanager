@@ -223,6 +223,16 @@ This application\'s policy generator is based on a fundamental security principl
 - If a user shares a **local subnet**, only their own devices can access it.
 - John cannot see or contact Jane\'s devices, exit nodes, or subnets, and vice-versa.
 
+**ACL Engines (Settings → ACL Generation Engine):**
+
+| Engine | Usage |
+|---|---|
+| **Legacy** | Merged tags — legacy configs |
+| **Standard** | Split tags — Headscale < 0.29 |
+| **Grants V29** | Headscale ≥ 0.29 grants with **`via`** routing — recommended when multiple users share the same LAN CIDR |
+
+The ACL screen has three tabs: **Grants**, **ACLs**, **JSON**. The ACL Puzzle shows three columns: Source | Via | Destination.
+
 **ACL page workflow:**
 
 The ACL page has two main functions:

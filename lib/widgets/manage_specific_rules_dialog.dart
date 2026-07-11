@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
-import 'package:headscalemanager/services/new_acl_generator_service.dart';
+import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
 import 'package:provider/provider.dart';
 
 class ManageSpecificRulesDialog extends StatefulWidget {
@@ -115,8 +115,9 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
       final users = await apiService.getUsers();
       final nodes = widget.allNodes;
 
-      final generator = NewAclGeneratorService();
-      final newPolicy = generator.generatePolicy(
+      final aclOrchestrator = AclPolicyOrchestrator();
+      final newPolicy = aclOrchestrator.generatePolicy(
+        engineMode: appProvider.aclEngineMode,
         users: users,
         nodes: nodes,
         temporaryRules: _temporaryRules,

@@ -6,12 +6,14 @@ import 'package:headscalemanager/screens/network_overview_screen.dart';
 import 'package:headscalemanager/screens/settings_screen.dart';
 import 'package:headscalemanager/screens/users_screen.dart';
 import 'package:headscalemanager/screens/dns_screen.dart';
-import 'package:eva_icons_flutter/eva_icons_flutter.dart';
 import 'package:headscalemanager/screens/help_screen.dart';
 import 'package:headscalemanager/screens/help_screen_en.dart';
 import 'package:provider/provider.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 
+import 'package:headscalemanager/models/acl_engine_mode.dart';
+import 'package:headscalemanager/models/version_info.dart';
+import 'package:headscalemanager/widgets/grants_migration_dialog.dart';
 import 'package:headscalemanager/widgets/legacy_migration_dialog.dart';
 import 'package:headscalemanager/widgets/whats_new_dialog.dart';
 
@@ -31,13 +33,14 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForWhatsNew();
       _checkForLegacyTags();
+      _checkForGrantsMigration();
     });
   }
 
   Future<void> _checkForWhatsNew() async {
     final provider = context.read<AppProvider>();
     // Update this version when releasing a new update with relevant "What's New" content
-    const currentVersion = '1.8.0';
+    const currentVersion = '2.0.0';
     const lastVersionKey = 'LAST_SEEN_VERSION';
 
     try {
@@ -82,6 +85,39 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _checkForGrantsMigration() async {
+    final provider = context.read<AppProvider>();
+    final serverId = provider.activeServer?.id;
+    if (serverId == null) return;
+    if (!VersionInfo.checkVersionAtLeast(provider.serverVersion, '0.29.0')) {
+      return;
+    }
+    if (provider.aclEngineMode == AclEngineMode.grantsV29) return;
+
+    try {
+      final dismissed =
+          await provider.storageService.isGrantsMigrationDismissed(serverId);
+      final completed =
+          await provider.storageService.isGrantsMigrationCompleted(serverId);
+      if (dismissed || completed) return;
+
+      final nodes = await provider.apiService.getNodes();
+      final hasLegacyTags =
+          nodes.any((n) => n.tags.any((t) => t.contains(';')));
+      if (hasLegacyTags) return;
+
+      if (mounted) {
+        showDialog(
+          barrierDismissible: false,
+          context: context,
+          builder: (_) => const GrantsMigrationDialog(),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error checking grants migration: $e');
+    }
+  }
+
   static const List<Widget> _widgetOptions = <Widget>[
     DashboardScreen(),
     UsersScreen(),
@@ -111,10 +147,10 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     final items = <Widget>[
-      Icon(EvaIcons.layout, size: 30, color: theme.colorScheme.onPrimary),
-      Icon(EvaIcons.people, size: 30, color: theme.colorScheme.onPrimary),
-      Icon(EvaIcons.shield, size: 30, color: theme.colorScheme.onPrimary),
-      Icon(EvaIcons.globe2Outline,
+      Icon(Icons.dashboard, size: 30, color: theme.colorScheme.onPrimary),
+      Icon(Icons.people, size: 30, color: theme.colorScheme.onPrimary),
+      Icon(Icons.shield, size: 30, color: theme.colorScheme.onPrimary),
+      Icon(Icons.public,
           size: 30, color: theme.colorScheme.onPrimary),
       Icon(Icons.dns_rounded, size: 30, color: theme.colorScheme.onPrimary),
     ];
@@ -148,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           IconButton(
-            icon: Icon(EvaIcons.settings, color: theme.colorScheme.primary),
+            icon: Icon(Icons.settings, color: theme.colorScheme.primary),
             onPressed: () {
               Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const SettingsScreen()));

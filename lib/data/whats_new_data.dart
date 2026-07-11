@@ -14,6 +14,30 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '2.0.0',
+        title: isFr
+            ? 'Release 2.0.0 — Grants, Via & UI ACL'
+            : 'Release 2.0.0 — Grants, Via & ACL UI',
+        description: isFr
+            ? 'Refonte complète de l\'écran ACL (onglets Grants/ACLs/JSON), Puzzle 3 colonnes avec routage via, graphe ACL enrichi, wizard de migration Grants V29, rollback moteur, et avertissements utilisateurs sans nœud tagué.'
+            : 'Full ACL screen overhaul (Grants/ACLs/JSON tabs), 3-column Puzzle with via routing, enhanced ACL graph, Grants V29 migration wizard, engine rollback, and warnings for users without tagged nodes.',
+        verification: isFr
+            ? 'ACL > onglets | Puzzle > colonne Via | Paramètres > Migration Grants V29'
+            : 'ACL > tabs | Puzzle > Via column | Settings > Grants V29 migration',
+      ),
+      WhatsNewVersion(
+        version: '1.10.0',
+        title: isFr
+            ? 'Moteur Grants V29 (via)'
+            : 'Grants V29 Engine (via)',
+        description: isFr
+            ? 'Nouveau moteur ACL basé sur les grants Headscale 0.29+ avec routage via pour les sous-réseaux LAN et exit nodes. Résout les collisions quand plusieurs utilisateurs partagent le même CIDR (ex. 192.168.1.0/24). Sélectionnable dans Paramètres > Moteur de génération ACL. Activation automatique sur serveurs ≥ 0.29 si aucun choix explicite.'
+            : 'New ACL engine based on Headscale 0.29+ grants with via routing for LAN subnets and exit nodes. Resolves collisions when multiple users share the same CIDR (e.g. 192.168.1.0/24). Selectable in Settings > ACL Generation Engine. Auto-enabled on servers ≥ 0.29 when no explicit choice was made.',
+        verification: isFr
+            ? 'Paramètres > Moteur ACL > Grants V29. Nécessite Headscale 0.29.0+.'
+            : 'Settings > ACL Engine > Grants V29. Requires Headscale 0.29.0+.',
+      ),
+      WhatsNewVersion(
         version: '1.9.0',
         title: isFr
             ? 'Support Officiel Taildrive (Headscale v0.29.0+)'

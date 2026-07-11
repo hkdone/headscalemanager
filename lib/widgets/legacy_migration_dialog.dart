@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 
+import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/tag_migration_service.dart';
-import 'package:headscalemanager/services/standard_acl_generator_service.dart';
+import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
 import 'package:provider/provider.dart';
 
 class LegacyMigrationDialog extends StatefulWidget {
@@ -208,7 +209,7 @@ class _LegacyMigrationDialogState extends State<LegacyMigrationDialog> {
   Future<void> _runMigration() async {
     final appProvider = context.read<AppProvider>();
     final migrationService = TagMigrationService(appProvider.apiService);
-    final standardAclGen = StandardAclGeneratorService();
+    final aclOrchestrator = AclPolicyOrchestrator();
 
     // Helper to add log
     void log(String fr, String en) {
@@ -264,7 +265,8 @@ class _LegacyMigrationDialogState extends State<LegacyMigrationDialog> {
             await appProvider.storageService.getTemporaryRules(serverId);
       }
 
-      final policy = standardAclGen.generatePolicy(
+      final policy = aclOrchestrator.generatePolicy(
+          engineMode: AclEngineMode.standard,
           users: users,
           nodes: freshNodes,
           temporaryRules: tempRules,

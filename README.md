@@ -225,6 +225,16 @@ Le générateur de politique de cette application est basé sur un principe de s
 - Si un utilisateur partage un **sous-réseau local**, seuls ses propres appareils peuvent y accéder.
 - Jean ne peut pas voir ou contacter les appareils, exit nodes ou sous-réseaux de Clarisse, et vice-versa.
 
+**Moteurs ACL (Paramètres → Moteur de génération ACL) :**
+
+| Moteur | Usage |
+|---|---|
+| **Legacy** | Tags fusionnés (`tag:user-client;exit-node`) — anciennes configs |
+| **Standard** | Tags séparés — Headscale < 0.29 ou préférence explicite |
+| **Grants V29** | Grants Headscale ≥ 0.29 avec routage **`via`** — recommandé si plusieurs utilisateurs partagent le même CIDR LAN |
+
+L'écran ACL propose trois onglets : **Grants** (règles réseau + via), **ACLs** (exceptions classiques), **JSON** (édition brute). Le Puzzle ACL affiche trois colonnes : Source | Via | Destination.
+
 **Workflow d'utilisation de la page ACL :**
 
 La page ACL a deux fonctions principales :
@@ -319,6 +329,8 @@ Cet écran vous permet de configurer l'application pour qu'elle se connecte à v
 - **URL du Serveur :** Entrez l'adresse publique (FQDN) de votre serveur Headscale (ex: `https://headscale.mondomaine.com`).
 - **Clé API :** Collez la clé API unique que vous avez générée depuis votre serveur Headscale. Ce champ est masqué pour des raisons de sécurité.
 - **Bouton Enregistrer :** Sauvegarde les identifiants saisis. L'application redémarrera pour appliquer les nouveaux paramètres.
+- **Moteur ACL :** Choix entre Legacy, Standard et Grants V29 (si serveur ≥ 0.29).
+- **Migration Grants V29 :** Wizard guidé dans la zone Danger (ou au premier lancement sur serveur 0.29+).
 
 ### 3.11. Gestion des clés API
 

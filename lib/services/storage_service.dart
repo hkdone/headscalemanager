@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/models/server.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -121,6 +122,8 @@ class StorageService {
   }
 
   static const _aclEngineKey = 'ACL_ENGINE_STANDARD_ENABLED';
+  static const _aclEngineModeKey = 'ACL_ENGINE_MODE';
+  static const _aclEngineExplicitKey = 'ACL_ENGINE_MODE_EXPLICIT';
   static const _taildriveSharesPrefix = 'TAILDRIVE_SHARES_';
 
   Future<void> saveTaildriveShares(
@@ -147,13 +150,59 @@ class StorageService {
   }
 
   Future<void> setStandardAclEngineEnabled(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_aclEngineKey, enabled);
+    await saveAclEngineMode(
+      enabled ? AclEngineMode.standard : AclEngineMode.legacy,
+    );
   }
 
   Future<bool> getStandardAclEngineEnabled() async {
+    final mode = await getAclEngineMode();
+    return mode != AclEngineMode.legacy;
+  }
+
+  Future<AclEngineMode> getAclEngineMode() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_aclEngineKey) ?? false;
+    final stored = prefs.getString(_aclEngineModeKey);
+    if (stored != null) {
+      return AclEngineModeStorage.fromStorageKey(stored);
+    }
+    final legacyStandard = prefs.getBool(_aclEngineKey) ?? false;
+    return legacyStandard ? AclEngineMode.standard : AclEngineMode.legacy;
+  }
+
+  Future<void> saveAclEngineMode(AclEngineMode mode,
+      {bool explicit = true}) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_aclEngineModeKey, mode.storageKey);
+    await prefs.setBool(_aclEngineKey, mode != AclEngineMode.legacy);
+    if (explicit) {
+      await prefs.setBool(_aclEngineExplicitKey, true);
+    }
+  }
+
+  Future<bool> hasExplicitAclEngineMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_aclEngineExplicitKey) ?? false;
+  }
+
+  Future<void> setGrantsMigrationCompleted(String serverId, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('GRANTS_MIGRATION_DONE_$serverId', value);
+  }
+
+  Future<bool> isGrantsMigrationCompleted(String serverId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('GRANTS_MIGRATION_DONE_$serverId') ?? false;
+  }
+
+  Future<void> setGrantsMigrationDismissed(String serverId, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('GRANTS_MIGRATION_DISMISSED_$serverId', value);
+  }
+
+  Future<bool> isGrantsMigrationDismissed(String serverId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('GRANTS_MIGRATION_DISMISSED_$serverId') ?? false;
   }
 
   Future<void> savePuzzleEntityAliases(

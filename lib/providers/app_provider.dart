@@ -7,7 +7,9 @@ import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/services/notification_service.dart';
 import 'package:headscalemanager/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/models/node.dart';
+import 'package:headscalemanager/models/version_info.dart';
 
 class AppProvider extends ChangeNotifier {
 
@@ -48,7 +50,7 @@ class AppProvider extends ChangeNotifier {
       await _loadCustomDeviceData();
 
       // Auto-detect if we should benefit from Standard ACL Engine
-      if (_activeServer != null && !_useStandardAclEngine) {
+      if (_activeServer != null && _aclEngineMode == AclEngineMode.legacy) {
         try {
           final nodes = await _apiService!.getNodes();
           bool hasStandardTags = false;
@@ -448,24 +450,49 @@ class AppProvider extends ChangeNotifier {
         await _storageService.saveServers(_servers);
         notifyListeners();
       }
+      await _maybeAutoEnableGrantsEngine();
     } catch (e) {
       debugPrint('Erreur lors de la détection de la version : $e');
       // On garde la version actuelle ou le défaut s'il n'y a pas de réponse
     }
   }
 
-  bool _useStandardAclEngine = false;
-  bool get useStandardAclEngine => _useStandardAclEngine;
+  AclEngineMode _aclEngineMode = AclEngineMode.standard;
+  AclEngineMode get aclEngineMode => _aclEngineMode;
+
+  /// Vrai pour Standard et Grants V29 (tags séparés).
+  bool get useStandardAclEngine => _aclEngineMode != AclEngineMode.legacy;
 
   Future<void> _loadAclEnginePreference() async {
-    _useStandardAclEngine = await _storageService.getStandardAclEngineEnabled();
+    _aclEngineMode = await _storageService.getAclEngineMode();
+    notifyListeners();
+  }
+
+  Future<void> setAclEngineMode(AclEngineMode mode) async {
+    _aclEngineMode = mode;
+    await _storageService.saveAclEngineMode(mode);
     notifyListeners();
   }
 
   Future<void> setStandardAclEngineEnabled(bool enabled) async {
-    _useStandardAclEngine = enabled;
-    await _storageService.setStandardAclEngineEnabled(enabled);
-    notifyListeners();
+    await setAclEngineMode(
+      enabled ? AclEngineMode.standard : AclEngineMode.legacy,
+    );
+  }
+
+  Future<void> _maybeAutoEnableGrantsEngine() async {
+    if (_activeServer == null) return;
+    if (!VersionInfo.checkVersionAtLeast(serverVersion, '0.29.0')) return;
+    if (_aclEngineMode == AclEngineMode.grantsV29) return;
+    if (await _storageService.hasExplicitAclEngineMode()) return;
+    if (_aclEngineMode == AclEngineMode.standard) {
+      _aclEngineMode = AclEngineMode.grantsV29;
+      await _storageService.saveAclEngineMode(
+        AclEngineMode.grantsV29,
+        explicit: false,
+      );
+      notifyListeners();
+    }
   }
 }
 

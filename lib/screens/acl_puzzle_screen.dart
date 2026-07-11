@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/models/acl_puzzle_model.dart';
 import 'package:headscalemanager/utils/json_utils.dart';
 import 'package:headscalemanager/services/acl_puzzle_service.dart';
-import 'package:headscalemanager/services/new_acl_generator_service.dart';
+import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
@@ -91,7 +92,7 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
   final List<PuzzleRule> _puzzleRules = [];
   bool _isLoading = true;
   final AclPuzzleService _puzzleService = AclPuzzleService();
-  final NewAclGeneratorService _baseGenerator = NewAclGeneratorService();
+  final AclPolicyOrchestrator _aclOrchestrator = AclPolicyOrchestrator();
 
   // Cached data for Entity Selection
   List<User> _users = [];
@@ -257,18 +258,19 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
     final cleanedNodes = await _cleanupObsoleteLanSharerTags(_nodes);
     
     // 1. Generate Base Policy (Infrastructure)
-    final basePolicy =
-        _baseGenerator.generatePolicy(
-          users: _users,
-          nodes: cleanedNodes,
-          taildriveShares: appProvider.taildriveShares,
-          serverVersion: appProvider.serverVersion,
-        );
+    final basePolicy = _aclOrchestrator.generatePolicy(
+      engineMode: appProvider.aclEngineMode,
+      users: _users,
+      nodes: cleanedNodes,
+      taildriveShares: appProvider.taildriveShares,
+      serverVersion: appProvider.serverVersion,
+    );
 
     // 2. Merge with Puzzle Rules
     final finalPolicy = _puzzleService.convertPuzzleToJson(
       rules: _puzzleRules,
       basePolicy: basePolicy,
+      emitGrants: appProvider.aclEngineMode == AclEngineMode.grantsV29,
     );
 
     // 3. Export to Server
@@ -319,9 +321,6 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
   }
 
   void _onReorder(int oldIndex, int newIndex) async {
-    if (newIndex > oldIndex) {
-      newIndex -= 1;
-    }
     final displayed = _displayedRules;
     final item = displayed.removeAt(oldIndex);
     displayed.insert(newIndex, item);
@@ -393,7 +392,7 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
                 : ReorderableListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: _displayedRules.length,
-                    onReorder: _onReorder,
+                    onReorderItem: _onReorder,
                     itemBuilder: (context, index) {
                       final rule = _displayedRules[index];
                       return _PuzzleBlockCard(
@@ -894,13 +893,24 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
             ),
           );
 
-    Map<String, dynamic> singleRuleJson = {
-      'action': widget.rule.action,
-      'src': widget.rule.sources.map((e) => e.value).toList(),
-      'dst': widget.rule.destinations
-          .map((e) => '${e.value}${e.value.contains(':') ? '' : ':*'}')
-          .toList(),
-    };
+    Map<String, dynamic> singleRuleJson;
+    if (widget.rule.isGrant || widget.rule.via.isNotEmpty) {
+      singleRuleJson = {
+        'src': widget.rule.sources.map((e) => e.value).toList(),
+        'dst': widget.rule.destinations.map((e) => e.value).toList(),
+        'ip': ['*'],
+        if (widget.rule.via.isNotEmpty)
+          'via': widget.rule.via.map((e) => e.value).toList(),
+      };
+    } else {
+      singleRuleJson = {
+        'action': widget.rule.action,
+        'src': widget.rule.sources.map((e) => e.value).toList(),
+        'dst': widget.rule.destinations
+            .map((e) => '${e.value}${e.value.contains(':') ? '' : ':*'}')
+            .toList(),
+      };
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1049,13 +1059,68 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                           .toList(),
                     ),
                   ),
+                  // Via (routage grants)
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: widget.rule.via.isEmpty
+                          ? [
+                              Center(
+                                child: Text(
+                                  isFr ? 'direct' : 'direct',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey[600],
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ),
+                            ]
+                          : widget.rule.via
+                              .map((e) => Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 4.0),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.purple.withAlpha(40),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: Colors.purple.withAlpha(80),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.alt_route,
+                                              size: 14, color: Colors.purple),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              _getEntityLabel(context, e),
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              softWrap: true,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ))
+                              .toList(),
+                    ),
+                  ),
                   // Flèche directionnelle
                   Expanded(
                     flex: 1,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.arrow_forward, color: Colors.green, size: 20),
+                        const Icon(Icons.arrow_forward,
+                            color: Colors.green, size: 20),
                         const SizedBox(height: 2),
                         Text(
                           isFr ? 'AUTOR.' : 'ALLOW',
@@ -1222,6 +1287,12 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                 ),
               ),
               const Divider(),
+              _buildDetailSection(
+                  ctx,
+                  isFr ? 'VIA (routage)' : 'VIA (routing)',
+                  widget.rule.via,
+                  Colors.purple),
+              const Divider(),
               _buildDetailSection(ctx, isFr ? 'DESTINATIONS' : 'DESTINATIONS',
                   widget.rule.destinations, Colors.orange),
             ],
@@ -1279,14 +1350,41 @@ class _RuleEditorDialog extends StatefulWidget {
 
 class _RuleEditorDialogState extends State<_RuleEditorDialog> {
   final List<PuzzleEntity> _selectedSources = [];
+  final List<PuzzleEntity> _selectedVia = [];
   final List<PuzzleEntity> _selectedDestinations = [];
   int _currentStep = 0;
+
+  String _stepTitle(bool isFr, bool useGrants) {
+    switch (_currentStep) {
+      case 0:
+        return isFr ? 'Étape 1: QUI ? (Source)' : 'Step 1: WHO? (Source)';
+      case 1:
+        if (!useGrants) {
+          return isFr
+              ? 'Étape 2: VERS QUOI ? (Destination)'
+              : 'Step 2: TO WHAT? (Destination)';
+        }
+        return isFr ? 'Étape 2: VIA ? (Routage)' : 'Step 2: VIA? (Routing)';
+      default:
+        return isFr
+            ? 'Étape 3: VERS QUOI ? (Destination)'
+            : 'Step 3: TO WHAT? (Destination)';
+    }
+  }
+
+  List<PuzzleEntity> _currentSelection(bool useGrants) {
+    if (_currentStep == 0) return _selectedSources;
+    if (_currentStep == 1 && useGrants) return _selectedVia;
+    return _selectedDestinations;
+  }
 
   @override
   Widget build(BuildContext context) {
     final isFr = context.watch<AppProvider>().locale.languageCode == 'fr';
+    final useGrants =
+        context.watch<AppProvider>().aclEngineMode == AclEngineMode.grantsV29;
+    final maxStep = useGrants ? 2 : 1;
 
-    // A simple wizard-like bottom sheet
     return SafeArea(
       child: Container(
         height: MediaQuery.of(context).size.height * 0.8,
@@ -1295,19 +1393,24 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              _currentStep == 0
-                  ? (isFr ? 'Étape 1: QUI ? (Source)' : 'Step 1: WHO? (Source)')
-                  : (isFr
-                      ? 'Étape 2: VERS QUOI ? (Destination)'
-                      : 'Step 2: TO WHAT? (Destination)'),
+              _stepTitle(isFr, useGrants),
               style: Theme.of(context).textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),
+            if (_currentStep == 1 && useGrants)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  isFr
+                      ? 'Optionnel — laissez vide pour un accès direct (intra-flotte).'
+                      : 'Optional — leave empty for direct access (intra-fleet).',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ),
             const SizedBox(height: 16),
             Expanded(
-              child: _buildEntityList(
-                  _currentStep == 0 ? _selectedSources : _selectedDestinations,
-                  isFr),
+              child: _buildEntityList(_currentSelection(useGrants), isFr, useGrants),
             ),
             const SizedBox(height: 16),
             Row(
@@ -1332,7 +1435,9 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
                         return;
                       }
                       setState(() => _currentStep++);
-                    } else {
+                    } else if (_currentStep == 1 && useGrants) {
+                      setState(() => _currentStep++);
+                    } else if (_currentStep == maxStep) {
                       if (_selectedDestinations.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             content: Text(isFr
@@ -1342,11 +1447,20 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
                         return;
                       }
                       widget.onSave(PuzzleRule(
-                          sources: List.from(_selectedSources),
-                          destinations: List.from(_selectedDestinations)));
+                        sources: List.from(_selectedSources),
+                        via: List.from(_selectedVia),
+                        destinations: List.from(_selectedDestinations),
+                        isGrant: useGrants &&
+                            (_selectedVia.isNotEmpty ||
+                                _selectedDestinations.any((d) =>
+                                    d.type == PuzzleEntityType.internet ||
+                                    d.type == PuzzleEntityType.cidr)),
+                      ));
+                    } else {
+                      setState(() => _currentStep++);
                     }
                   },
-                  child: Text(_currentStep == 0
+                  child: Text(_currentStep < maxStep
                       ? (isFr ? 'Suivant' : 'Next')
                       : (isFr ? 'Ajouter la pièce' : 'Add Piece')),
                 ),
@@ -1358,13 +1472,14 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
     );
   }
 
-  Widget _buildEntityList(List<PuzzleEntity> selectedList, bool isFr) {
+  Widget _buildEntityList(
+      List<PuzzleEntity> selectedList, bool isFr, bool useGrants) {
     // Group entities by type for better UI
     final grouped = <PuzzleEntityType, List<PuzzleEntity>>{};
 
     // Smart Filtering Logic for Step 2 (Destinations)
     Set<String> excludedIds = {};
-    if (_currentStep == 1) {
+    if (_currentStep == (useGrants ? 2 : 1)) {
       for (var rule in widget.existingRules) {
         // If the rule has *any* of the currently selected sources
         bool sharesSource = rule.sources.any((ruleSrc) => _selectedSources
@@ -1382,11 +1497,20 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
     }
 
     for (var e in widget.availableEntities) {
-      // Step 0: Skip Internet/CIDR for sources usually
       if (e.type == PuzzleEntityType.internet && _currentStep == 0) continue;
 
-      // Step 1: Filter out already configured destinations
-      if (_currentStep == 1 && excludedIds.contains(e.value)) continue;
+      if (_currentStep == 1 && useGrants) {
+        final isViaTag = e.type == PuzzleEntityType.tag &&
+            (e.value.contains('-lan-sharer') ||
+                e.value.contains('-exit-node') ||
+                e.value.contains(';lan-sharer') ||
+                e.value.contains(';exit-node'));
+        if (!isViaTag) continue;
+      }
+
+      if (_currentStep == (useGrants ? 2 : 1) && excludedIds.contains(e.value)) {
+        continue;
+      }
 
       grouped.putIfAbsent(e.type, () => []).add(e);
     }

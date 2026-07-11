@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
-import 'package:headscalemanager/services/new_acl_generator_service.dart';
+import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:provider/provider.dart';
@@ -111,13 +111,15 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
           }
           final tempRules =
               await provider.storageService.getTemporaryRules(serverId);
-          final aclGenerator = NewAclGeneratorService();
-          final newPolicyMap = aclGenerator.generatePolicy(
-              users: allUsers,
-              nodes: allNodes,
-              temporaryRules: tempRules,
-              taildriveShares: provider.taildriveShares,
-              serverVersion: provider.serverVersion);
+          final aclOrchestrator = AclPolicyOrchestrator();
+          final newPolicyMap = aclOrchestrator.generatePolicy(
+            engineMode: provider.aclEngineMode,
+            users: allUsers,
+            nodes: allNodes,
+            temporaryRules: tempRules,
+            taildriveShares: provider.taildriveShares,
+            serverVersion: provider.serverVersion,
+          );
           final newPolicyJson = jsonEncode(newPolicyMap);
           await provider.apiService.setAclPolicy(newPolicyJson);
 

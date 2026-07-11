@@ -3,7 +3,6 @@ import 'package:headscalemanager/screens/client_commands_screen.dart';
 import 'package:headscalemanager/widgets/whats_new_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
-import 'package:eva_icons_flutter/eva_icons_flutter.dart';
 
 /// English help screen for the application.
 ///
@@ -383,6 +382,18 @@ routes:
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),
+                    _buildBodyText(context, '**ACL Engines (v2.0)**',
+                        isBold: true),
+                    const SizedBox(height: 4),
+                    _buildBodyText(
+                      context,
+                      '- **Legacy**: merged tags (old format).\n'
+                      '- **Standard**: split tags (Identity vs Capability).\n'
+                      '- **Grants V29**: Headscale ≥ 0.29 grants with **via** routing to isolate identical LAN CIDRs across users.\n'
+                      'Select in Settings. ACL screen has Grants / ACLs / JSON tabs.',
+                      isSmall: true,
+                    ),
+                    const SizedBox(height: 16),
                     _buildBodyText(
                         context, '**Workflow for using the ACL page:**',
                         isBold: true),
@@ -603,7 +614,7 @@ routes:
       ),
       margin: const EdgeInsets.symmetric(vertical: 8.0),
       child: ListTile(
-        leading: Icon(EvaIcons.hardDriveOutline,
+        leading: Icon(Icons.storage,
             color: theme.colorScheme.onPrimary, size: 32),
         title: Text(
           'Client Command Library',

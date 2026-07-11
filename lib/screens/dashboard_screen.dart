@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
-import 'package:headscalemanager/services/new_acl_generator_service.dart';
+import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
 import 'package:headscalemanager/services/route_conflict_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
@@ -715,8 +715,9 @@ class _UserNodeCard extends StatelessWidget {
                     
                     if (!context.mounted) return;
                     
-                    final aclGenerator = NewAclGeneratorService();
-                    final newPolicyMap = aclGenerator.generatePolicy(
+                    final aclOrchestrator = AclPolicyOrchestrator();
+                    final newPolicyMap = aclOrchestrator.generatePolicy(
+                        engineMode: appProvider.aclEngineMode,
                         users: allUsers,
                         nodes: cleanedNodes,
                         temporaryRules: tempRules,
@@ -859,8 +860,9 @@ class _UserNodeCard extends StatelessWidget {
                     
                     if (!context.mounted) return;
                     
-                    final aclGenerator = NewAclGeneratorService();
-                    final newPolicyMap = aclGenerator.generatePolicy(
+                    final aclOrchestrator = AclPolicyOrchestrator();
+                    final newPolicyMap = aclOrchestrator.generatePolicy(
+                        engineMode: appProvider.aclEngineMode,
                         users: allUsers,
                         nodes: cleanedNodes,
                         temporaryRules: tempRules,

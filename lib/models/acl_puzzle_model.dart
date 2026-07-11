@@ -38,20 +38,25 @@ class PuzzleEntity {
 class PuzzleRule {
   final String id;
   final List<PuzzleEntity> sources;
+  final List<PuzzleEntity> via;
   final List<PuzzleEntity> destinations;
   final String action;
+  final bool isGrant;
 
   PuzzleRule({
     String? id,
     required this.sources,
+    this.via = const [],
     required this.destinations,
     this.action = 'accept',
+    this.isGrant = false,
   }) : id = id ?? const Uuid().v4();
 
   String get signature {
     final srcValues = sources.map((e) => e.value).toList()..sort();
+    final viaValues = via.map((e) => e.value).toList()..sort();
     final dstValues = destinations.map((e) => e.value).toList()..sort();
-    return 'src:${srcValues.join(",")}|dst:${dstValues.join(",")}';
+    return 'src:${srcValues.join(",")}|via:${viaValues.join(",")}|dst:${dstValues.join(",")}';
   }
 
   factory PuzzleRule.fromJson(Map<String, dynamic> json) {
@@ -60,10 +65,16 @@ class PuzzleRule {
       sources: (json['sources'] as List)
           .map((e) => PuzzleEntity.fromJson(e))
           .toList(),
+      via: json['via'] != null
+          ? (json['via'] as List)
+              .map((e) => PuzzleEntity.fromJson(e))
+              .toList()
+          : const [],
       destinations: (json['destinations'] as List)
           .map((e) => PuzzleEntity.fromJson(e))
           .toList(),
       action: json['action'] ?? 'accept',
+      isGrant: json['isGrant'] ?? false,
     );
   }
 
@@ -71,9 +82,10 @@ class PuzzleRule {
     return {
       'id': id,
       'sources': sources.map((e) => e.toJson()).toList(),
+      'via': via.map((e) => e.toJson()).toList(),
       'destinations': destinations.map((e) => e.toJson()).toList(),
       'action': action,
+      'isGrant': isGrant,
     };
   }
 }
-

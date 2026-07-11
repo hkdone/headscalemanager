@@ -5,17 +5,41 @@ import 'package:headscalemanager/utils/ip_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 
 // Models to represent parsed permissions
+class AllowedGrantRoute {
+  final String destination;
+  final List<String> ip;
+  final String? viaTag;
+  final Node? viaNode;
+  final List<String> sourceAliases;
+
+  AllowedGrantRoute({
+    required this.destination,
+    this.ip = const ['*'],
+    this.viaTag,
+    this.viaNode,
+    this.sourceAliases = const [],
+  });
+
+  bool get isInternet => destination == 'autogroup:internet';
+
+  @override
+  String toString() =>
+      '$destination via ${viaTag ?? "direct"} (${viaNode?.name ?? "?"})';
+}
+
 class NodePermission {
   final List<AllowedPeer> allowedPeers;
   final List<AllowedSubnet> allowedSubnets;
   final List<AllowedExitNode> allowedExitNodes;
   final List<TaildriveGrant> allowedTaildriveShares;
+  final List<AllowedGrantRoute> allowedGrantRoutes;
 
   NodePermission({
     required this.allowedPeers,
     required this.allowedSubnets,
     required this.allowedExitNodes,
     this.allowedTaildriveShares = const [],
+    this.allowedGrantRoutes = const [],
   });
 
   @override
@@ -114,30 +138,47 @@ class AclParserService {
 
   void _parseAliases() {
     if (aclPolicy.containsKey('tagOwners')) {
-      final Map<String, dynamic> tagOwners = aclPolicy['tagOwners'];
-      tagOwners.forEach((tag, owners) {
-        final List<String> ownerAliases = (owners as List).cast<String>();
-        for (var ownerAlias in ownerAliases) {
-          final user = allUsers.firstWhere((u) => u.name == ownerAlias,
-              orElse: () => User(id: '', name: '', createdAt: DateTime.now()));
-          if (user.id.isNotEmpty) {
-            final userNodes = allNodes.where((n) =>
-                n.user == user.name ||
-                n.getNormalizedOwner() == normalizeUserName(user.name));
-            _aliases[tag] = userNodes.expand((n) => n.ipAddresses).toList();
+      final tagOwnersRaw = aclPolicy['tagOwners'];
+      if (tagOwnersRaw is Map) {
+        tagOwnersRaw.forEach((tag, ownersRaw) {
+          final ownerAliases = _coerceStringList(ownersRaw);
+          for (var ownerAlias in ownerAliases) {
+            final user = allUsers.firstWhere((u) => u.name == ownerAlias,
+                orElse: () =>
+                    User(id: '', name: '', createdAt: DateTime.now()));
+            if (user.id.isNotEmpty) {
+              final userNodes = allNodes.where((n) =>
+                  n.user == user.name ||
+                  n.getNormalizedOwner() == normalizeUserName(user.name));
+              _aliases[tag.toString()] =
+                  userNodes.expand((n) => n.ipAddresses).toList();
+            }
           }
-        }
-      });
+        });
+      }
     }
     if (aclPolicy.containsKey('groups')) {
-      final Map<String, dynamic> groups = aclPolicy['groups'];
-      groups.forEach((group, aliases) {
-        _aliases[group] = (aliases as List).cast<String>();
-      });
+      final groupsRaw = aclPolicy['groups'];
+      if (groupsRaw is Map) {
+        groupsRaw.forEach((group, aliasesRaw) {
+          _aliases[group.toString()] = _coerceStringList(aliasesRaw);
+        });
+      }
     }
   }
 
-  List<String> _resolveAlias(String alias, Node sourceNode) {
+  List<String> _coerceStringList(dynamic value) {
+    if (value is List) {
+      return value.map((e) => e.toString()).toList();
+    }
+    if (value is String) return [value];
+    return const [];
+  }
+
+  List<String> _resolveAlias(String alias, Node sourceNode,
+      [Set<String>? visited]) {
+    visited ??= <String>{};
+    if (!visited.add(alias)) return const [];
     if (alias == '*') {
       return allNodes.expand((n) => n.ipAddresses).toList();
     }
@@ -146,7 +187,7 @@ class AclParserService {
     }
     if (_aliases.containsKey(alias)) {
       return _aliases[alias]!
-          .expand((a) => _resolveAlias(a, sourceNode))
+          .expand((a) => _resolveAlias(a, sourceNode, visited))
           .toList();
     }
     if (IpUtils.isCIDR(alias)) {
@@ -185,104 +226,241 @@ class AclParserService {
     return [alias];
   }
 
+  Node? _findNodeByTag(String tag) {
+    for (var node in allNodes) {
+      if (node.tags.contains(tag)) return node;
+    }
+    return null;
+  }
+
+  bool _grantAppliesToNode(List<String> sources, Node node) {
+    for (var source in sources) {
+      if (source.startsWith('tag:')) {
+        final requiredTags = source
+            .split(';')
+            .where((t) => t.isNotEmpty)
+            .map((t) => t.startsWith('tag:') ? t : 'tag:$t')
+            .toSet();
+        if (requiredTags.isNotEmpty &&
+            requiredTags.every((t) => node.tags.contains(t))) {
+          return true;
+        }
+      }
+    }
+
+    final sourceIps = sources.expand((s) => _resolveAlias(s, node)).toSet();
+    return sourceIps.any((ip) => node.ipAddresses.contains(ip)) ||
+        sources.contains('*');
+  }
+
   NodePermission getPermissionsForNode(Node node) {
     final allowedPeers = <AllowedPeer>[];
     final allowedSubnets = <AllowedSubnet>[];
     final allowedExitNodes = <AllowedExitNode>[];
+    final allowedGrantRoutes = <AllowedGrantRoute>[];
     final Set<String> processedRules = HashSet();
 
-    if (!aclPolicy.containsKey('acls')) {
-      return NodePermission(
-          allowedPeers: [], allowedSubnets: [], allowedExitNodes: []);
-    }
+    if (aclPolicy.containsKey('acls')) {
+      final acls = aclPolicy['acls'];
+      if (acls is List) {
+        for (var rule in acls) {
+          if (rule is! Map) continue;
+          if (rule['action'] != 'accept') continue;
 
-    final List<dynamic> acls = aclPolicy['acls'];
+          final srcRaw = rule['src'];
+          final dstRaw = rule['dst'];
+          if (srcRaw is! List || dstRaw is! List) continue;
 
-    for (var rule in acls) {
-      if (rule['action'] != 'accept') continue;
+          final List<String> sources = srcRaw.map((e) => e.toString()).toList();
+          final sourceIps =
+              sources.expand((s) => _resolveAlias(s, node)).toSet();
 
-      final List<String> sources = (rule['src'] as List).cast<String>();
-      final sourceIps = sources.expand((s) => _resolveAlias(s, node)).toSet();
+          bool isSource =
+              sourceIps.any((ip) => node.ipAddresses.contains(ip));
+          if (!isSource && !sources.contains('*')) {
+            continue;
+          }
 
-      // Vérifie si le nœud actuel est concerné par la source
-      bool isSource = sourceIps.any((ip) => node.ipAddresses.contains(ip));
-      if (!isSource && !sources.contains('*')) {
-        continue;
-      }
+          final List<String> destinations =
+              dstRaw.map((e) => e.toString()).toList();
+          final List<String> defaultPorts =
+              (rule['ports'] is List) ? (rule['ports'] as List).map((e) => e.toString()).toList() : ['*'];
 
-      final List<String> destinations = (rule['dst'] as List).cast<String>();
-      final List<String> defaultPorts =
-          (rule['ports'] as List?)?.cast<String>() ?? ['*'];
+          for (var dest in destinations) {
+            final ruleSignature = '${rule.hashCode}-$dest';
+            if (processedRules.contains(ruleSignature)) continue;
+            processedRules.add(ruleSignature);
 
-      for (var dest in destinations) {
-        final ruleSignature = '${rule.hashCode}-$dest';
-        if (processedRules.contains(ruleSignature)) continue;
-        processedRules.add(ruleSignature);
+            String destAddr = dest;
+            List<String> ports = defaultPorts;
 
-        String destAddr = dest;
-        List<String> ports = defaultPorts;
+            int lastColon = dest.lastIndexOf(':');
+            if (lastColon != -1) {
+              String potentialAddr = dest.substring(0, lastColon);
+              String potentialPort = dest.substring(lastColon + 1);
 
-        int lastColon = dest.lastIndexOf(':');
-        if (lastColon != -1) {
-          String potentialAddr = dest.substring(0, lastColon);
-          String potentialPort = dest.substring(lastColon + 1);
+              if (potentialAddr.startsWith('[') && potentialAddr.endsWith(']')) {
+                destAddr = potentialAddr;
+                ports = potentialPort.split(',');
+              } else if (!potentialAddr.contains(':')) {
+                destAddr = potentialAddr;
+                ports = potentialPort.split(',');
+              }
+            }
 
-          if (potentialAddr.startsWith('[') && potentialAddr.endsWith(']')) {
-            destAddr = potentialAddr;
-            ports = potentialPort.split(',');
-          } else if (!potentialAddr.contains(':')) {
-            destAddr = potentialAddr;
-            ports = potentialPort.split(',');
+            final List<String> resolvedDestIpsOrCidrs =
+                _resolveAlias(destAddr, node).toList();
+
+            for (var destIpOrCidr in resolvedDestIpsOrCidrs) {
+              final trimmedDest = destIpOrCidr.trim();
+
+              if (_routeSourceMap.containsKey(trimmedDest)) {
+                final advertiserNode = _routeSourceMap[trimmedDest];
+                if (trimmedDest == '0.0.0.0/0' || trimmedDest == '::/0') {
+                  if (advertiserNode != null) {
+                    allowedExitNodes.add(AllowedExitNode(
+                        node: advertiserNode, sourceNode: advertiserNode));
+                  }
+                } else {
+                  allowedSubnets.add(AllowedSubnet(
+                      subnet: trimmedDest,
+                      specificRule: trimmedDest,
+                      ports: ports,
+                      sourceNode: advertiserNode));
+                }
+              } else {
+                bool foundParentRoute = false;
+
+                for (var knownRoute in _routeSourceMap.keys) {
+                  if (knownRoute == '0.0.0.0/0' || knownRoute == '::/0') {
+                    continue;
+                  }
+
+                  if (_isIpInSubnet(trimmedDest, knownRoute)) {
+                    final advertiserNode = _routeSourceMap[knownRoute];
+                    allowedSubnets.add(AllowedSubnet(
+                        subnet: knownRoute,
+                        specificRule: trimmedDest,
+                        ports: ports,
+                        sourceNode: advertiserNode));
+                    foundParentRoute = true;
+                    break;
+                  }
+                }
+
+                if (!foundParentRoute && _nodeIpMap.containsKey(trimmedDest)) {
+                  final destNode = _nodeIpMap[trimmedDest]!;
+                  if (destNode.id != node.id) {
+                    allowedPeers.add(AllowedPeer(node: destNode, ports: ports));
+                  }
+                }
+              }
+            }
           }
         }
+      }
+    }
 
-        final List<String> resolvedDestIpsOrCidrs =
-            _resolveAlias(destAddr, node).toList();
+    // --- Parsing network Grants (Headscale 0.29+) ---
+    final allowedTaildriveShares = <TaildriveGrant>[];
+    final grants = aclPolicy['grants'];
+    if (grants is List) {
+      for (var grant in grants) {
+        if (grant is! Map) continue;
+        final grantMap = Map<String, dynamic>.from(grant);
 
-        for (var destIpOrCidr in resolvedDestIpsOrCidrs) {
-          final trimmedDest = destIpOrCidr.trim();
+        final List<String> sources =
+            (grantMap['src'] as List?)?.map((e) => e.toString()).toList() ?? [];
+        if (sources.isEmpty) continue;
 
-          // CAS 1 : Correspondance exacte
-          if (_routeSourceMap.containsKey(trimmedDest)) {
-            final advertiserNode = _routeSourceMap[trimmedDest];
-            if (trimmedDest == '0.0.0.0/0' || trimmedDest == '::/0') {
-              if (advertiserNode != null) {
-                allowedExitNodes.add(AllowedExitNode(
-                    node: advertiserNode, sourceNode: advertiserNode));
+        if (!_grantAppliesToNode(sources, node)) continue;
+
+        final Map<String, dynamic>? app =
+            grantMap['app'] is Map ? Map<String, dynamic>.from(grantMap['app']) : null;
+        final hasTaildriveApp = app != null &&
+            (app.containsKey('tailscale.com/cap/drive') ||
+                app.containsKey('tailscale.com/cap/taildrive'));
+
+        if (hasTaildriveApp) {
+          final List<String> destinations =
+              (grantMap['dst'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          final List<dynamic> taildriveCaps = [
+            ...(app['tailscale.com/cap/drive'] as List? ?? []),
+            ...(app['tailscale.com/cap/taildrive'] as List? ?? []),
+          ];
+
+          if (taildriveCaps.isNotEmpty) {
+            final List<Node> targetNodes = [];
+            for (var dest in destinations) {
+              final destIps = _resolveAlias(dest, node);
+              for (var dip in destIps) {
+                if (_nodeIpMap.containsKey(dip)) {
+                  targetNodes.add(_nodeIpMap[dip]!);
+                }
               }
-            } else {
-              allowedSubnets.add(AllowedSubnet(
-                  subnet: trimmedDest,
-                  specificRule: trimmedDest,
-                  ports: ports,
-                  sourceNode: advertiserNode));
+            }
+
+            if (targetNodes.isNotEmpty) {
+              for (var cap in taildriveCaps) {
+                if (cap is! Map) continue;
+                final capMap = Map<String, dynamic>.from(cap);
+                final shares = capMap['shares'] as List?;
+                final shareName = shares != null && shares.isNotEmpty
+                    ? shares.first.toString()
+                    : capMap['share']?.toString() ?? 'unknown';
+                allowedTaildriveShares.add(TaildriveGrant(
+                  shareName: shareName,
+                  access: capMap['access']?.toString() ?? 'ro',
+                  sourceNodes: targetNodes,
+                ));
+              }
             }
           }
-          // CAS 2 : Inclusion (Calcul mathématique)
-          else {
-            bool foundParentRoute = false;
+          continue;
+        }
 
-            for (var knownRoute in _routeSourceMap.keys) {
-              if (knownRoute == '0.0.0.0/0' || knownRoute == '::/0') continue;
+        if (!grantMap.containsKey('ip')) continue;
 
-              // Utilisation du nouveau helper
-              if (_isIpInSubnet(trimmedDest, knownRoute)) {
-                final advertiserNode = _routeSourceMap[knownRoute];
-                allowedSubnets.add(AllowedSubnet(
-                    subnet: knownRoute, // Parent
-                    specificRule: trimmedDest, // Règle spécifique
-                    ports: ports,
-                    sourceNode: advertiserNode));
-                foundParentRoute = true;
-                break;
-              }
-            }
+        final viaList = (grantMap['via'] as List?)?.map((e) => e.toString()).toList();
+        final viaTag = viaList != null && viaList.isNotEmpty ? viaList.first : null;
+        final viaNode = viaTag != null ? _findNodeByTag(viaTag) : null;
+        final ipList =
+            (grantMap['ip'] as List?)?.map((e) => e.toString()).toList() ?? ['*'];
+        final destinations =
+            (grantMap['dst'] as List?)?.map((e) => e.toString()).toList() ?? [];
 
-            // CAS 3 : Peer direct
-            if (!foundParentRoute && _nodeIpMap.containsKey(trimmedDest)) {
-              final destNode = _nodeIpMap[trimmedDest]!;
-              if (destNode.id != node.id) {
-                allowedPeers.add(AllowedPeer(node: destNode, ports: ports));
+        for (var dest in destinations) {
+          allowedGrantRoutes.add(AllowedGrantRoute(
+            destination: dest,
+            ip: ipList,
+            viaTag: viaTag,
+            viaNode: viaNode,
+            sourceAliases: sources,
+          ));
+
+          if (dest == 'autogroup:internet' && viaNode != null) {
+            allowedExitNodes.add(
+                AllowedExitNode(node: viaNode, sourceNode: viaNode));
+          } else if (dest.contains('/')) {
+            allowedSubnets.add(AllowedSubnet(
+              subnet: dest,
+              specificRule: dest,
+              ports: ipList.contains('*') ? ['*'] : ipList,
+              sourceNode: viaNode ?? _routeSourceMap[dest.trim()],
+            ));
+          } else if (dest.startsWith('tag:') ||
+              dest.startsWith('group:') ||
+              (dest.startsWith('autogroup:') && dest != 'autogroup:internet')) {
+            continue;
+          } else {
+            final destIps = _resolveAlias(dest, node);
+            for (var dip in destIps) {
+              if (_nodeIpMap.containsKey(dip)) {
+                final destNode = _nodeIpMap[dip]!;
+                if (destNode.id != node.id) {
+                  allowedPeers.add(
+                      AllowedPeer(node: destNode, ports: ['*']));
+                }
               }
             }
           }
@@ -310,54 +488,13 @@ class AclParserService {
       }
     }
 
-    // --- Parsing Taildrive Grants ---
-    final allowedTaildriveShares = <TaildriveGrant>[];
-    if (aclPolicy.containsKey('grants')) {
-      final List<dynamic> grants = aclPolicy['grants'];
-      for (var grant in grants) {
-        final List<String> sources = (grant['src'] as List).cast<String>();
-        final sourceIps = sources.expand((s) => _resolveAlias(s, node)).toSet();
-
-        // Vérifie si le nœud actuel est concerné par la source du grant
-        bool isSource = sourceIps.any((ip) => node.ipAddresses.contains(ip));
-        if (!isSource && !sources.contains('*')) {
-          continue;
-        }
-
-        final List<String> destinations = (grant['dst'] as List).cast<String>();
-        final Map<String, dynamic> app = grant['app'] ?? {};
-        final List<dynamic> taildriveCaps =
-            app['tailscale.com/cap/taildrive'] ?? [];
-
-        if (taildriveCaps.isNotEmpty) {
-          final List<Node> targetNodes = [];
-          for (var dest in destinations) {
-            final destIps = _resolveAlias(dest, node);
-            for (var dip in destIps) {
-              if (_nodeIpMap.containsKey(dip)) {
-                targetNodes.add(_nodeIpMap[dip]!);
-              }
-            }
-          }
-
-          if (targetNodes.isNotEmpty) {
-            for (var cap in taildriveCaps) {
-              allowedTaildriveShares.add(TaildriveGrant(
-                shareName: cap['share'] ?? 'unknown',
-                access: cap['access'] ?? 'ro',
-                sourceNodes: targetNodes,
-              ));
-            }
-          }
-        }
-      }
-    }
-
+    // --- Dedup peers ---
     return NodePermission(
       allowedPeers: uniquePeers.values.toList(),
       allowedSubnets: allowedSubnets,
       allowedExitNodes: uniqueExitNodes.values.toList(),
       allowedTaildriveShares: allowedTaildriveShares,
+      allowedGrantRoutes: allowedGrantRoutes,
     );
   }
 

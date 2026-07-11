@@ -3,7 +3,6 @@ import 'package:headscalemanager/screens/client_commands_screen.dart';
 import 'package:headscalemanager/widgets/whats_new_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
-import 'package:eva_icons_flutter/eva_icons_flutter.dart';
 
 /// Écran d'aide de l'application.
 ///
@@ -387,6 +386,18 @@ routes:
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),
+                    _buildBodyText(context,
+                        '**Moteurs ACL (v2.0)**', isBold: true),
+                    const SizedBox(height: 4),
+                    _buildBodyText(
+                      context,
+                      '- **Legacy** : tags fusionnés (ancien format).\n'
+                      '- **Standard** : tags séparés (Identity vs Capability).\n'
+                      '- **Grants V29** : grants Headscale ≥ 0.29 avec routage **via** pour isoler les LAN identiques entre utilisateurs.\n'
+                      'Sélection dans Paramètres. L\'écran ACL affiche des onglets Grants / ACLs / JSON.',
+                      isSmall: true,
+                    ),
+                    const SizedBox(height: 16),
                     _buildBodyText(
                         context, '**Workflow d\'utilisation de la page ACL :**',
                         isBold: true),
@@ -613,7 +624,7 @@ routes:
       ),
       margin: const EdgeInsets.symmetric(vertical: 8.0),
       child: ListTile(
-        leading: Icon(EvaIcons.hardDriveOutline,
+        leading: Icon(Icons.storage,
             color: theme.colorScheme.onPrimary, size: 32),
         title: Text(
           'Bibliothèque de Commandes Client',

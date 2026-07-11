@@ -10,10 +10,10 @@ plugins {
 android {
     namespace = "com.dkstudio.headscalemanager"
     compileSdk = 36 // Updated as required by plugins
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "28.2.13676358"
 
     val keystoreProperties = Properties()
-    val keystorePropertiesFile = file("C:/Users/dkdone/StudioProjects/headscaleManager/android/key.properties")
+    val keystorePropertiesFile = rootProject.file("key.properties")
     if (keystorePropertiesFile.exists()) {
         keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
     }

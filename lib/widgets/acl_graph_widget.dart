@@ -39,6 +39,7 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
   final Map<String, headscale_node.Node> _idToNodeMap = {};
   final Map<Node, Widget> _nodeWidgetCache = {};
   bool _graphBuilt = false;
+  String? _graphError;
   final TransformationController _transformationController =
       TransformationController();
   late final BuchheimWalkerConfiguration _configuration;
@@ -48,6 +49,12 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
 
   // Padding interne pour éviter que le graphe ne touche les bords (règle l'overflow du canvas)
   final double _graphPadding = 150.0;
+
+  // Empilement stable des symboles sous chaque machine (LAN, Exit, Taildrive)
+  static const double _symbolHeight = 90.0;
+  static const double _ownerSymbolBaseOffset = 120.0;
+  static const double _ownerSymbolStackGap = 28.0;
+  static const double _crossUserGap = 40.0;
 
   @override
   void initState() {
@@ -97,19 +104,23 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_graphBuilt) {
-      _buildGraph();
+      try {
+        _buildGraph();
+        _algorithm.run(graph, 0, 0);
+        _adjustNodePositions();
 
-      _algorithm.run(graph, 0, 0);
-
-      // C'est ici que l'on force le repositionnement des icônes sous leur parent
-      _adjustNodePositions();
-
-      // --- CENTRAGE ET ZOOM AUTOMATIQUE ---
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _centerAndZoomGraph();
-      });
-
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          try {
+            _centerAndZoomGraph();
+          } catch (e, stack) {
+            debugPrint('ACL graph zoom error: $e\n$stack');
+          }
+        });
+      } catch (e, stack) {
+        debugPrint('ACL graph build error: $e\n$stack');
+        _graphError = e.toString();
+      }
       _graphBuilt = true;
     }
   }
@@ -156,82 +167,139 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
   }
 
   void _adjustNodePositions() {
-    // 1. Centrer les "shared peers" entre leurs parents
-    final sharedPeerNodes = graph.nodes
-        .where((n) => (n.key?.value as String).startsWith('shared_peer_'))
-        .toList();
+    final ownerSymbolBottoms = <String, double>{};
+
+    // 1. Symboles rattachés à une machine : colonne verticale stable sous le propriétaire
+    final ownerSymbolNodes = graph.nodes.where((n) {
+      final id = n.key?.value;
+      if (id is! String) return false;
+      return id.startsWith('lan_symbol_') ||
+          id.startsWith('internet_symbol_') ||
+          id.startsWith('taildrive_symbol_');
+    }).toList()
+      ..sort((a, b) {
+        final aId = a.key?.value?.toString() ?? '';
+        final bId = b.key?.value?.toString() ?? '';
+        final ownerA = _resolveSymbolOwnerId(aId) ?? '';
+        final ownerB = _resolveSymbolOwnerId(bId) ?? '';
+        final ownerCmp = ownerA.compareTo(ownerB);
+        if (ownerCmp != 0) return ownerCmp;
+        return _symbolStackOrder(aId).compareTo(_symbolStackOrder(bId));
+      });
+
+    final ownerSymbolStacks = <String, int>{};
+
+    for (var symbolNode in ownerSymbolNodes) {
+      final symbolId = symbolNode.key?.value;
+      if (symbolId is! String) continue;
+
+      final ownerId = _resolveSymbolOwnerId(symbolId);
+      if (ownerId == null) continue;
+
+      final ownerGraphNode = _graphNodeForMachine(ownerId);
+      if (ownerGraphNode == null) continue;
+
+      final stackIndex = ownerSymbolStacks[ownerId] ?? 0;
+      ownerSymbolStacks[ownerId] = stackIndex + 1;
+
+      symbolNode.x = ownerGraphNode.x;
+      symbolNode.y = ownerGraphNode.y +
+          _ownerSymbolBaseOffset +
+          stackIndex * (_symbolHeight + _ownerSymbolStackGap);
+
+      ownerSymbolBottoms[ownerId] = symbolNode.y + _symbolHeight;
+    }
+
+    // 2. Partages inter-utilisateurs : centrés entre les deux machines, sous leurs symboles
+    final sharedPeerNodes = graph.nodes.where((n) {
+      final id = n.key?.value;
+      return id is String && id.startsWith('shared_peer_');
+    }).toList()
+      ..sort((a, b) =>
+          (a.key?.value?.toString() ?? '').compareTo(b.key?.value?.toString() ?? ''));
+
+    final crossUserStacks = <int, int>{};
 
     for (var sharedNode in sharedPeerNodes) {
       final parentEdges =
           graph.edges.where((e) => e.destination == sharedNode).toList();
-      if (parentEdges.length == 2) {
-        final parent1 = parentEdges[0].source;
-        final parent2 = parentEdges[1].source;
+      if (parentEdges.isEmpty) continue;
 
-        sharedNode.x = (parent1.x + parent2.x) / 2;
-        sharedNode.y = (parent1.y > parent2.y ? parent1.y : parent2.y) + 80;
+      final parents = parentEdges.map((e) => e.source).toList();
+      final anchorParents = parents.length >= 2 ? parents.sublist(0, 2) : parents;
+
+      double maxBottom = 0;
+      for (var parent in anchorParents) {
+        final machineId = _machineIdFromGraphNode(parent);
+        final bottom = machineId != null && ownerSymbolBottoms.containsKey(machineId)
+            ? ownerSymbolBottoms[machineId]!
+            : parent.y + 60;
+        if (bottom > maxBottom) maxBottom = bottom;
+      }
+
+      final midX = anchorParents.length == 1
+          ? anchorParents.first.x
+          : (anchorParents[0].x + anchorParents[1].x) / 2;
+
+      final bucket = (midX / 80).round();
+      final stackIndex = crossUserStacks[bucket] ?? 0;
+      crossUserStacks[bucket] = stackIndex + 1;
+
+      sharedNode.x = midX;
+      sharedNode.y = maxBottom +
+          _crossUserGap +
+          stackIndex * (_symbolHeight + _ownerSymbolStackGap);
+    }
+  }
+
+  int _symbolStackOrder(String symbolId) {
+    if (symbolId.startsWith('lan_symbol_')) return 0;
+    if (symbolId.startsWith('internet_symbol_')) return 1;
+    if (symbolId.startsWith('taildrive_symbol_')) return 2;
+    return 3;
+  }
+
+  String? _machineIdFromGraphNode(Node node) {
+    final id = node.key?.value;
+    if (id is String && id.startsWith('machine_')) {
+      return id.substring(8);
+    }
+    return null;
+  }
+
+  Node? _graphNodeForMachine(String machineId) {
+    try {
+      return graph.nodes
+          .firstWhere((n) => n.key?.value == 'machine_$machineId');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _resolveSymbolOwnerId(String symbolId) {
+    if (symbolId.startsWith('internet_symbol_')) {
+      return symbolId.substring('internet_symbol_'.length);
+    }
+
+    if (symbolId.startsWith('taildrive_symbol_')) {
+      final body = symbolId.substring('taildrive_symbol_'.length);
+      final lastSep = body.lastIndexOf('_');
+      if (lastSep > 0) return body.substring(lastSep + 1);
+      return null;
+    }
+
+    if (symbolId.startsWith('lan_symbol_')) {
+      final body = symbolId.substring('lan_symbol_'.length);
+      for (final id in _idToNodeMap.keys) {
+        if (body.startsWith('${id}_') || body == id) return id;
+      }
+      final parts = body.split('_');
+      if (parts.isNotEmpty && _idToNodeMap.containsKey(parts.first)) {
+        return parts.first;
       }
     }
 
-    // 2. FORCER les symboles LAN, Exit et Taildrive à rester sous leur PROPRIÉTAIRE (Source)
-    final symbolNodes = graph.nodes.where((n) {
-      final id = n.key?.value as String;
-      return id.startsWith('lan_symbol_') ||
-          id.startsWith('internet_symbol_') ||
-          id.startsWith('taildrive_symbol_');
-    }).toList();
-
-    for (var symbolNode in symbolNodes) {
-      final symbolId = symbolNode.key?.value as String;
-      headscale_node.Node? ownerNode;
-
-      // a) Identifier le nœud propriétaire
-      if (symbolId.startsWith('internet_symbol_')) {
-        final ownerId = symbolId.substring(16);
-        ownerNode = _idToNodeMap[ownerId];
-      } else if (symbolId.startsWith('taildrive_symbol_')) {
-        final parts = symbolId.split('_');
-        if (parts.length >= 4) {
-          final ownerId = parts[3];
-          ownerNode = _idToNodeMap[ownerId];
-        }
-      } else if (symbolId.startsWith('lan_symbol_')) {
-        // Nouveau format: lan_symbol_nodeId_192.168.1.0_24
-        final parts = symbolId.substring(11).split('_');
-        if (parts.length >= 3) {
-          // Nouveau format avec nodeId
-          final nodeId = parts[0];
-          ownerNode = _idToNodeMap[nodeId];
-        } else {
-          // Ancien format: lan_symbol_192.168.1.0_24
-          final route = symbolId.substring(11).replaceAll('_', '/');
-          try {
-            ownerNode = widget.nodes.firstWhere(
-              (n) => n.sharedRoutes.contains(route),
-            );
-          } catch (e) {
-            // Si non trouvé (rare), on ignore
-          }
-        }
-      }
-
-      // b) Appliquer la position forcée
-      if (ownerNode != null) {
-        try {
-          // Retrouver l'objet Node du graphe correspondant au propriétaire
-          final ownerGraphNode = graph.nodes
-              .firstWhere((n) => n.key?.value == 'machine_${ownerNode!.id}');
-
-          // On force la position X pour qu'elle soit identique à celle du propriétaire
-          symbolNode.x = ownerGraphNode.x;
-
-          // On force la position Y pour qu'elle soit juste en dessous (offset fixe)
-          symbolNode.y = ownerGraphNode.y + 120; // 120px plus bas
-        } catch (e) {
-          // Le noeud propriétaire n'est pas dans le graphe ?
-        }
-      }
-    }
+    return null;
   }
 
   void _buildGraph() {
@@ -317,12 +385,13 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
       for (var subnetPermission in permissions.allowedSubnets) {
         // IMPORTANT : On utilise subnetPermission.subnet (le PARENT) pour lier graphiquement
         final trimmedRoute = subnetPermission.subnet.trim();
-        // Trouver le nœud propriétaire de cette route pour construire le bon symbolId
-        String? ownerNodeId;
-        for (var node in widget.nodes) {
-          if (node.sharedRoutes.contains(trimmedRoute)) {
-            ownerNodeId = node.id;
-            break;
+        String? ownerNodeId = subnetPermission.sourceNode?.id;
+        if (ownerNodeId == null) {
+          for (var node in widget.nodes) {
+            if (node.sharedRoutes.contains(trimmedRoute)) {
+              ownerNodeId = node.id;
+              break;
+            }
           }
         }
         final symbolId = ownerNodeId != null
@@ -522,7 +591,9 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
 
   // Récupération des données
   dynamic _getItemFromNode(Node node) {
-    final prefixedId = node.key!.value as String;
+    final key = node.key?.value;
+    if (key is! String) return null;
+    final prefixedId = key;
 
     if (prefixedId == 'server_headscale_server') {
       return {'type': 'server', 'url': widget.serverUrl};
@@ -971,6 +1042,33 @@ class _AclGraphWidgetState extends State<AclGraphWidget>
 
   @override
   Widget build(BuildContext context) {
+    if (_graphError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline,
+                  size: 48, color: Theme.of(context).colorScheme.error),
+              const SizedBox(height: 16),
+              Text(
+                'Impossible d\'afficher le graphe ACL.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _graphError!,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return InteractiveViewer(
       transformationController: _transformationController,
       constrained: false, // Important pour laisser le graphe s'étendre

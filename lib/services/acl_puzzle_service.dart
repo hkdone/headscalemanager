@@ -1,126 +1,190 @@
 import 'package:headscalemanager/models/acl_puzzle_model.dart';
 
 class AclPuzzleService {
-  /// Converts a list of PuzzleRules into a full Headscale ACL Policy JSON
-  /// It reuses the base generator for groups/tags definitions but replaces
-  /// the 'acls' section with the custom rules.
   Map<String, dynamic> convertPuzzleToJson({
     required List<PuzzleRule> rules,
     required Map<String, dynamic> basePolicy,
+    bool emitGrants = false,
   }) {
-    // 1. Extract base infrastructure (groups, tagOwners, autoApprovers)
+    if (rules.isEmpty && emitGrants) {
+      return basePolicy;
+    }
+
     final groups = basePolicy['groups'] ?? {};
     final tagOwners = basePolicy['tagOwners'] ?? {};
     final autoApprovers = basePolicy['autoApprovers'] ?? {};
     final hosts = basePolicy['hosts'] ?? {};
 
-    // 2. Generate ACLs from Puzzle Rules
-    final List<Map<String, dynamic>> generatedAcls = [];
+    final generatedAcls = <Map<String, dynamic>>[];
+    final generatedGrants = <Map<String, dynamic>>[];
 
     for (var rule in rules) {
-      // 2a. Extract sources
-      final List<String> src = rule.sources.map((e) => e.value).toList();
+      final src = rule.sources.map((e) => e.value).toList();
+      final dstRaw = rule.destinations.map((e) => e.value).toList();
+      final via = rule.via.map((e) => e.value).toList();
 
-      // 2b. Extract destinations
-      // Note: In Headscale ACLs, destinations usually need a port.
-      // For simplicity in Puzzle view (Layer 3 focus), we might default to ":*"
-      // unless we add port selection to the PuzzleEntity or Rule.
-      // Let's assume ":*" for now as the user primarily wants to manage access rights.
-      final List<String> dst = rule.destinations.map((e) {
-        if (e.value.contains(':')) {
-          // If value already has a port (e.g. autogroup:internet:* is common, but usually it's autogroup:internet)
-          // actually autogroup:internet needs :* in ACLs.
-          // If the entity value is just an IP or tag, we append :*
-          // If it's autogroup:internet, we usually treat it as the base.
-          return e.value.endsWith(':*') ? e.value : '${e.value}:*';
-        } else {
-          return '${e.value}:*';
-        }
-      }).toList();
-
-      generatedAcls.add({
-        'action': rule.action,
-        'src': src,
-        'dst': dst,
-      });
+      if (emitGrants && (rule.isGrant || via.isNotEmpty)) {
+        final grant = <String, dynamic>{
+          'src': src,
+          'dst': dstRaw,
+          'ip': ['*'],
+        };
+        if (via.isNotEmpty) grant['via'] = via;
+        generatedGrants.add(grant);
+      } else {
+        final dst = dstRaw.map((value) {
+          if (value.endsWith(':*')) return value;
+          return '$value:*';
+        }).toList();
+        generatedAcls.add({
+          'action': rule.action,
+          'src': src,
+          'dst': dst,
+        });
+      }
     }
 
-    // 3. Assemble Final Policy
-    return {
+    final taildriveGrants = <Map<String, dynamic>>[];
+    final baseGrants = basePolicy['grants'];
+    if (baseGrants is List) {
+      for (var g in baseGrants) {
+        if (g is Map<String, dynamic> &&
+            g['app'] != null &&
+            (g['app'] as Map).keys.any((k) =>
+                k.toString().contains('cap/drive') ||
+                k.toString().contains('cap/taildrive'))) {
+          taildriveGrants.add(g);
+        }
+      }
+    }
+
+    final policy = <String, dynamic>{
       'groups': groups,
       'tagOwners': tagOwners,
       'hosts': hosts,
-      'acls': generatedAcls,
       'autoApprovers': autoApprovers,
     };
+
+    if (emitGrants) {
+      policy['grants'] = [...generatedGrants, ...taildriveGrants];
+      if (generatedAcls.isNotEmpty) policy['acls'] = generatedAcls;
+    } else {
+      policy['acls'] = generatedAcls;
+      if (taildriveGrants.isNotEmpty) policy['grants'] = taildriveGrants;
+    }
+
+    final nodeAttrs = basePolicy['nodeAttrs'];
+    if (nodeAttrs != null) policy['nodeAttrs'] = nodeAttrs;
+
+    return policy;
   }
 
-  /// Parses a full Headscale ACL Policy JSON into a list of PuzzleRules.
-  /// It attempts to map raw strings back to known PuzzleEntities.
   List<PuzzleRule> parseJsonToPuzzle({
     required Map<String, dynamic> jsonPolicy,
     required List<PuzzleEntity> availableEntities,
   }) {
-    final List<PuzzleRule> rules = [];
+    final rules = <PuzzleRule>[];
+    final seen = <String>{};
+
+    void addRule(PuzzleRule rule) {
+      if (seen.add(rule.signature)) rules.add(rule);
+    }
+
     final acls = jsonPolicy['acls'];
-
-    if (acls is! List) return rules;
-
-    for (var acl in acls) {
-      if (acl is! Map<String, dynamic>) continue;
-
-      final action = acl['action']?.toString() ?? 'accept';
-      final srcList = acl['src'];
-      final dstList = acl['dst'];
-
-      if (srcList is! List || dstList is! List) continue;
-
-      // Map Sources
-      final List<PuzzleEntity> sources = [];
-      for (var srcItem in srcList) {
-        final srcStr = srcItem.toString();
-        // Try to find exact match in available entities
-        final match = availableEntities.firstWhere(
-          (e) => e.value == srcStr,
-          orElse: () => PuzzleEntity(
-            id: srcStr,
-            type: _inferType(srcStr),
-            value: srcStr,
-            displayLabel: _formatLabel(srcStr),
-          ),
-        );
-        sources.add(match);
+    if (acls is List) {
+      for (var acl in acls) {
+        if (acl is! Map<String, dynamic>) continue;
+        final parsed = _parseAclRule(acl, availableEntities);
+        if (parsed != null) addRule(parsed);
       }
+    }
 
-      // Map Destinations
-      final List<PuzzleEntity> destinations = [];
-      for (var dstItem in dstList) {
-        var dstStr = dstItem.toString();
-        // Remove port suffix if present (e.g. ":*") for matching
-        if (dstStr.endsWith(':*')) {
-          dstStr = dstStr.substring(0, dstStr.length - 2);
-        }
-
-        final match = availableEntities.firstWhere(
-          (e) => e.value == dstStr,
-          orElse: () => PuzzleEntity(
-            id: dstStr,
-            type: _inferType(dstStr),
-            value: dstStr,
-            displayLabel: _formatLabel(dstStr),
-          ),
-        );
-        destinations.add(match);
+    final grants = jsonPolicy['grants'];
+    if (grants is List) {
+      for (var grant in grants) {
+        if (grant is! Map<String, dynamic>) continue;
+        if (grant['app'] != null) continue;
+        if (!grant.containsKey('ip')) continue;
+        final parsed = _parseGrantRule(grant, availableEntities);
+        if (parsed != null) addRule(parsed);
       }
-
-      rules.add(PuzzleRule(
-        sources: sources,
-        destinations: destinations,
-        action: action,
-      ));
     }
 
     return rules;
+  }
+
+  PuzzleRule? _parseAclRule(
+    Map<String, dynamic> acl,
+    List<PuzzleEntity> availableEntities,
+  ) {
+    final action = acl['action']?.toString() ?? 'accept';
+    final srcList = acl['src'];
+    final dstList = acl['dst'];
+    if (srcList is! List || dstList is! List) return null;
+
+    return PuzzleRule(
+      sources: _mapEntities(srcList, availableEntities),
+      destinations: _mapDestinations(dstList, availableEntities),
+      action: action,
+      isGrant: false,
+    );
+  }
+
+  PuzzleRule? _parseGrantRule(
+    Map<String, dynamic> grant,
+    List<PuzzleEntity> availableEntities,
+  ) {
+    final srcList = grant['src'];
+    final dstList = grant['dst'];
+    if (srcList is! List || dstList is! List) return null;
+    final viaList = grant['via'];
+
+    return PuzzleRule(
+      sources: _mapEntities(srcList, availableEntities),
+      via: viaList is List
+          ? _mapEntities(viaList, availableEntities)
+          : const [],
+      destinations: _mapDestinations(dstList, availableEntities, stripPort: false),
+      isGrant: true,
+    );
+  }
+
+  List<PuzzleEntity> _mapEntities(
+      List<dynamic> values, List<PuzzleEntity> availableEntities) {
+    return values.map((item) {
+      final str = item.toString();
+      return availableEntities.firstWhere(
+        (e) => e.value == str,
+        orElse: () => PuzzleEntity(
+          id: str,
+          type: _inferType(str),
+          value: str,
+          displayLabel: _formatLabel(str),
+        ),
+      );
+    }).toList();
+  }
+
+  List<PuzzleEntity> _mapDestinations(
+    List<dynamic> values,
+    List<PuzzleEntity> availableEntities, {
+    bool stripPort = true,
+  }) {
+    return values.map((item) {
+      var str = item.toString();
+      if (stripPort && str.endsWith(':*')) {
+        str = str.substring(0, str.length - 2);
+      }
+      return availableEntities.firstWhere(
+        (e) => e.value == str,
+        orElse: () => PuzzleEntity(
+          id: str,
+          type: _inferType(str),
+          value: str,
+          displayLabel: _formatLabel(str),
+        ),
+      );
+    }).toList();
   }
 
   PuzzleEntityType _inferType(String value) {
@@ -129,26 +193,17 @@ class AclPuzzleService {
     if (value.startsWith('autogroup:internet')) {
       return PuzzleEntityType.internet;
     }
-    if (value.contains('/')) {
-      return PuzzleEntityType.cidr; // loose check for CIDR
-    }
-
-    // Heuristic for IPs
+    if (value.contains('/')) return PuzzleEntityType.cidr;
     if (RegExp(r'^\d+\.\d+\.\d+\.\d+$').hasMatch(value)) {
       return PuzzleEntityType.host;
     }
-
-    // Default to User if no specific prefix is found, assuming it's a bare username
     return PuzzleEntityType.user;
   }
 
   String _formatLabel(String value) {
     if (value.contains(';')) {
-      // Legacy merged tag support (e.g. tag:user-client;exit-node)
-      // We truncate to make it readable, or keep it as is if short
       return value.replaceAll('tag:', 'Tag: ');
     }
-    // Standard tag support
     if (value.startsWith('tag:')) {
       return value.replaceFirst('tag:', 'Tag: ');
     }

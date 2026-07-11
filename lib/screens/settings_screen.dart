@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import 'package:headscalemanager/models/acl_engine_mode.dart';
+import 'package:headscalemanager/models/version_info.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/help_screen.dart';
 import 'package:headscalemanager/screens/help_screen_en.dart';
@@ -10,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:headscalemanager/screens/add_edit_server_screen.dart';
 import 'package:headscalemanager/services/tag_migration_service.dart';
 import 'package:headscalemanager/widgets/server_list_tile.dart';
+import 'package:headscalemanager/widgets/grants_migration_dialog.dart';
 import 'package:headscalemanager/screens/api_keys_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -127,27 +130,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ],
                               ),
                               const Divider(),
-                              // Standard Engine Toggle
-                              SwitchListTile(
-                                contentPadding: EdgeInsets.zero,
-                                title: Text(
-                                  isFr
-                                      ? 'Utiliser le moteur ACL standard'
-                                      : 'Use Standard ACL Engine',
-                                  style: theme.textTheme.bodyLarge,
-                                ),
-                                subtitle: Text(
-                                  isFr
-                                      ? 'Sépare les tags (Identity vs Capability).'
-                                      : 'Splits tags (Identity vs Capability).',
-                                  style: theme.textTheme.bodySmall,
-                                ),
-                                value: appProvider.useStandardAclEngine,
-                                onChanged: (bool value) async {
-                                  await appProvider
-                                      .setStandardAclEngineEnabled(value);
-                                },
+                              Text(
+                                isFr
+                                    ? 'Moteur de génération ACL'
+                                    : 'ACL Generation Engine',
+                                style: theme.textTheme.bodyLarge
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
+                              const SizedBox(height: 4),
+                              _AclEngineModeTile(
+                                isFr: isFr,
+                                mode: AclEngineMode.legacy,
+                                groupValue: appProvider.aclEngineMode,
+                                title: isFr ? 'Legacy' : 'Legacy',
+                                subtitle: isFr
+                                    ? 'Tags fusionnés (ancien format).'
+                                    : 'Merged tags (legacy format).',
+                                onChanged: (mode) =>
+                                    appProvider.setAclEngineMode(mode),
+                              ),
+                              _AclEngineModeTile(
+                                isFr: isFr,
+                                mode: AclEngineMode.standard,
+                                groupValue: appProvider.aclEngineMode,
+                                title: isFr ? 'Standard' : 'Standard',
+                                subtitle: isFr
+                                    ? 'Tags séparés (Identity vs Capability).'
+                                    : 'Split tags (Identity vs Capability).',
+                                onChanged: (mode) =>
+                                    appProvider.setAclEngineMode(mode),
+                              ),
+                              _AclEngineModeTile(
+                                isFr: isFr,
+                                mode: AclEngineMode.grantsV29,
+                                groupValue: appProvider.aclEngineMode,
+                                title: isFr
+                                    ? 'Grants V29 (via)'
+                                    : 'Grants V29 (via)',
+                                subtitle: isFr
+                                    ? 'Headscale ≥ 0.29 — routage via pour LAN/exit.'
+                                    : 'Headscale ≥ 0.29 — via routing for LAN/exit.',
+                                enabled: VersionInfo.checkVersionAtLeast(
+                                  appProvider.serverVersion,
+                                  '0.29.0',
+                                ),
+                                onChanged: (mode) =>
+                                    appProvider.setAclEngineMode(mode),
+                              ),
+                              if (!VersionInfo.checkVersionAtLeast(
+                                appProvider.serverVersion,
+                                '0.29.0',
+                              ))
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      left: 16, bottom: 8),
+                                  child: Text(
+                                    isFr
+                                        ? 'Grants V29 nécessite Headscale 0.29.0+.'
+                                        : 'Grants V29 requires Headscale 0.29.0+.',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: Colors.orange,
+                                    ),
+                                  ),
+                                ),
                               const Divider(),
                               ListTile(
                                 contentPadding: EdgeInsets.zero,
@@ -176,6 +221,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 style: theme.textTheme.titleSmall?.copyWith(
                                     color: Colors.red,
                                     fontWeight: FontWeight.bold),
+                              ),
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(isFr
+                                    ? 'Migrer vers Grants V29'
+                                    : 'Migrate to Grants V29'),
+                                subtitle: Text(isFr
+                                    ? 'Régénère la politique avec routage via.'
+                                    : 'Regenerates policy with via routing.'),
+                                trailing: const Icon(Icons.alt_route,
+                                    color: Colors.green),
+                                enabled: VersionInfo.checkVersionAtLeast(
+                                  appProvider.serverVersion,
+                                  '0.29.0',
+                                ),
+                                onTap: VersionInfo.checkVersionAtLeast(
+                                  appProvider.serverVersion,
+                                  '0.29.0',
+                                )
+                                    ? () => showDialog(
+                                          context: context,
+                                          builder: (_) =>
+                                              const GrantsMigrationDialog(),
+                                        )
+                                    : null,
+                              ),
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(isFr
+                                    ? 'Rollback Grants → Standard'
+                                    : 'Rollback Grants → Standard'),
+                                subtitle: Text(isFr
+                                    ? 'Revient au moteur Standard (tags séparés).'
+                                    : 'Reverts to Standard engine (split tags).'),
+                                trailing: const Icon(Icons.undo,
+                                    color: Colors.orange),
+                                onTap: appProvider.aclEngineMode ==
+                                        AclEngineMode.grantsV29
+                                    ? () => _confirmAction(
+                                          context,
+                                          isFr
+                                              ? 'Revenir au moteur Standard ?'
+                                              : 'Revert to Standard engine?',
+                                          isFr
+                                              ? 'Les grants via ne seront plus générés. Régénérez la politique ACL ensuite.'
+                                              : 'Via grants will no longer be generated. Regenerate ACL policy afterwards.',
+                                          () async {
+                                            await appProvider.setAclEngineMode(
+                                                AclEngineMode.standard);
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                  content: Text(isFr
+                                                      ? 'Moteur Standard activé.'
+                                                      : 'Standard engine enabled.'),
+                                                ),
+                                              );
+                                            }
+                                          },
+                                        )
+                                    : null,
                               ),
                               ListTile(
                                 contentPadding: EdgeInsets.zero,
@@ -498,6 +605,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Text(content),
         ],
       ),
+    );
+  }
+}
+
+class _AclEngineModeTile extends StatelessWidget {
+  final bool isFr;
+  final AclEngineMode mode;
+  final AclEngineMode groupValue;
+  final String title;
+  final String subtitle;
+  final bool enabled;
+  final ValueChanged<AclEngineMode> onChanged;
+
+  const _AclEngineModeTile({
+    required this.isFr,
+    required this.mode,
+    required this.groupValue,
+    required this.title,
+    required this.subtitle,
+    required this.onChanged,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = groupValue == mode;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      enabled: enabled,
+      title: Text(title),
+      subtitle: Text(subtitle),
+      trailing: selected
+          ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary)
+          : Icon(Icons.circle_outlined,
+              color: Theme.of(context).colorScheme.outline),
+      onTap: enabled ? () => onChanged(mode) : null,
     );
   }
 }

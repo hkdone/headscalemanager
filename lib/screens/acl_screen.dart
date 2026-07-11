@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/acl_manager_screen.dart';
@@ -8,11 +9,15 @@ import 'package:headscalemanager/screens/taildrive_manager_screen.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:headscalemanager/services/new_acl_generator_service.dart';
-import 'package:headscalemanager/services/standard_acl_generator_service.dart';
+import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
 import 'package:headscalemanager/widgets/shared_routes_access_dialog.dart';
 import 'package:headscalemanager/utils/ip_utils.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import 'package:headscalemanager/models/user.dart';
+import 'package:headscalemanager/widgets/acl/acl_engine_banner.dart';
+import 'package:headscalemanager/widgets/acl/acls_list_view.dart';
+import 'package:headscalemanager/widgets/acl/grants_list_view.dart';
+import 'package:headscalemanager/widgets/acl/policy_diff_dialog.dart';
 import 'package:headscalemanager/screens/acl_puzzle_screen.dart';
 
 class AclScreen extends StatefulWidget {
@@ -26,10 +31,11 @@ class _AclScreenState extends State<AclScreen> {
   final TextEditingController _aclController = TextEditingController();
   bool _isLoading = true;
   Map<String, dynamic> _currentAclPolicy = {};
-  final NewAclGeneratorService _newAclGeneratorService =
-      NewAclGeneratorService();
+  final AclPolicyOrchestrator _aclOrchestrator = AclPolicyOrchestrator();
 
   List<Node> _allNodes = [];
+  List<User> _users = [];
+  Map<String, dynamic> _lastGeneratedPolicy = {};
   List<Node> _destinationNodes = [];
   Node? _selectedSourceNode;
   Node? _selectedDestinationNode;
@@ -37,7 +43,7 @@ class _AclScreenState extends State<AclScreen> {
   final List<Map<String, dynamic>> _temporaryRules = [];
   String _selectedProtocol = 'any'; // 'any', 'tcp', 'udp'
   String? _activeServerId;
-  bool? _lastStandardAclEngineEnabled;
+  AclEngineMode? _lastAclEngineMode;
 
   @override
   void initState() {
@@ -56,8 +62,8 @@ class _AclScreenState extends State<AclScreen> {
       shouldReload = true;
     }
 
-    if (_lastStandardAclEngineEnabled != appProvider.useStandardAclEngine) {
-      _lastStandardAclEngineEnabled = appProvider.useStandardAclEngine;
+    if (_lastAclEngineMode != appProvider.aclEngineMode) {
+      _lastAclEngineMode = appProvider.aclEngineMode;
       shouldReload = true;
     }
 
@@ -134,29 +140,90 @@ class _AclScreenState extends State<AclScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : GestureDetector(
-              onTap: () => FocusScope.of(context).unfocus(),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  children: [
-                    _buildTemporaryRulesSection(),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _aclController,
-                      maxLines: 20,
-                      minLines: 5,
-                      decoration: _buildInputDecoration('Politique ACL', '')
-                          .copyWith(
-                              filled: true,
-                              fillColor: Theme.of(context).cardColor),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontFamily: 'monospace',
-                            fontSize: 12,
+          : DefaultTabController(
+              length: 3,
+              child: Column(
+                children: [
+                  AclEngineBanner(
+                    engineMode: context.watch<AppProvider>().aclEngineMode,
+                    serverVersion:
+                        context.watch<AppProvider>().serverVersion,
+                    users: _users,
+                    nodes: _allNodes,
+                    isFr: isFr,
+                  ),
+                  TabBar(
+                    tabs: [
+                      Tab(text: isFr ? 'Grants' : 'Grants'),
+                      Tab(text: isFr ? 'ACLs' : 'ACLs'),
+                      Tab(text: isFr ? 'JSON' : 'JSON'),
+                    ],
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        GestureDetector(
+                          onTap: () => FocusScope.of(context).unfocus(),
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              children: [
+                                _buildTemporaryRulesSection(),
+                                const SizedBox(height: 8),
+                                GrantsListView(
+                                  grants: (_currentAclPolicy['grants']
+                                          as List?) ??
+                                      const [],
+                                  isFr: isFr,
+                                ),
+                              ],
+                            ),
                           ),
+                        ),
+                        SingleChildScrollView(
+                          padding: const EdgeInsets.all(8),
+                          child: AclsListView(
+                            acls: (_currentAclPolicy['acls'] as List?) ??
+                                const [],
+                            isFr: isFr,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => FocusScope.of(context).unfocus(),
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(8),
+                            child: TextField(
+                              controller: _aclController,
+                              maxLines: 30,
+                              minLines: 10,
+                              onChanged: (_) {
+                                try {
+                                  _currentAclPolicy = json.decode(
+                                      _aclController.text)
+                                      as Map<String, dynamic>;
+                                } catch (_) {}
+                                setState(() {});
+                              },
+                              decoration: _buildInputDecoration(
+                                      'Politique ACL', '')
+                                  .copyWith(
+                                      filled: true,
+                                      fillColor:
+                                          Theme.of(context).cardColor),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    fontFamily: 'monospace',
+                                    fontSize: 12,
+                                  ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
       floatingActionButton: SpeedDial(
@@ -848,24 +915,17 @@ class _AclScreenState extends State<AclScreen> {
       // Clean up obsolete lan-sharer tags before ACL generation
       final cleanedNodes = await _cleanupObsoleteLanSharerTags(nodes);
 
-      if (appProvider.useStandardAclEngine) {
-        final standardAclGeneratorService = StandardAclGeneratorService();
-        _currentAclPolicy = standardAclGeneratorService.generatePolicy(
-          users: users,
-          nodes: cleanedNodes,
-          temporaryRules: _temporaryRules,
-          taildriveShares: appProvider.taildriveShares,
-          serverVersion: appProvider.serverVersion,
-        );
-      } else {
-        _currentAclPolicy = _newAclGeneratorService.generatePolicy(
-          users: users,
-          nodes: cleanedNodes,
-          temporaryRules: _temporaryRules,
-          taildriveShares: appProvider.taildriveShares,
-          serverVersion: appProvider.serverVersion,
-        );
-      }
+      _currentAclPolicy = _aclOrchestrator.generatePolicy(
+        engineMode: appProvider.aclEngineMode,
+        users: users,
+        nodes: cleanedNodes,
+        temporaryRules: _temporaryRules,
+        taildriveShares: appProvider.taildriveShares,
+        serverVersion: appProvider.serverVersion,
+      );
+      _users = users;
+      _lastGeneratedPolicy =
+          Map<String, dynamic>.from(_currentAclPolicy);
 
       _updateAclControllerText();
 
@@ -979,43 +1039,30 @@ class _AclScreenState extends State<AclScreen> {
     final isFr = locale.languageCode == 'fr';
 
     if (showConfirmation) {
-      final bool confirm = await showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: Text(
-                    isFr ? 'Confirmer l\'exportation' : 'Confirm Export',
-                    style: Theme.of(context).textTheme.titleLarge),
-                content: Text(
-                    isFr
-                        ? 'Vous allez appliquer la politique ACL définie dans le champ de texte sur votre serveur. Êtes-vous sûr ?'
-                        : 'You are about to apply the ACL policy defined in the text field to your server. Are you sure?',
-                    style: Theme.of(context).textTheme.bodyMedium),
-                actions: <Widget>[
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: Text(isFr ? 'Annuler' : 'Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: Text(isFr ? 'Confirmer' : 'Confirm',
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.error)),
-                  ),
-                ],
-              );
-            },
-          ) ??
-          false;
+      Map<String, dynamic> editedPolicy;
+      try {
+        editedPolicy =
+            json.decode(_aclController.text) as Map<String, dynamic>;
+      } catch (_) {
+        editedPolicy = _currentAclPolicy;
+      }
 
-      if (!confirm) return;
-
-      if (!mounted) return;
+      final confirmed = await PolicyDiffDialog.show(
+        context,
+        currentPolicy: _lastGeneratedPolicy.isNotEmpty
+            ? _lastGeneratedPolicy
+            : _currentAclPolicy,
+        newPolicy: editedPolicy,
+        isFr: isFr,
+      );
+      if (confirmed != true) return;
     }
+
+    if (!mounted) return;
+    final apiService = context.read<AppProvider>().apiService;
 
     setState(() => _isLoading = true);
     try {
-      final apiService = context.read<AppProvider>().apiService;
       await apiService.setAclPolicy(_aclController.text);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

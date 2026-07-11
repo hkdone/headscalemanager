@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
-import 'package:headscalemanager/services/new_acl_generator_service.dart';
+import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
 import 'package:headscalemanager/services/route_conflict_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
@@ -641,13 +641,15 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       // Clean up obsolete lan-sharer tags before ACL generation
       final cleanedNodes = await _cleanupObsoleteLanSharerTags(updatedNodes);
 
-      final aclGenerator = NewAclGeneratorService();
-      final newPolicyMap = aclGenerator.generatePolicy(
-          users: allUsers,
-          nodes: cleanedNodes,
-          temporaryRules: tempRules,
-          taildriveShares: appProvider.taildriveShares,
-          serverVersion: appProvider.serverVersion);
+      final aclOrchestrator = AclPolicyOrchestrator();
+      final newPolicyMap = aclOrchestrator.generatePolicy(
+        engineMode: appProvider.aclEngineMode,
+        users: allUsers,
+        nodes: cleanedNodes,
+        temporaryRules: tempRules,
+        taildriveShares: appProvider.taildriveShares,
+        serverVersion: appProvider.serverVersion,
+      );
       final newPolicyJson = jsonEncode(newPolicyMap);
       await apiService.setAclPolicy(newPolicyJson);
 

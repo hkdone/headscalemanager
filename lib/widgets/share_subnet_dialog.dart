@@ -2,8 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
-import 'package:headscalemanager/services/new_acl_generator_service.dart';
-import 'package:headscalemanager/services/standard_acl_generator_service.dart';
+import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
 // For debugPrint
@@ -168,24 +167,15 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
                     final tempRules = await appProvider.storageService
                         .getTemporaryRules(serverId);
 
-                    Map<String, dynamic> newPolicyMap;
-                    if (useStandardEngine) {
-                      final aclGenerator = StandardAclGeneratorService();
-                      newPolicyMap = aclGenerator.generatePolicy(
-                          users: allUsers,
-                          nodes: allNodes,
-                          temporaryRules: tempRules,
-                          taildriveShares: appProvider.taildriveShares,
-                          serverVersion: appProvider.serverVersion);
-                    } else {
-                      final aclGenerator = NewAclGeneratorService();
-                      newPolicyMap = aclGenerator.generatePolicy(
-                          users: allUsers,
-                          nodes: allNodes,
-                          temporaryRules: tempRules,
-                          taildriveShares: appProvider.taildriveShares,
-                          serverVersion: appProvider.serverVersion);
-                    }
+                    final aclOrchestrator = AclPolicyOrchestrator();
+                    final newPolicyMap = aclOrchestrator.generatePolicy(
+                      engineMode: appProvider.aclEngineMode,
+                      users: allUsers,
+                      nodes: allNodes,
+                      temporaryRules: tempRules,
+                      taildriveShares: appProvider.taildriveShares,
+                      serverVersion: appProvider.serverVersion,
+                    );
 
                     final newPolicyJson = jsonEncode(newPolicyMap);
                     await appProvider.apiService.setAclPolicy(newPolicyJson);
