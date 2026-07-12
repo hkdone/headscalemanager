@@ -137,7 +137,6 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
         _nodes = nodes;
         _buildAvailableEntities(isFr);
 
-        // Parse existing policy
         if (currentPolicy.isNotEmpty) {
           _puzzleRules.clear();
           _puzzleRules.addAll(_puzzleService.parseJsonToPuzzle(
@@ -148,6 +147,9 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
 
         _isLoading = false;
       });
+
+      await appProvider.reconcilePuzzleMetadataForRules(_puzzleRules);
+      if (mounted) setState(() {});
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -196,6 +198,54 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
             type: PuzzleEntityType.tag,
             value: tag,
             displayLabel: 'Tag: $tag'));
+      }
+    }
+
+    // Nœuds routeurs (picker via par machine)
+    for (var node in _nodes) {
+      final norm = normalizeUserName(node.user.isNotEmpty
+          ? node.getNormalizedOwner()
+          : node.user);
+      final stdLan = 'tag:$norm-lan-sharer';
+      final stdExit = 'tag:$norm-exit-node';
+      String? viaTag;
+      String role = 'LAN';
+
+      if (node.tags.contains(stdLan) &&
+          node.sharedRoutes.any((r) => r != '0.0.0.0/0' && r != '::/0')) {
+        viaTag = stdLan;
+        role = 'LAN';
+      } else if (node.tags.contains(stdExit) && node.isExitNode) {
+        viaTag = stdExit;
+        role = 'Exit';
+      } else {
+        for (var t in node.tags) {
+          if (t.contains(';lan-sharer') &&
+              node.sharedRoutes.any((r) => r != '0.0.0.0/0' && r != '::/0')) {
+            viaTag = t;
+            role = 'LAN';
+            break;
+          }
+          if (t.contains(';exit-node') && node.isExitNode) {
+            viaTag = t;
+            role = 'Exit';
+            break;
+          }
+        }
+      }
+
+      if (viaTag != null) {
+        final entityId = 'router_${node.id}';
+        if (!_availableEntities.any((e) => e.id == entityId)) {
+          _availableEntities.add(PuzzleEntity(
+            id: entityId,
+            type: PuzzleEntityType.host,
+            value: viaTag,
+            displayLabel: isFr
+                ? 'Routeur: ${node.name} ($role)'
+                : 'Router: ${node.name} ($role)',
+          ));
+        }
       }
     }
 
@@ -1081,7 +1131,14 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                               .map((e) => Padding(
                                     padding: const EdgeInsets.symmetric(
                                         vertical: 4.0),
-                                    child: Container(
+                                    child: InkWell(
+                                      onTap: () {
+                                        _showEntityRenameDialog(context, e, () {
+                                          setState(() {});
+                                        });
+                                      },
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Container(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 8, vertical: 8),
                                       decoration: BoxDecoration(
@@ -1108,6 +1165,7 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                                           ),
                                         ],
                                       ),
+                                    ),
                                     ),
                                   ))
                               .toList(),
@@ -1505,7 +1563,9 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
                 e.value.contains('-exit-node') ||
                 e.value.contains(';lan-sharer') ||
                 e.value.contains(';exit-node'));
-        if (!isViaTag) continue;
+        final isViaRouter =
+            e.type == PuzzleEntityType.host && e.id.startsWith('router_');
+        if (!isViaTag && !isViaRouter) continue;
       }
 
       if (_currentStep == (useGrants ? 2 : 1) && excludedIds.contains(e.value)) {

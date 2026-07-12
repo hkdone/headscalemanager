@@ -18,6 +18,14 @@ import 'package:headscalemanager/widgets/acl/acl_engine_banner.dart';
 import 'package:headscalemanager/widgets/acl/acls_list_view.dart';
 import 'package:headscalemanager/widgets/acl/grants_list_view.dart';
 import 'package:headscalemanager/widgets/acl/policy_diff_dialog.dart';
+import 'package:headscalemanager/services/acl/grant_composer_service.dart';
+import 'package:headscalemanager/utils/grants_v29_gate.dart';
+import 'package:headscalemanager/widgets/acl/grant_composer_sheet.dart';
+import 'package:headscalemanager/widgets/acl/grant_edit_sheet.dart';
+import 'package:headscalemanager/widgets/acl/grants_migration_banner.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:headscalemanager/services/acl/policy_file_service.dart';
+import 'package:headscalemanager/widgets/acl/acl_workflow_guide.dart';
 import 'package:headscalemanager/screens/acl_puzzle_screen.dart';
 
 class AclScreen extends StatefulWidget {
@@ -44,6 +52,7 @@ class _AclScreenState extends State<AclScreen> {
   String _selectedProtocol = 'any'; // 'any', 'tcp', 'udp'
   String? _activeServerId;
   AclEngineMode? _lastAclEngineMode;
+  bool _isLocalDraft = false;
 
   @override
   void initState() {
@@ -121,10 +130,280 @@ class _AclScreenState extends State<AclScreen> {
     }
   }
 
+  bool _isComposerAvailable(AppProvider provider) {
+    return GrantsV29Gate.isAvailable(
+      engineMode: provider.aclEngineMode,
+      serverVersion: provider.serverVersion,
+    );
+  }
+
+  Future<void> _openGrantComposer({Node? prefilledRouter}) async {
+    final provider = context.read<AppProvider>();
+    final locale = provider.locale;
+    final isFr = locale.languageCode == 'fr';
+
+    if (!_isComposerAvailable(provider)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(isFr
+            ? 'Composeur disponible uniquement en mode Grants V29 (Headscale ≥ 0.29).'
+            : 'Composer available only in Grants V29 mode (Headscale ≥ 0.29).'),
+      ));
+      return;
+    }
+
+    if (_users.isEmpty) {
+      try {
+        _users = await provider.apiService.getUsers();
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
+    final result = await GrantComposerSheet.show(
+      context,
+      users: _users,
+      nodes: _allNodes,
+      isFr: isFr,
+      prefilledRouterNode: prefilledRouter,
+    );
+
+    if (result == null || !mounted) return;
+
+    setState(() {
+      if (result.containsKey('action')) {
+        _currentAclPolicy =
+            GrantComposerService.appendExceptionAcl(_currentAclPolicy, result);
+      } else {
+        _currentAclPolicy =
+            GrantComposerService.appendNetworkGrant(_currentAclPolicy, result);
+      }
+      _isLocalDraft = true;
+      _updateAclControllerText();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(isFr
+          ? 'Règle ajoutée à la policy locale. Exportez pour appliquer au serveur.'
+          : 'Rule added to local policy. Export to apply to server.'),
+    ));
+  }
+
+  Future<void> _onEditGrant(int networkIndex, Map<String, dynamic> grant) async {
+    final provider = context.read<AppProvider>();
+    final isFr = provider.locale.languageCode == 'fr';
+
+    if (!_isComposerAvailable(provider)) return;
+
+    final updated = await GrantEditSheet.show(
+      context,
+      grant: grant,
+      users: _users,
+      nodes: _allNodes,
+      isFr: isFr,
+    );
+
+    if (updated == null || !mounted) return;
+
+    setState(() {
+      _currentAclPolicy = GrantComposerService.updateNetworkGrantAt(
+        _currentAclPolicy,
+        networkIndex,
+        updated,
+      );
+      _isLocalDraft = true;
+      _updateAclControllerText();
+    });
+  }
+
+  void _onDeleteGrant(int networkIndex) {
+    setState(() {
+      _currentAclPolicy = GrantComposerService.removeNetworkGrantAt(
+        _currentAclPolicy,
+        networkIndex,
+      );
+      _isLocalDraft = true;
+      _updateAclControllerText();
+    });
+  }
+
+  Widget _buildScrollHeader({
+    required bool isFr,
+    required AppProvider appProvider,
+    required int grantCount,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: AclEngineBanner(
+                engineMode: appProvider.aclEngineMode,
+                serverVersion: appProvider.serverVersion,
+                users: _users,
+                nodes: _allNodes,
+                isFr: isFr,
+                compact: true,
+              ),
+            ),
+            if (_isLocalDraft) AclWorkflowGuide(isFr: isFr),
+          ],
+        ),
+        if (!_isLocalDraft)
+          GrantsMigrationBanner(
+            isFr: isFr,
+            grantCount: grantCount,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildGrantsTab({
+    required bool isFr,
+    required AppProvider appProvider,
+    required bool composerAvailable,
+  }) {
+    final grantCount =
+        GrantComposerService.countNetworkGrants(_currentAclPolicy);
+
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildScrollHeader(
+              isFr: isFr,
+              appProvider: appProvider,
+              grantCount: grantCount,
+            ),
+            _buildComposerButton(isFr, appProvider),
+            if (composerAvailable)
+              _buildAdvancedExceptionsSection(isFr)
+            else
+              _buildTemporaryRulesSection(),
+            const SizedBox(height: 8),
+            GrantsListView(
+              grants: (_currentAclPolicy['grants'] as List?) ?? const [],
+              isFr: isFr,
+              onEditGrant: composerAvailable ? _onEditGrant : null,
+              onDeleteGrant: composerAvailable ? _onDeleteGrant : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAclsTab({
+    required bool isFr,
+    required AppProvider appProvider,
+  }) {
+    final grantCount =
+        GrantComposerService.countNetworkGrants(_currentAclPolicy);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildScrollHeader(
+            isFr: isFr,
+            appProvider: appProvider,
+            grantCount: grantCount,
+          ),
+          AclsListView(
+            acls: (_currentAclPolicy['acls'] as List?) ?? const [],
+            isFr: isFr,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJsonTab({required bool isFr}) {
+    final appProvider = context.read<AppProvider>();
+    final grantCount =
+        GrantComposerService.countNetworkGrants(_currentAclPolicy);
+
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildScrollHeader(
+              isFr: isFr,
+              appProvider: appProvider,
+              grantCount: grantCount,
+            ),
+            TextField(
+              controller: _aclController,
+              maxLines: null,
+              minLines: 16,
+              onChanged: (_) {
+                try {
+                  _currentAclPolicy =
+                      json.decode(_aclController.text) as Map<String, dynamic>;
+                } catch (_) {}
+                setState(() => _isLocalDraft = true);
+              },
+              decoration: _buildInputDecoration('Politique ACL', '')
+                  .copyWith(
+                    filled: true,
+                    fillColor: Theme.of(context).cardColor,
+                  ),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdvancedExceptionsSection(bool isFr) {
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      title: Text(
+        isFr ? 'Mode avancé : exceptions manuelles' : 'Advanced: manual exceptions',
+        style: Theme.of(context).textTheme.titleSmall,
+      ),
+      subtitle: Text(
+        isFr
+            ? 'Ancien formulaire nœud à nœud — le composeur suffit en général'
+            : 'Legacy node-to-node form — composer is usually enough',
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      children: [
+        _buildTemporaryRulesSection(),
+      ],
+    );
+  }
+
+  Widget _buildComposerButton(bool isFr, AppProvider provider) {
+    if (!_isComposerAvailable(provider)) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: FilledButton.icon(
+        onPressed: () => _openGrantComposer(),
+        icon: const Icon(Icons.auto_fix_high),
+        label: Text(isFr ? 'Composer une règle' : 'Compose a rule'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final locale = context.watch<AppProvider>().locale;
+    final appProvider = context.watch<AppProvider>();
+    final locale = appProvider.locale;
     final isFr = locale.languageCode == 'fr';
+    final composerAvailable = _isComposerAvailable(appProvider);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -144,14 +423,6 @@ class _AclScreenState extends State<AclScreen> {
               length: 3,
               child: Column(
                 children: [
-                  AclEngineBanner(
-                    engineMode: context.watch<AppProvider>().aclEngineMode,
-                    serverVersion:
-                        context.watch<AppProvider>().serverVersion,
-                    users: _users,
-                    nodes: _allNodes,
-                    isFr: isFr,
-                  ),
                   TabBar(
                     tabs: [
                       Tab(text: isFr ? 'Grants' : 'Grants'),
@@ -162,64 +433,13 @@ class _AclScreenState extends State<AclScreen> {
                   Expanded(
                     child: TabBarView(
                       children: [
-                        GestureDetector(
-                          onTap: () => FocusScope.of(context).unfocus(),
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.all(8),
-                            child: Column(
-                              children: [
-                                _buildTemporaryRulesSection(),
-                                const SizedBox(height: 8),
-                                GrantsListView(
-                                  grants: (_currentAclPolicy['grants']
-                                          as List?) ??
-                                      const [],
-                                  isFr: isFr,
-                                ),
-                              ],
-                            ),
-                          ),
+                        _buildGrantsTab(
+                          isFr: isFr,
+                          appProvider: appProvider,
+                          composerAvailable: composerAvailable,
                         ),
-                        SingleChildScrollView(
-                          padding: const EdgeInsets.all(8),
-                          child: AclsListView(
-                            acls: (_currentAclPolicy['acls'] as List?) ??
-                                const [],
-                            isFr: isFr,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () => FocusScope.of(context).unfocus(),
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.all(8),
-                            child: TextField(
-                              controller: _aclController,
-                              maxLines: 30,
-                              minLines: 10,
-                              onChanged: (_) {
-                                try {
-                                  _currentAclPolicy = json.decode(
-                                      _aclController.text)
-                                      as Map<String, dynamic>;
-                                } catch (_) {}
-                                setState(() {});
-                              },
-                              decoration: _buildInputDecoration(
-                                      'Politique ACL', '')
-                                  .copyWith(
-                                      filled: true,
-                                      fillColor:
-                                          Theme.of(context).cardColor),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    fontFamily: 'monospace',
-                                    fontSize: 12,
-                                  ),
-                            ),
-                          ),
-                        ),
+                        _buildAclsTab(isFr: isFr, appProvider: appProvider),
+                        _buildJsonTab(isFr: isFr),
                       ],
                     ),
                   ),
@@ -230,6 +450,14 @@ class _AclScreenState extends State<AclScreen> {
         animatedIcon: AnimatedIcons.menu_close,
         backgroundColor: Theme.of(context).colorScheme.primary,
         children: [
+          if (composerAvailable)
+            SpeedDialChild(
+              child: const Icon(Icons.auto_fix_high),
+              label: isFr ? 'Composeur de grants' : 'Grant composer',
+              backgroundColor: Colors.teal,
+              foregroundColor: Colors.white,
+              onTap: () => _openGrantComposer(),
+            ),
           SpeedDialChild(
             child: const Icon(Icons.account_tree_outlined),
             label: isFr ? 'Vue Graphe' : 'Graph View',
@@ -292,11 +520,17 @@ class _AclScreenState extends State<AclScreen> {
           case 'fetch':
             _fetchAclPolicyFromServer();
             break;
+          case 'backup':
+            _exportPolicyBackup();
+            break;
+          case 'import':
+            _importPolicyFromFile();
+            break;
           case 'share':
             _shareAclFile();
             break;
-          case 'reset':
-            _resetAclPolicy();
+          case 'staging':
+            _showPolicyStagingDialog();
             break;
         }
       },
@@ -314,6 +548,21 @@ class _AclScreenState extends State<AclScreen> {
               leading: const Icon(Icons.cloud_download),
               title: Text(isFr ? 'Récupérer du serveur' : 'Fetch from Server')),
         ),
+        const PopupMenuDivider(),
+        PopupMenuItem<String>(
+          value: 'backup',
+          child: ListTile(
+            leading: const Icon(Icons.save_alt),
+            title: Text(isFr ? 'Exporter backup JSON' : 'Export JSON Backup'),
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'import',
+          child: ListTile(
+            leading: const Icon(Icons.upload_file),
+            title: Text(isFr ? 'Importer depuis JSON' : 'Import from JSON'),
+          ),
+        ),
         PopupMenuItem<String>(
           value: 'share',
           child: ListTile(
@@ -322,11 +571,13 @@ class _AclScreenState extends State<AclScreen> {
         ),
         const PopupMenuDivider(),
         PopupMenuItem<String>(
-          value: 'reset',
+          value: 'staging',
           child: ListTile(
             leading: const Icon(Icons.lock_open, color: Colors.orange),
             title: Text(
-                isFr ? 'Autoriser tout (Réinitialiser)' : 'Allow All (Reset)',
+                isFr
+                    ? 'Repartir : tout autoriser…'
+                    : 'Start over: allow all…',
                 style: const TextStyle(color: Colors.orange)),
           ),
         ),
@@ -928,6 +1179,7 @@ class _AclScreenState extends State<AclScreen> {
           Map<String, dynamic>.from(_currentAclPolicy);
 
       _updateAclControllerText();
+      if (mounted) setState(() => _isLocalDraft = true);
 
       final locale = appProvider.locale;
       final isFr = locale.languageCode == 'fr';
@@ -1065,6 +1317,7 @@ class _AclScreenState extends State<AclScreen> {
     try {
       await apiService.setAclPolicy(_aclController.text);
       if (mounted) {
+        setState(() => _isLocalDraft = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
@@ -1109,6 +1362,7 @@ class _AclScreenState extends State<AclScreen> {
       final locale = appProvider.locale;
       final isFr = locale.languageCode == 'fr';
       if (mounted) {
+        setState(() => _isLocalDraft = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
@@ -1142,112 +1396,158 @@ class _AclScreenState extends State<AclScreen> {
     }
   }
 
-  Future<void> _shareAclFile() async {
-    if (!mounted) return;
-    try {
-      const JsonEncoder encoder = JsonEncoder.withIndent('  ');
-      final String aclJsonString = encoder.convert(_currentAclPolicy);
-
-      final locale = context.read<AppProvider>().locale;
-      final isFr = locale.languageCode == 'fr';
-      if (aclJsonString.isEmpty || aclJsonString == encoder.convert({})) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  isFr
-                      ? 'Le contenu ACL est vide. Générez d\'abord une politique.'
-                      : 'ACL content is empty. Generate a policy first.',
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.onError)),
-              backgroundColor: Theme.of(context).colorScheme.error),
-        );
-        return;
+  void _applyPolicyLocally(
+    Map<String, dynamic> policy, {
+    bool markAsDraft = true,
+    bool clearTemporaryRules = false,
+  }) {
+    setState(() {
+      _currentAclPolicy = Map<String, dynamic>.from(policy);
+      _aclController.text = PolicyFileService.encodePolicy(_currentAclPolicy);
+      _isLocalDraft = markAsDraft;
+      if (clearTemporaryRules) {
+        _temporaryRules.clear();
       }
+    });
+  }
 
-      final directory = await getTemporaryDirectory();
-      final file = File('${directory.path}/acl.json');
-      await file.writeAsString(aclJsonString);
-
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path)],
-          text: 'Voici votre politique ACL Headscale.',
-        ),
-      );
-    } catch (e) {
-      debugPrint('Erreur lors du partage du fichier ACL : $e');
-      if (mounted) {
-        final locale = context.read<AppProvider>().locale;
-        final isFr = locale.languageCode == 'fr';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  '${isFr ? 'Échec du partage du fichier ACL' : 'Failed to share ACL file'}: $e',
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.onError)),
-              backgroundColor: Theme.of(context).colorScheme.error),
-        );
-      }
+  Future<void> _persistClearedTemporaryRules() async {
+    final serverId = context.read<AppProvider>().activeServer?.id;
+    if (serverId != null) {
+      await context
+          .read<AppProvider>()
+          .storageService
+          .saveTemporaryRules(serverId, _temporaryRules);
     }
   }
 
-  Future<void> _resetAclPolicy() async {
+  Future<void> _showPolicyStagingDialog() async {
     if (!mounted) return;
     final locale = context.read<AppProvider>().locale;
     final isFr = locale.languageCode == 'fr';
 
-    final bool confirm = await showDialog(
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isFr ? 'Repartir de zéro' : 'Start from scratch'),
+        content: SingleChildScrollView(
+          child: Text(
+            isFr
+                ? 'Approche recommandée :\n\n'
+                    '1. Chargez un brouillon « tout autoriser » (local uniquement — le serveur reste inchangé)\n'
+                    '2. Ajoutez vos grants spécifiques via le composeur\n'
+                    '3. Supprimez la règle « tout autoriser » quand vos règles sont prêtes\n'
+                    '4. Exportez vers le serveur uniquement quand vous êtes prêt\n\n'
+                    'Ainsi personne n\'est coupé brutalement pendant que vous construisez la nouvelle policy.'
+                : 'Recommended approach:\n\n'
+                    '1. Load an « allow all » draft (local only — server unchanged)\n'
+                    '2. Add specific grants via the composer\n'
+                    '3. Remove the « allow all » rule when your rules are ready\n'
+                    '4. Export to server only when you are ready\n\n'
+                    'Nobody gets cut off while you build the new policy.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(isFr ? 'Annuler' : 'Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('local'),
+            child: Text(
+              isFr ? 'Brouillon local' : 'Local draft',
+              style: const TextStyle(color: Colors.orange),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('publish'),
+            child: Text(
+              isFr ? 'Publier tout autoriser' : 'Publish allow all',
+              style: TextStyle(color: Theme.of(ctx).colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || choice == null) return;
+
+    if (choice == 'local') {
+      await _loadAllowAllDraftLocal();
+    } else if (choice == 'publish') {
+      await _publishAllowAllToServer();
+    }
+  }
+
+  Future<void> _loadAllowAllDraftLocal() async {
+    if (!mounted) return;
+    final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
+
+    _applyPolicyLocally(
+      PolicyFileService.allowAllTemplate(),
+      clearTemporaryRules: true,
+    );
+    await _persistClearedTemporaryRules();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isFr
+                ? 'Brouillon « tout autoriser » chargé localement. Le serveur n\'a pas été modifié.'
+                : '« Allow all » draft loaded locally. Server was not changed.',
+            style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+        ),
+      );
+    }
+  }
+
+  Future<void> _publishAllowAllToServer() async {
+    if (!mounted) return;
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
+    final confirm = await showDialog<bool>(
           context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: Text(
-                  isFr ? 'Confirmer la réinitialisation' : 'Confirm Reset',
-                  style: Theme.of(context).textTheme.titleLarge),
-              content: Text(
-                  isFr
-                      ? 'Vous allez remplacer la politique actuelle par une politique qui autorise TOUT le trafic entre TOUS les appareils. Êtes-vous sûr ?'
-                      : 'You are about to replace the current policy with one that allows ALL traffic between ALL devices. Are you sure?',
-                  style: Theme.of(context).textTheme.bodyMedium),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(isFr ? 'Annuler' : 'Cancel'),
+          builder: (ctx) => AlertDialog(
+            title: Text(isFr ? 'Publier tout autoriser' : 'Publish allow all'),
+            content: Text(
+              isFr
+                  ? 'La policy actuelle du serveur sera remplacée par « tout autoriser » immédiatement. Continuer ?'
+                  : 'The server policy will be replaced with « allow all » immediately. Continue?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(isFr ? 'Annuler' : 'Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(
+                  isFr ? 'Publier' : 'Publish',
+                  style: TextStyle(color: Theme.of(ctx).colorScheme.error),
                 ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: Text(isFr ? 'Confirmer' : 'Confirm',
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.error)),
-                ),
-              ],
-            );
-          },
+              ),
+            ],
+          ),
         ) ??
         false;
 
     if (!confirm || !mounted) return;
 
-    const defaultPolicy = {
-      "acls": [
-        {
-          "action": "accept",
-          "src": ["*"],
-          "dst": ["*:*"]
-        }
-      ]
-    };
+    _applyPolicyLocally(
+      PolicyFileService.allowAllTemplate(),
+      markAsDraft: false,
+      clearTemporaryRules: true,
+    );
+    await _persistClearedTemporaryRules();
 
-    const JsonEncoder encoder = JsonEncoder.withIndent('  ');
-    _aclController.text = encoder.convert(defaultPolicy);
+    if (!mounted) return;
 
-    setState(() {
-      _temporaryRules.clear();
-    });
-    final appProvider = context.read<AppProvider>();
-    final storage = appProvider.storageService;
-    final serverId = appProvider.activeServer?.id;
+    final serverId = context.read<AppProvider>().activeServer?.id;
     if (serverId == null) {
-      // Handle no active server error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1260,13 +1560,156 @@ class _AclScreenState extends State<AclScreen> {
       }
       return;
     }
-    await storage.saveTemporaryRules(serverId, _temporaryRules);
 
     await _exportAclPolicyToServer(
-        showConfirmation: false,
-        successMessage: isFr
-            ? 'Politique réinitialisée : tout le trafic est maintenant autorisé.'
-            : 'Policy reset: all traffic is now allowed.');
+      showConfirmation: false,
+      successMessage: isFr
+          ? 'Policy publiée : tout le trafic est maintenant autorisé.'
+          : 'Policy published: all traffic is now allowed.',
+    );
+  }
+
+  Future<void> _exportPolicyBackup() async {
+    if (!mounted) return;
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
+    try {
+      Map<String, dynamic> policy;
+      try {
+        policy = json.decode(_aclController.text) as Map<String, dynamic>;
+      } catch (_) {
+        policy = _currentAclPolicy;
+      }
+
+      PolicyFileService.validatePolicy(policy);
+      final aclJsonString = PolicyFileService.encodePolicy(policy);
+
+      final directory = await getTemporaryDirectory();
+      final fileName = PolicyFileService.backupFileName();
+      final file = File('${directory.path}/$fileName');
+      await file.writeAsString(aclJsonString);
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text: isFr
+              ? 'Backup de votre policy Headscale.'
+              : 'Backup of your Headscale policy.',
+        ),
+      );
+    } catch (e) {
+      debugPrint('Erreur export backup policy : $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${isFr ? 'Échec de l\'export backup' : 'Backup export failed'}: $e',
+              style: TextStyle(color: Theme.of(context).colorScheme.onError),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _importPolicyFromFile() async {
+    if (!mounted) return;
+    final locale = context.read<AppProvider>().locale;
+    final isFr = locale.languageCode == 'fr';
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        withData: false,
+      );
+
+      if (result == null || result.files.isEmpty || !mounted) return;
+
+      final picked = result.files.single;
+      final path = picked.path;
+      if (path == null) {
+        throw Exception(isFr ? 'Chemin fichier inaccessible' : 'File path unavailable');
+      }
+
+      final raw = await File(path).readAsString();
+      final policy = PolicyFileService.parsePolicyContent(raw);
+
+      if (!mounted) return;
+
+      final publish = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text(isFr ? 'Importer la policy' : 'Import policy'),
+              content: Text(
+                isFr
+                    ? 'Charger en brouillon local (recommandé) ou publier immédiatement sur le serveur ?'
+                    : 'Load as local draft (recommended) or publish immediately to the server?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(isFr ? 'Annuler' : 'Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text(
+                    isFr ? 'Brouillon local' : 'Local draft',
+                    style: const TextStyle(color: Colors.orange),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: Text(isFr ? 'Publier' : 'Publish'),
+                ),
+              ],
+            ),
+          );
+
+      if (!mounted || publish == null) return;
+
+      _applyPolicyLocally(policy, markAsDraft: !publish);
+
+      if (publish) {
+        await _exportAclPolicyToServer(
+          showConfirmation: true,
+          successMessage: isFr
+              ? 'Policy importée et publiée sur le serveur.'
+              : 'Policy imported and published to the server.',
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isFr
+                  ? 'Policy importée en brouillon local. Le serveur n\'a pas été modifié.'
+                  : 'Policy imported as local draft. Server was not changed.',
+              style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Erreur import policy : $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${isFr ? 'Échec de l\'import' : 'Import failed'}: $e',
+              style: TextStyle(color: Theme.of(context).colorScheme.onError),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _shareAclFile() async {
+    await _exportPolicyBackup();
   }
 
   List<String> _removeCapabilities(List<String> tags,

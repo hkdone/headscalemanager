@@ -167,6 +167,10 @@ class _GrantsMigrationDialogState extends State<GrantsMigrationDialog> {
 
       await provider.storageService.setGrantsMigrationCompleted(serverId, true);
       await provider.storageService.setGrantsMigrationDismissed(serverId, false);
+      await provider.storageService.setGrantsMigrationDate(
+          serverId, DateTime.now());
+      await provider.storageService.setGrantsMigrationBannerDismissed(
+          serverId, false);
 
       _log(_isFr ? 'Migration réussie !' : 'Migration successful!');
       if (mounted) setState(() => _step = 2);

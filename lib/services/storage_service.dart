@@ -205,16 +205,53 @@ class StorageService {
     return prefs.getBool('GRANTS_MIGRATION_DISMISSED_$serverId') ?? false;
   }
 
+  Future<void> setGrantsMigrationDate(String serverId, DateTime date) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'GRANTS_MIGRATION_DATE_$serverId',
+      date.toIso8601String(),
+    );
+  }
+
+  Future<DateTime?> getGrantsMigrationDate(String serverId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('GRANTS_MIGRATION_DATE_$serverId');
+    if (raw == null) return null;
+    return DateTime.tryParse(raw);
+  }
+
+  Future<void> setGrantsMigrationBannerDismissed(
+      String serverId, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('GRANTS_MIGRATION_BANNER_DISMISSED_$serverId', value);
+  }
+
+  Future<bool> isGrantsMigrationBannerDismissed(String serverId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('GRANTS_MIGRATION_BANNER_DISMISSED_$serverId') ?? false;
+  }
+
   Future<void> savePuzzleEntityAliases(
       String serverId, Map<String, String> aliases) async {
-    final String aliasesJson = json.encode(aliases);
-    await _storage.write(
-        key: 'PUZZLE_ENTITY_ALIASES_$serverId', value: aliasesJson);
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'PUZZLE_ENTITY_ALIASES_$serverId';
+    await prefs.setString(key, json.encode(aliases));
   }
 
   Future<Map<String, String>> getPuzzleEntityAliases(String serverId) async {
-    final String? aliasesJson =
-        await _storage.read(key: 'PUZZLE_ENTITY_ALIASES_$serverId');
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'PUZZLE_ENTITY_ALIASES_$serverId';
+    var aliasesJson = prefs.getString(key);
+
+    if (aliasesJson == null) {
+      aliasesJson =
+          await _storage.read(key: 'PUZZLE_ENTITY_ALIASES_$serverId');
+      if (aliasesJson != null && aliasesJson.isNotEmpty) {
+        await prefs.setString(key, aliasesJson);
+        await _storage.delete(key: 'PUZZLE_ENTITY_ALIASES_$serverId');
+      }
+    }
+
     if (aliasesJson != null && aliasesJson.isNotEmpty) {
       try {
         final Map<String, dynamic> decodedMap = json.decode(aliasesJson);
@@ -228,15 +265,25 @@ class StorageService {
 
   Future<void> savePuzzleBlocksMeta(
       String serverId, Map<String, Map<String, dynamic>> meta) async {
-    final String metaJson = json.encode(meta);
-    await _storage.write(
-        key: 'PUZZLE_BLOCKS_META_$serverId', value: metaJson);
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'PUZZLE_BLOCKS_META_$serverId';
+    await prefs.setString(key, json.encode(meta));
   }
 
   Future<Map<String, Map<String, dynamic>>> getPuzzleBlocksMeta(
       String serverId) async {
-    final String? metaJson =
-        await _storage.read(key: 'PUZZLE_BLOCKS_META_$serverId');
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'PUZZLE_BLOCKS_META_$serverId';
+    var metaJson = prefs.getString(key);
+
+    if (metaJson == null) {
+      metaJson = await _storage.read(key: 'PUZZLE_BLOCKS_META_$serverId');
+      if (metaJson != null && metaJson.isNotEmpty) {
+        await prefs.setString(key, metaJson);
+        await _storage.delete(key: 'PUZZLE_BLOCKS_META_$serverId');
+      }
+    }
+
     if (metaJson != null && metaJson.isNotEmpty) {
       try {
         final Map<String, dynamic> decodedMap = json.decode(metaJson);
@@ -251,14 +298,24 @@ class StorageService {
 
   Future<void> savePuzzleVisualOrder(
       String serverId, List<String> order) async {
-    final String orderJson = json.encode(order);
-    await _storage.write(
-        key: 'PUZZLE_VISUAL_ORDER_$serverId', value: orderJson);
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'PUZZLE_VISUAL_ORDER_$serverId';
+    await prefs.setString(key, json.encode(order));
   }
 
   Future<List<String>> getPuzzleVisualOrder(String serverId) async {
-    final String? orderJson =
-        await _storage.read(key: 'PUZZLE_VISUAL_ORDER_$serverId');
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'PUZZLE_VISUAL_ORDER_$serverId';
+    var orderJson = prefs.getString(key);
+
+    if (orderJson == null) {
+      orderJson = await _storage.read(key: 'PUZZLE_VISUAL_ORDER_$serverId');
+      if (orderJson != null && orderJson.isNotEmpty) {
+        await prefs.setString(key, orderJson);
+        await _storage.delete(key: 'PUZZLE_VISUAL_ORDER_$serverId');
+      }
+    }
+
     if (orderJson != null && orderJson.isNotEmpty) {
       try {
         final List<dynamic> decodedList = json.decode(orderJson);

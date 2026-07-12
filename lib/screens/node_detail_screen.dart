@@ -11,6 +11,9 @@ import 'package:dart_ping/dart_ping.dart';
 import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
+import 'package:headscalemanager/utils/grants_v29_gate.dart';
+import 'package:headscalemanager/widgets/acl/grant_composer_sheet.dart';
+import 'package:headscalemanager/services/acl/grant_composer_service.dart';
 import 'package:headscalemanager/widgets/rename_node_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -118,9 +121,77 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     }
   }
 
+  Future<void> _openGrantComposer(BuildContext context) async {
+    final provider = context.read<AppProvider>();
+    final isFr = provider.locale.languageCode == 'fr';
+
+    if (!GrantsV29Gate.isAvailable(
+      engineMode: provider.aclEngineMode,
+      serverVersion: provider.serverVersion,
+    )) {
+      return;
+    }
+
+    try {
+      final users = await provider.apiService.getUsers();
+      final nodes = await provider.apiService.getNodes();
+      if (!context.mounted) return;
+
+      final result = await GrantComposerSheet.show(
+        context,
+        users: users,
+        nodes: nodes,
+        isFr: isFr,
+        prefilledRouterNode: _currentNode,
+      );
+
+      if (result == null || !context.mounted) return;
+
+      final tempRules = await provider.storageService
+          .getTemporaryRules(provider.activeServer!.id);
+      final orchestrator = AclPolicyOrchestrator();
+      var policy = orchestrator.generatePolicy(
+        engineMode: provider.aclEngineMode,
+        users: users,
+        nodes: nodes,
+        temporaryRules: tempRules,
+        taildriveShares: provider.taildriveShares,
+        serverVersion: provider.serverVersion,
+      );
+
+      if (result.containsKey('action')) {
+        policy = GrantComposerService.appendExceptionAcl(policy, result);
+      } else {
+        policy = GrantComposerService.appendNetworkGrant(policy, result);
+      }
+
+      final jsonPolicy = const JsonEncoder.withIndent('  ').convert(policy);
+      await provider.apiService.setAclPolicy(jsonPolicy);
+
+      if (context.mounted) {
+        showSafeSnackBar(
+          context,
+          isFr
+              ? 'Grant ajouté et policy mise à jour sur le serveur.'
+              : 'Grant added and policy updated on server.',
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showSafeSnackBar(context, e.toString());
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final provider = context.watch<AppProvider>();
+    final isFr = provider.locale.languageCode == 'fr';
+    final showComposer = GrantsV29Gate.isAvailable(
+      engineMode: provider.aclEngineMode,
+      serverVersion: provider.serverVersion,
+    );
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -129,6 +200,14 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
         iconTheme: theme.appBarTheme.iconTheme,
+        actions: [
+          if (showComposer)
+            IconButton(
+              icon: const Icon(Icons.auto_fix_high),
+              tooltip: isFr ? 'Composer une règle' : 'Compose a rule',
+              onPressed: () => _openGrantComposer(context),
+            ),
+        ],
       ),
       body: SafeArea(
         child: ListView(

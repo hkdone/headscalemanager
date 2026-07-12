@@ -14,6 +14,54 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '2.1.3',
+        title: isFr
+            ? 'Release 2.1.3 — Puzzle & persistance'
+            : 'Release 2.1.3 — Puzzle & persistence',
+        description: isFr
+            ? 'Correction de la sauvegarde des noms et icônes dans le Puzzle ACL (SharedPreferences + migration des clés Grants V29). Renommage possible sur la colonne Via.'
+            : 'Fixed ACL Puzzle name and icon persistence (SharedPreferences + Grants V29 key migration). Rename enabled on Via column.',
+        verification: isFr
+            ? 'Puzzle > personnaliser une règle > fermer l\'app > rouvrir'
+            : 'Puzzle > customize a rule > close app > reopen',
+      ),
+      WhatsNewVersion(
+        version: '2.1.2',
+        title: isFr
+            ? 'Release 2.1.2 — ACL plus clair'
+            : 'Release 2.1.2 — Clearer ACL UI',
+        description: isFr
+            ? 'Écran ACL simplifié : guide pas-à-pas en brouillon, défilement sur toute la page, formulaire avancé replié, bandeau migration sans lien Rollback confus, SafeArea corrigé sur le composeur de grants.'
+            : 'Simplified ACL screen: step-by-step draft guide, full-page scroll, collapsed advanced form, migration banner without confusing Rollback link, SafeArea fix on grant composer.',
+        verification: isFr
+            ? 'ACL > brouillon local : guide 4 étapes | Composeur : bouton Suivant visible'
+            : 'ACL > local draft: 4-step guide | Composer: Next button visible',
+      ),
+      WhatsNewVersion(
+        version: '2.1.1',
+        title: isFr
+            ? 'Release 2.1.1 — Backup & brouillon ACL'
+            : 'Release 2.1.1 — ACL Backup & Draft',
+        description: isFr
+            ? 'Export et import de la policy ACL en JSON (backup daté), workflow « repartir de zéro » en brouillon local (tout autoriser sans toucher au serveur), bandeau brouillon non publié, et correction des radios du composeur d\'édition.'
+            : 'Export and import ACL policy as JSON (dated backup), « start from scratch » workflow as local draft (allow all without touching the server), unpublished draft banner, and edit composer radio fixes.',
+        verification: isFr
+            ? 'ACL > ⋮ > Exporter backup JSON | Importer depuis JSON | Repartir : tout autoriser… > Brouillon local'
+            : 'ACL > ⋮ > Export JSON Backup | Import from JSON | Start over: allow all… > Local draft',
+      ),
+      WhatsNewVersion(
+        version: '2.1.0',
+        title: isFr
+            ? 'Release 2.1.0 — Composeur de Grants'
+            : 'Release 2.1.0 — Grant Composer',
+        description: isFr
+            ? 'Nouveau composeur guidé de règles Grants V29 (templates LAN, Internet, intra-flotte, IP), édition inline des grants, bandeau post-migration, et picker routeur par nœud dans le Puzzle. Disponible uniquement en mode Grants V29 sur Headscale ≥ 0.29.'
+            : 'New guided Grants V29 rule composer (LAN, Internet, intra-fleet, IP templates), inline grant editing, post-migration banner, and per-node router picker in Puzzle. Available only in Grants V29 mode on Headscale ≥ 0.29.',
+        verification: isFr
+            ? 'ACL > Composeur | Tap grant pour éditer | Fiche nœud > icône baguette'
+            : 'ACL > Composer | Tap grant to edit | Node detail > wand icon',
+      ),
+      WhatsNewVersion(
         version: '2.0.0',
         title: isFr
             ? 'Release 2.0.0 — Grants, Via & UI ACL'

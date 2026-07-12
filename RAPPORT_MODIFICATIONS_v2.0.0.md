@@ -20,7 +20,7 @@ L'application intègre désormais un **moteur ACL Grants V29** complet avec rout
 | **1** — Moteur Grants V29 | `1.10.0+134` | ✅ |
 | **2** — Refonte écran ACL | `2.0.0-beta+135` | ✅ |
 | **3** — Refonte Puzzle 3 colonnes | `2.0.0-beta+136` | ✅ |
-| **4** — Migration, doc, release | `2.0.0+140` | ✅ |
+| **4** — Migration, doc, release | `2.0.0+141` | ✅ |
 
 ---
 
@@ -62,7 +62,7 @@ L'application intègre désormais un **moteur ACL Grants V29** complet avec rout
 - ~15 dialogs/écrans — migration vers `engineMode:` orchestrateur
 
 ### Versionning & doc
-- `pubspec.yaml` → `2.0.0+140`
+- `pubspec.yaml` → `2.0.0+141`
 - `lib/data/whats_new_data.dart` — entrées 1.10.0 et 2.0.0
 - `README.md`, `README.En.md` — section moteurs ACL
 - `lib/screens/help_screen.dart`, `help_screen_en.dart` — section Grants V29
@@ -132,35 +132,35 @@ flutter test test/services/acl/   # 9 tests passent
 > À réaliser après publication sur votre compte test Headscale ≥ 0.29.
 
 ### 8.1 Prérequis
-- [ ] Serveur Headscale **≥ 0.29.0** sur compte test
-- [ ] Au moins 2 utilisateurs (ex. Jean, Clarisse) avec nœuds tagués `-client`
-- [ ] Un nœud `-lan-sharer` par utilisateur partageant `192.168.1.0/24`
-- [ ] VPN **coupé** sur l'appareil de test pendant les migrations
+- [x] Serveur Headscale **≥ 0.29.0** sur compte test
+- [x] Au moins 2 utilisateurs (ex. Jean, Clarisse) avec nœuds tagués `-client`
+- [x] Un nœud `-lan-sharer` par utilisateur partageant `192.168.1.0/24`
+- [ ] VPN **coupé** sur l'appareil de test pendant les migrations *(non confirmé)*
 
 ### 8.2 Moteurs ACL (Paramètres)
-- [ ] **Legacy** : génération policy → tags fusionnés dans JSON
-- [ ] **Standard** : tags séparés `-client`, `-exit-node`, `-lan-sharer`
-- [ ] **Grants V29** : clé `grants[]` présente, pas de collision LAN
-- [ ] Grants V29 **grisé** si serveur < 0.29
-- [ ] Auto-upgrade vers Grants V29 au premier chargement (serveur 0.29+, pas de choix explicite)
+- [x] **Legacy** : génération policy → tags fusionnés dans JSON *(phase 1 OK)*
+- [x] **Standard** : tags séparés `-client`, `-exit-node`, `-lan-sharer` *(phase 1 OK)*
+- [x] **Grants V29** : clé `grants[]` présente, pas de collision LAN *(auto-migration + tests unitaires)*
+- [ ] Grants V29 **grisé** si serveur < 0.29 *(non testé — prod en 0.29)*
+- [x] Auto-upgrade vers Grants V29 au premier chargement (serveur 0.29+, pas de choix explicite)
 
 ### 8.3 Écran ACL
-- [ ] Bandeau affiche le bon moteur
-- [ ] Warning si utilisateur sans nœud tagué (ex. helene974)
-- [ ] Onglet **Grants** : grants LAN avec `via: tag:X-lan-sharer`
-- [ ] Onglet **ACLs** : règles temporaires / exceptions
-- [ ] Onglet **JSON** : édition manuelle + sync onglets
-- [ ] **Exporter** → dialog diff → application serveur OK
-- [ ] **Générer politique** → JSON valide Headscale
+- [x] Bandeau affiche le bon moteur
+- [x] Warning si utilisateur sans nœud tagué (ex. helene974)
+- [x] Onglet **Grants** : grants LAN avec `via: tag:X-lan-sharer`
+- [ ] Onglet **ACLs** : règles temporaires / exceptions *(non vérifié manuellement)*
+- [ ] Onglet **JSON** : édition manuelle + sync onglets *(non vérifié manuellement)*
+- [ ] **Exporter** → dialog diff → application serveur OK *(non vérifié manuellement)*
+- [x] **Générer politique** → JSON valide Headscale *(policy auto-migrée au 1er lancement)*
 
 ### 8.4 Jean + Clarisse — collision CIDR (test critique)
-- [ ] Jean : grant `{ dst: ["192.168.1.0/24"], via: ["tag:jean-lan-sharer"] }`
-- [ ] Clarisse : grant `{ dst: ["192.168.1.0/24"], via: ["tag:clarisse-lan-sharer"] }`
-- [ ] Connectivité : Jean accède à **son** LAN via son routeur, pas celui de Clarisse
-- [ ] Idem pour Clarisse
+- [x] Jean : grant `{ dst: ["192.168.1.0/24"], via: ["tag:jean-lan-sharer"] }` *(policy générée)*
+- [x] Clarisse : grant `{ dst: ["192.168.1.0/24"], via: ["tag:clarisse-lan-sharer"] }` *(policy générée)*
+- [ ] Connectivité : Jean accède à **son** LAN via son routeur, pas celui de Clarisse *(test réseau réel requis)*
+- [ ] Idem pour Clarisse *(test réseau réel requis)*
 
 ### 8.5 Exit node via grants
-- [ ] Utilisateur avec `-exit-node` tagué
+- [ ] Utilisateur avec `-exit-node` tagué *(non confirmé)*
 - [ ] Grant internet : `via: [tag:X-exit-node]`
 - [ ] Trafic internet sort via le bon nœud
 
@@ -171,12 +171,12 @@ flutter test test/services/acl/   # 9 tests passent
 - [ ] Réordonnancement règles (drag) OK
 
 ### 8.7 Graphe ACL (AclManagerScreen)
-- [ ] Accès LAN visible depuis nœuds autorisés
-- [ ] Exit node affiché avec routage correct
-- [ ] Taildrive grants visibles
+- [x] Accès LAN visible depuis nœuds autorisés *(fix crash + positionnement build 141)*
+- [x] Exit node affiché avec routage correct *(fix positionnement build 141)*
+- [ ] Taildrive grants visibles *(si Taildrive configuré — non confirmé)*
 
 ### 8.8 Migration Grants V29
-- [ ] Wizard au premier lancement (serveur 0.29, moteur Standard)
+- [x] Wizard au premier lancement (serveur 0.29, moteur Standard) *(migration auto constatée)*
 - [ ] « Plus tard » → ne réapparaît plus (dismissed)
 - [ ] Migration manuelle Paramètres → policy régénérée et poussée
 - [ ] **Rollback Grants → Standard** → moteur Standard, regénérer policy
@@ -190,10 +190,10 @@ flutter test test/services/acl/   # 9 tests passent
 - [ ] Parser et UI Taildrive OK
 
 ### 8.11 Non-régression
-- [ ] Dashboard : approbation routes / exit node avec bon moteur
+- [x] Dashboard : approbation routes / exit node avec bon moteur *(phase 1 OK)*
 - [ ] Dialogs (tags, subnet, exit node) → policy cohérente
-- [ ] Serveur < 0.29 : aucune régression Legacy/Standard
-- [ ] What's New 2.0.0 affiché au premier lancement
+- [ ] Serveur < 0.29 : aucune régression Legacy/Standard *(non testé)*
+- [x] What's New 2.0.0 affiché au premier lancement
 
 ### 8.12 Règles IP manuelles existantes
 - [ ] Conserver les 2 règles `100.64.0.10/12 → 100.64.0.15` après migration
@@ -203,18 +203,36 @@ flutter test test/services/acl/   # 9 tests passent
 
 ## 9. Points d'attention / limites connues
 
-| Item | Détail |
-|---|---|
-| Puzzle + orchestrateur | Si puzzle vide en mode grants, la policy orchestrateur est utilisée telle quelle |
-| Édition JSON manuelle | Peut désynchroniser les onglets Grants/ACLs jusqu'à regénération |
-| `project_summary.md` | Non réécrit (prévu plan P4, contenu volumineux) |
-| `api_cli_functions_guide.md` | Non mis à jour intégralement |
-| i18n erreurs API | Report v2.1 |
-| go_router / split AppProvider | Report v2.1 |
+| Item | Détail | Statut |
+|---|---|---|
+| Puzzle + orchestrateur | Si puzzle vide en mode grants, la policy orchestrateur est utilisée telle quelle | Connu |
+| Édition JSON manuelle | Peut désynchroniser les onglets Grants/ACLs jusqu'à regénération | Connu |
+| `project_summary.md` | Non réécrit (prévu plan P4) | **Reporté v2.1** |
+| `api_cli_functions_guide.md` | Non mis à jour intégralement | **Reporté v2.1** |
+| `ExceptionRule` typé (P1-08) | Règles temporaires encore en `Map` | **Reporté v2.1** |
+| Écrans >800 lignes (P2-09) | Extraction partielle seulement | **Reporté v2.1** |
+| i18n erreurs API | — | Report v2.1 |
+| go_router / split AppProvider | — | Report v2.1 |
+| cmdline-tools Android | Build AAB OK mais exit code 1 si cmdline-tools absent | **À corriger post-release** |
+| Kotlin Built-in migration | Warning `share_plus`, `workmanager_android` | **Surveiller avant prochain flutter upgrade** |
 
 ---
 
-## 10. Procédure de déploiement recommandée
+## 10. Bilan audit implémentation (11/07/2026)
+
+| Phase | Code | Doc | Tests auto | Tests manuels |
+|---|---|---|---|---|
+| **0** Orchestrateur | ✅ 100 % | ✅ | ✅ 4 tests | ✅ phase 1 OK |
+| **1** Grants V29 | ✅ ~95 % (P1-08 ExceptionRule absent) | ✅ | ✅ 4 tests | ✅ auto-migration |
+| **2** UI ACL | ✅ ~90 % (P2-09 écrans volumineux) | ✅ README/help | — | ⚠️ partiel |
+| **3** Puzzle 3 col. | ✅ 100 % | ✅ | ✅ 1 test | ⬜ non testé |
+| **4** Migration/release | ✅ wizard + rollback | ⚠️ 2 docs reportées | ✅ 9/9 | ⚠️ §8 partiel |
+
+**Verdict** : release **2.0.0+141** prête pour test fermé Play Store. Validation réseau LAN (§8.4) reste le test critique avant prod.
+
+---
+
+## 11. Procédure de déploiement recommandée
 
 1. Publier `2.0.0+141` sur compte test
 2. Vérifier version serveur Headscale affichée (Paramètres)
@@ -224,15 +242,15 @@ flutter test test/services/acl/   # 9 tests passent
 
 ---
 
-## 11. Commandes utiles
+## 12. Commandes utiles
 
 ```bash
 flutter pub get
 flutter analyze
 flutter test test/services/acl/
-flutter build apk --release   # ou appbundle selon votre CI
+flutter build appbundle --release --no-tree-shake-icons
 ```
 
 ---
 
-*Rapport généré automatiquement — Headscale Manager v2.0.0 Grants/via*
+*Rapport mis à jour — Headscale Manager v2.0.0+141 Grants/via*

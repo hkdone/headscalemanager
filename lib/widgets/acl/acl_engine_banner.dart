@@ -11,6 +11,7 @@ class AclEngineBanner extends StatelessWidget {
   final List<User> users;
   final List<Node> nodes;
   final bool isFr;
+  final bool compact;
 
   const AclEngineBanner({
     super.key,
@@ -19,6 +20,7 @@ class AclEngineBanner extends StatelessWidget {
     required this.users,
     required this.nodes,
     required this.isFr,
+    this.compact = false,
   });
 
   List<String> _usersWithoutTaggedNodes() {
@@ -66,6 +68,42 @@ class AclEngineBanner extends StatelessWidget {
     final untagged = _usersWithoutTaggedNodes();
     final grantsFallback = engineMode == AclEngineMode.grantsV29 &&
         !VersionInfo.checkVersionAtLeast(serverVersion, '0.29.0');
+
+    if (compact) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            Icon(Icons.settings_suggest,
+                size: 18, color: _engineColor(context)),
+            const SizedBox(width: 6),
+            Text(
+              isFr ? 'Moteur :' : 'Engine:',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(width: 6),
+            Chip(
+              label: Text(
+                _engineLabel(),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              backgroundColor: _engineColor(context).withValues(alpha: 0.15),
+            ),
+            if (grantsFallback) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isFr ? 'Fallback Standard (< 0.29)' : 'Standard fallback (< 0.29)',
+                  style: TextStyle(color: Colors.orange[800], fontSize: 11),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),

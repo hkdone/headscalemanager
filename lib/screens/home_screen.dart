@@ -40,7 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _checkForWhatsNew() async {
     final provider = context.read<AppProvider>();
     // Update this version when releasing a new update with relevant "What's New" content
-    const currentVersion = '2.0.0';
+    const currentVersion = '2.1.4';
     const lastVersionKey = 'LAST_SEEN_VERSION';
 
     try {

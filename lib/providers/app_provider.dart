@@ -9,7 +9,9 @@ import 'package:headscalemanager/services/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/models/node.dart';
+import 'package:headscalemanager/models/acl_puzzle_model.dart';
 import 'package:headscalemanager/models/version_info.dart';
+import 'package:headscalemanager/services/puzzle_metadata_migrator.dart';
 
 class AppProvider extends ChangeNotifier {
 
@@ -124,6 +126,36 @@ class AppProvider extends ChangeNotifier {
     _puzzleEntityAliases = await _storageService.getPuzzleEntityAliases(_activeServer!.id);
     _puzzleBlocksMeta = await _storageService.getPuzzleBlocksMeta(_activeServer!.id);
     _puzzleVisualOrder = await _storageService.getPuzzleVisualOrder(_activeServer!.id);
+    notifyListeners();
+  }
+
+  /// Remappe alias/icônes Puzzle après migration Grants V29 ou changement de signatures.
+  Future<void> reconcilePuzzleMetadataForRules(List<PuzzleRule> rules) async {
+    if (_activeServer == null) return;
+
+    final remappedAliases =
+        PuzzleMetadataMigrator.remappedEntityAliases(_puzzleEntityAliases);
+    final remappedBlocks = PuzzleMetadataMigrator.remappedBlockMeta(
+      stored: _puzzleBlocksMeta,
+      currentRules: rules,
+    );
+
+    final aliasesChanged =
+        remappedAliases.length != _puzzleEntityAliases.length ||
+            remappedAliases.entries.any(
+                (e) => _puzzleEntityAliases[e.key] != e.value);
+    final blocksChanged = remappedBlocks.length != _puzzleBlocksMeta.length ||
+        remappedBlocks.entries.any((e) =>
+            _puzzleBlocksMeta[e.key]?.toString() != e.value.toString());
+
+    if (!aliasesChanged && !blocksChanged) return;
+
+    _puzzleEntityAliases = remappedAliases;
+    _puzzleBlocksMeta = remappedBlocks;
+    await _storageService.savePuzzleEntityAliases(
+        _activeServer!.id, _puzzleEntityAliases);
+    await _storageService.savePuzzleBlocksMeta(
+        _activeServer!.id, _puzzleBlocksMeta);
     notifyListeners();
   }
 
@@ -491,6 +523,9 @@ class AppProvider extends ChangeNotifier {
         AclEngineMode.grantsV29,
         explicit: false,
       );
+      await _storageService.setGrantsMigrationCompleted(_activeServer!.id, true);
+      await _storageService.setGrantsMigrationDate(
+          _activeServer!.id, DateTime.now());
       notifyListeners();
     }
   }
