@@ -26,24 +26,39 @@ class StandardAclGeneratorService {
     final groups = <String, List<String>>{};
     final tagOwners = <String, List<String>>{};
 
+    final fallbackDomain =
+        nodes.isNotEmpty ? nodes.first.baseDomain : 'headscale.local';
+
     for (var user in users) {
       final groupName = 'group:${normalizeUserName(user.name)}';
-      final members = <String>{user.name};
+      groups[groupName] = resolveAclGroupMembers(
+        user.name,
+        email: user.email,
+        fallbackDomain: fallbackDomain,
+      );
+
+      final normalizedNames = <String>{normalizeUserName(user.name)};
       if (user.email != null && user.email!.isNotEmpty) {
-        members.add(user.email!);
+        normalizedNames.add(normalizeUserName(user.email!));
       }
-      groups[groupName] = members.toList();
+      if (user.displayName != null && user.displayName!.isNotEmpty) {
+        normalizedNames.add(normalizeUserName(user.displayName!));
+      }
 
-      // Define standard tags for this user
-      final normalizedUser = normalizeUserName(user.name);
-      final baseTag = 'tag:$normalizedUser-client';
-      final exitNodeTag = 'tag:$normalizedUser-exit-node';
-      final lanSharerTag = 'tag:$normalizedUser-lan-sharer';
+      final owners = <String>{groupName};
+      if (user.email != null && user.email!.contains('@')) {
+        owners.add(user.email!);
+      } else if (user.name.contains('@')) {
+        owners.add(user.name);
+      }
 
-      // Assign ownership of these tags to the user's group
-      _addTagOwner(tagOwners, baseTag, groupName);
-      _addTagOwner(tagOwners, exitNodeTag, groupName);
-      _addTagOwner(tagOwners, lanSharerTag, groupName);
+      for (final norm in normalizedNames) {
+        for (final owner in owners) {
+          _addTagOwner(tagOwners, 'tag:$norm-client', owner);
+          _addTagOwner(tagOwners, 'tag:$norm-exit-node', owner);
+          _addTagOwner(tagOwners, 'tag:$norm-lan-sharer', owner);
+        }
+      }
     }
 
     // --- Step 2: AutoApprovers (Routes) ---
@@ -272,6 +287,11 @@ class StandardAclGeneratorService {
 
   void _addTagOwner(
       Map<String, List<String>> tagOwners, String tag, String owner) {
+    if (!owner.startsWith('group:') &&
+        !owner.startsWith('autogroup:') &&
+        !owner.contains('@')) {
+      return;
+    }
     if (!tagOwners.containsKey(tag)) {
       tagOwners[tag] = [];
     }

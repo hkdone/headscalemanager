@@ -18,18 +18,39 @@ class PolicyInfrastructureBuilder {
       'routes': <String, List<String>>{},
     };
 
+    final fallbackDomain =
+        nodes.isNotEmpty ? nodes.first.baseDomain : 'headscale.local';
+
     for (var user in users) {
       final groupName = 'group:${normalizeUserName(user.name)}';
-      final members = <String>{user.name};
-      if (user.email != null && user.email!.isNotEmpty) {
-        members.add(user.email!);
-      }
-      groups[groupName] = members.toList();
+      groups[groupName] = resolveAclGroupMembers(
+        user.name,
+        email: user.email,
+        fallbackDomain: fallbackDomain,
+      );
 
-      final normalizedUser = normalizeUserName(user.name);
-      _addTagOwner(tagOwners, 'tag:$normalizedUser-client', groupName);
-      _addTagOwner(tagOwners, 'tag:$normalizedUser-exit-node', groupName);
-      _addTagOwner(tagOwners, 'tag:$normalizedUser-lan-sharer', groupName);
+      final normalizedNames = <String>{normalizeUserName(user.name)};
+      if (user.email != null && user.email!.isNotEmpty) {
+        normalizedNames.add(normalizeUserName(user.email!));
+      }
+      if (user.displayName != null && user.displayName!.isNotEmpty) {
+        normalizedNames.add(normalizeUserName(user.displayName!));
+      }
+
+      final owners = <String>{groupName};
+      if (user.email != null && user.email!.contains('@')) {
+        owners.add(user.email!);
+      } else if (user.name.contains('@')) {
+        owners.add(user.name);
+      }
+
+      for (final norm in normalizedNames) {
+        for (final owner in owners) {
+          _addTagOwner(tagOwners, 'tag:$norm-client', owner);
+          _addTagOwner(tagOwners, 'tag:$norm-exit-node', owner);
+          _addTagOwner(tagOwners, 'tag:$norm-lan-sharer', owner);
+        }
+      }
     }
 
     for (var node in nodes) {
@@ -99,6 +120,11 @@ class PolicyInfrastructureBuilder {
 
   static void _addTagOwner(
       Map<String, List<String>> tagOwners, String tag, String owner) {
+    if (!owner.startsWith('group:') &&
+        !owner.startsWith('autogroup:') &&
+        !owner.contains('@')) {
+      return;
+    }
     tagOwners.putIfAbsent(tag, () => []);
     if (!tagOwners[tag]!.contains(owner)) {
       tagOwners[tag]!.add(owner);

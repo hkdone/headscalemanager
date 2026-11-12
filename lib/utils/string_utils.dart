@@ -51,6 +51,39 @@ String normalizeUserName(String userName) {
   return sanitized.isEmpty ? 'user' : sanitized;
 }
 
+/// Résout les membres valides pour les groupes Tailscale/Headscale ACL.
+/// Règle Headscale/Tailscale stricte : chaque membre d'un groupe doit impérativement
+/// contenir un '@' (username must contain @), sauf s'il s'agit d'un autre groupe (group:).
+List<String> resolveAclGroupMembers(
+  String userName, {
+  String? email,
+  String? fallbackDomain,
+}) {
+  final domain = (fallbackDomain != null && fallbackDomain.isNotEmpty)
+      ? fallbackDomain
+      : 'headscale.local';
+  final members = <String>{};
+
+  // 1. Priorité à l'email si présent et valide (format OIDC / Tailscale standard)
+  if (email != null && email.contains('@')) {
+    members.add(email);
+  }
+
+  // 2. Si le nom d'utilisateur contient un '@' (ex: user@domaine.com)
+  if (userName.contains('@')) {
+    members.add(userName);
+  }
+
+  // 3. Si aucun identifiant ne contient de '@' (ex: utilisateur local simple sans domaine),
+  // Headscale / Tailscale v2.Groups rejette tout nom sans '@'.
+  // On lui accole donc le domaine du serveur pour satisfaire la règle Tailscale.
+  if (members.isEmpty) {
+    members.add('$userName@$domain');
+  }
+
+  return members.toList();
+}
+
 /// Validation RFC 1123 pour les sous-domaines DNS.
 ///
 /// Règles :

@@ -15,6 +15,7 @@ import 'package:headscalemanager/utils/grants_v29_gate.dart';
 import 'package:headscalemanager/widgets/acl/grant_composer_sheet.dart';
 import 'package:headscalemanager/services/acl/grant_composer_service.dart';
 import 'package:headscalemanager/widgets/rename_node_dialog.dart';
+import 'package:headscalemanager/widgets/edit_tags_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NodeDetailScreen extends StatefulWidget {
@@ -201,6 +202,11 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         elevation: 0,
         iconTheme: theme.appBarTheme.iconTheme,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.style_outlined),
+            tooltip: isFr ? 'Modifier les tags' : 'Edit tags',
+            onPressed: () => _showEditTagsDialog(context),
+          ),
           if (showComposer)
             IconButton(
               icon: const Icon(Icons.auto_fix_high),
@@ -592,6 +598,28 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     );
   }
 
+  void _showEditTagsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => EditTagsDialog(
+        node: _currentNode,
+        fallbackUser: _currentNode.user,
+        onTagsUpdated: () async {
+          final updated = await context
+              .read<AppProvider>()
+              .apiService
+              .getNodeDetails(_currentNode.id);
+          if (mounted) {
+            setState(() {
+              _currentNode = updated;
+              _selectedRoutes = Set<String>.from(_currentNode.sharedRoutes);
+            });
+          }
+        },
+      ),
+    );
+  }
+
   Widget _buildTagsAndRoutesCard(BuildContext context) {
     final theme = Theme.of(context);
     final locale = context.watch<AppProvider>().locale;
@@ -600,20 +628,26 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Tags',
-              style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onPrimary)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Tags',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onPrimary)),
+              IconButton(
+                icon: Icon(Icons.edit, color: theme.colorScheme.onPrimary),
+                tooltip: isFr ? 'Modifier les tags' : 'Edit tags',
+                onPressed: () => _showEditTagsDialog(context),
+              ),
+            ],
+          ),
           Divider(
               height: 20,
               color: theme.colorScheme.onPrimary.withValues(alpha: 0.5)),
-          Text('Tags:',
-              style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onPrimary)),
-          const SizedBox(height: 8),
           Wrap(
             spacing: 8.0,
+            runSpacing: 4.0,
             children: _currentNode.tags.isEmpty
                 ? [
                     Text(isFr ? 'Aucun tag' : 'No tags',
@@ -628,6 +662,23 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                           backgroundColor: theme.colorScheme.onPrimary,
                         ))
                     .toList(),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _showEditTagsDialog(context),
+              icon: Icon(Icons.edit, color: theme.colorScheme.onPrimary),
+              label: Text(
+                isFr ? 'Modifier les tags' : 'Edit tags',
+                style: TextStyle(color: theme.colorScheme.onPrimary),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(
+                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
           ),
         ],
       ),

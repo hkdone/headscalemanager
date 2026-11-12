@@ -27,20 +27,43 @@ class NewAclGeneratorService {
     final groups = <String, List<String>>{};
     final tagOwners = <String, List<String>>{};
 
+    final fallbackDomain =
+        nodes.isNotEmpty ? nodes.first.baseDomain : 'headscale.local';
+
     for (var user in users) {
       final groupName = 'group:${normalizeUserName(user.name)}';
-      final members = <String>{user.name};
-      if (user.email != null && user.email!.isNotEmpty) {
-        members.add(user.email!);
-      }
-      groups[groupName] = members.toList();
+      groups[groupName] = resolveAclGroupMembers(
+        user.name,
+        email: user.email,
+        fallbackDomain: fallbackDomain,
+      );
 
-      final baseTag = 'tag:${normalizeUserName(user.name)}-client';
-      if (!tagOwners.containsKey(baseTag)) {
-        tagOwners[baseTag] = [];
+      final normalizedNames = <String>{normalizeUserName(user.name)};
+      if (user.email != null && user.email!.isNotEmpty) {
+        normalizedNames.add(normalizeUserName(user.email!));
       }
-      if (!tagOwners[baseTag]!.contains(groupName)) {
-        tagOwners[baseTag]!.add(groupName);
+      if (user.displayName != null && user.displayName!.isNotEmpty) {
+        normalizedNames.add(normalizeUserName(user.displayName!));
+      }
+
+      final owners = <String>{groupName};
+      if (user.email != null && user.email!.contains('@')) {
+        owners.add(user.email!);
+      } else if (user.name.contains('@')) {
+        owners.add(user.name);
+      }
+
+      for (final norm in normalizedNames) {
+        final baseTag = 'tag:$norm-client';
+        tagOwners.putIfAbsent(baseTag, () => []);
+        for (final owner in owners) {
+          if ((owner.startsWith('group:') ||
+                  owner.startsWith('autogroup:') ||
+                  owner.contains('@')) &&
+              !tagOwners[baseTag]!.contains(owner)) {
+            tagOwners[baseTag]!.add(owner);
+          }
+        }
       }
     }
 

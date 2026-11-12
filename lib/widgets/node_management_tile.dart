@@ -11,6 +11,7 @@ import 'package:headscalemanager/widgets/rename_node_dialog.dart';
 import 'package:headscalemanager/widgets/move_node_dialog.dart';
 import 'package:headscalemanager/widgets/exit_node_command_dialog.dart';
 import 'package:headscalemanager/widgets/share_subnet_dialog.dart';
+import 'package:headscalemanager/widgets/edit_tags_dialog.dart';
 
 /// Un widget réutilisable pour afficher un nœud et fournir des actions de gestion.
 ///
@@ -91,6 +92,16 @@ class NodeManagementTile extends StatelessWidget {
           icon: const Icon(Icons.more_vert),
           onSelected: (String value) async {
             switch (value) {
+              case 'edit_tags':
+                showDialog(
+                  context: context,
+                  builder: (ctx) => EditTagsDialog(
+                    node: node,
+                    fallbackUser: node.user,
+                    onTagsUpdated: onNodeUpdate,
+                  ),
+                );
+                break;
               case 'rename':
                 // Affiche le dialogue pour renommer le nœud.
                 showDialog(
@@ -179,6 +190,13 @@ class NodeManagementTile extends StatelessWidget {
             }
           },
           itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+            PopupMenuItem<String>(
+              value: 'edit_tags',
+              child: ListTile(
+                leading: const Icon(Icons.style_outlined),
+                title: Text(isFr ? 'Modifier les tags' : 'Edit Tags'),
+              ),
+            ),
             PopupMenuItem<String>(
               value: 'rename',
               child: ListTile(

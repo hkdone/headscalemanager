@@ -14,6 +14,30 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '2.1.9',
+        title: isFr
+            ? 'Release 2.1.9 — Outil de normalisation et suppression des tags'
+            : 'Release 2.1.9 — Tag normalization and deletion tool',
+        description: isFr
+            ? 'Permet désormais de supprimer individuellement les tags d\'un nœud et d\'auto-normaliser en 1 clic les tags contenant des points (.) pour réintégrer immédiatement les appareils isolés dans le réseau.'
+            : 'Now allows individually deleting node tags and auto-normalizing tags with dots (.) in 1 click to immediately reintegrate isolated devices into the network.',
+        verification: isFr
+            ? 'Détails de l\'utilisateur > Modifier les tags > Normaliser le tag'
+            : 'User Details > Edit Tags > Normalize tag',
+      ),
+      WhatsNewVersion(
+        version: '2.1.8',
+        title: isFr
+            ? 'Release 2.1.8 — Correction stricte du format des tagOwners'
+            : 'Release 2.1.8 — Strict tagOwners format compliance',
+        description: isFr
+            ? 'Correction de l\'erreur Go v2.OwnerEnc lors de la sauvegarde ACL : seuls les groupes (group:*) ou emails valides avec @ sont autorisés dans tagOwners. Nettoyage automatique des anciens propriétaires non conformes.'
+            : 'Fixed Go v2.OwnerEnc error when saving ACLs: only groups (group:*) or valid emails with @ are allowed in tagOwners. Automatic cleanup of legacy non-compliant owners.',
+        verification: isFr
+            ? 'Détails de l\'utilisateur > Modifier les tags > Sauvegarder'
+            : 'User Details > Edit Tags > Save',
+      ),
+      WhatsNewVersion(
         version: '2.1.7',
         title: isFr
             ? 'Release 2.1.7 — Normalisation des tags OIDC'

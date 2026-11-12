@@ -197,6 +197,52 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
               serverVersion: appProvider.serverVersion,
             );
 
+            // S'assurer que tous les tags assignés à ce nœud sont déclarés dans tagOwners
+            if (newPolicyMap.containsKey('tagOwners') &&
+                newPolicyMap['tagOwners'] is Map) {
+              final tagOwnersMap =
+                  newPolicyMap['tagOwners'] as Map;
+
+              // Nettoyer tous les tags existants de tout owner invalide (ex: usernames sans @)
+              tagOwnersMap.forEach((tag, owners) {
+                if (owners is Iterable) {
+                  tagOwnersMap[tag] = owners
+                      .map((e) => e.toString())
+                      .where((e) =>
+                          e.startsWith('group:') ||
+                          e.startsWith('autogroup:') ||
+                          e.contains('@'))
+                      .toList();
+                }
+              });
+
+              final fallbackOwner =
+                  widget.fallbackUser ?? widget.node.getNormalizedOwner();
+              final ownerGroup = 'group:${normalizeUserName(fallbackOwner)}';
+              for (final t in _currentTags) {
+                if (t.startsWith('tag:')) {
+                  final list = (tagOwnersMap[t] is Iterable)
+                      ? (tagOwnersMap[t] as Iterable)
+                          .map((e) => e.toString())
+                          .toList()
+                      : <String>[];
+                  final candidates = <String>{
+                    ownerGroup,
+                    if (widget.node.user.contains('@')) widget.node.user,
+                    if (widget.fallbackUser != null &&
+                        widget.fallbackUser!.contains('@'))
+                      widget.fallbackUser!,
+                  };
+                  for (final c in candidates) {
+                    if (c.isNotEmpty && !list.contains(c)) {
+                      list.add(c);
+                    }
+                  }
+                  tagOwnersMap[t] = list;
+                }
+              }
+            }
+
             await apiService.setAclPolicy(jsonEncode(newPolicyMap));
             // Retenter l'assignation des tags maintenant que tagOwners est à jour
             await apiService.setTags(widget.node.id, _currentTags);
@@ -269,6 +315,52 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
             serverVersion: appProvider.serverVersion,
           );
 
+          // S'assurer que tous les tags assignés à ce nœud sont déclarés dans tagOwners
+          if (newPolicyMap.containsKey('tagOwners') &&
+              newPolicyMap['tagOwners'] is Map) {
+            final tagOwnersMap =
+                newPolicyMap['tagOwners'] as Map;
+
+            // Nettoyer tous les tags existants de tout owner invalide (ex: usernames sans @)
+            tagOwnersMap.forEach((tag, owners) {
+              if (owners is Iterable) {
+                tagOwnersMap[tag] = owners
+                    .map((e) => e.toString())
+                    .where((e) =>
+                        e.startsWith('group:') ||
+                        e.startsWith('autogroup:') ||
+                        e.contains('@'))
+                    .toList();
+              }
+            });
+
+            final fallbackOwner =
+                widget.fallbackUser ?? widget.node.getNormalizedOwner();
+            final ownerGroup = 'group:${normalizeUserName(fallbackOwner)}';
+            for (final t in _currentTags) {
+              if (t.startsWith('tag:')) {
+                final list = (tagOwnersMap[t] is Iterable)
+                    ? (tagOwnersMap[t] as Iterable)
+                        .map((e) => e.toString())
+                        .toList()
+                    : <String>[];
+                final candidates = <String>{
+                  ownerGroup,
+                  if (widget.node.user.contains('@')) widget.node.user,
+                  if (widget.fallbackUser != null &&
+                      widget.fallbackUser!.contains('@'))
+                    widget.fallbackUser!,
+                };
+                for (final c in candidates) {
+                  if (c.isNotEmpty && !list.contains(c)) {
+                    list.add(c);
+                  }
+                }
+                tagOwnersMap[t] = list;
+              }
+            }
+          }
+
           final newPolicyJson = jsonEncode(newPolicyMap);
           await apiService.setAclPolicy(newPolicyJson);
 
@@ -333,9 +425,91 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
             Wrap(
               spacing: 8.0,
               runSpacing: 4.0,
-              children:
-                  _currentTags.map((tag) => Chip(label: Text(tag))).toList(),
+              children: _currentTags.map((tag) {
+                final hasDot = tag.contains('.');
+                return Chip(
+                  label: Text(tag),
+                  avatar: hasDot
+                      ? const Icon(Icons.warning, size: 16, color: Colors.orange)
+                      : null,
+                  backgroundColor: hasDot
+                      ? Colors.orange.withValues(alpha: 0.15)
+                      : null,
+                  deleteIcon: const Icon(Icons.close, size: 16),
+                  onDeleted: () {
+                    setState(() {
+                      _currentTags.remove(tag);
+                    });
+                  },
+                );
+              }).toList(),
             ),
+            if (_currentTags.any((t) => t.contains('.'))) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.12),
+                  border: Border.all(color: Colors.amber.shade700),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.auto_fix_high,
+                            size: 20, color: Colors.amber.shade800),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            isFr
+                                ? 'Tag avec point (.) détecté !'
+                                : 'Tag with dot (.) detected!',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber.shade900,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      isFr
+                          ? 'Ce tag isole l\'appareil car les règles attendent des tirets (-).'
+                          : 'This tag isolates the device because rules expect hyphens (-).',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _currentTags = _currentTags.map((t) {
+                              if (t.startsWith('tag:')) {
+                                return 'tag:${t.substring(4).replaceAll('.', '-')}';
+                              }
+                              return t.replaceAll('.', '-');
+                            }).toSet().toList();
+                          });
+                        },
+                        icon: const Icon(Icons.check_circle_outline, size: 18),
+                        label: Text(isFr
+                            ? 'Normaliser le tag (remplacer . par -)'
+                            : 'Normalize tag (replace . with -)'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber.shade800,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             Text(isFr ? 'Suggestions' : 'Suggestions',
                 style: Theme.of(context).textTheme.titleSmall),

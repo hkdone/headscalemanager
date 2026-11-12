@@ -162,7 +162,42 @@ class HeadscaleApiService {
   }
 
   Future<void> setAclPolicy(String aclPolicy) async {
-    final body = jsonEncode({'policy': aclPolicy});
+    String payload = aclPolicy;
+    try {
+      final decoded = jsonDecode(aclPolicy);
+      if (decoded is Map<String, dynamic>) {
+        bool modified = false;
+
+        // Assurer que tagOwners ne contient aucun format invalide (rejeté par Go v2.OwnerEnc)
+        if (decoded.containsKey('tagOwners') && decoded['tagOwners'] is Map) {
+          final tagOwners = decoded['tagOwners'] as Map;
+          tagOwners.forEach((tag, owners) {
+            if (owners is Iterable) {
+              final originalList = owners.toList();
+              final cleaned = originalList
+                  .where((e) =>
+                      e is String &&
+                      (e.startsWith('group:') ||
+                          e.startsWith('autogroup:') ||
+                          e.contains('@')))
+                  .toList();
+              if (cleaned.length != originalList.length) {
+                tagOwners[tag] = cleaned;
+                modified = true;
+              }
+            }
+          });
+        }
+
+        if (modified) {
+          payload = jsonEncode(decoded);
+        }
+      }
+    } catch (_) {
+      // Conserver le payload d'origine si ce n'est pas du JSON standard (ex: HuJSON)
+    }
+
+    final body = jsonEncode({'policy': payload});
 
     final response = await http.put(
       Uri.parse('$_baseUrl/api/v1/policy'),
