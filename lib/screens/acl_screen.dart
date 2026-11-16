@@ -27,7 +27,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:headscalemanager/services/acl/policy_file_service.dart';
 import 'package:headscalemanager/widgets/acl/acl_workflow_guide.dart';
 import 'package:headscalemanager/screens/acl_puzzle_screen.dart';
+import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/services/security_service.dart';
+import 'package:headscalemanager/utils/json_utils.dart';
+import 'package:headscalemanager/utils/tag_capability_helper.dart';
 
 class AclScreen extends StatefulWidget {
   const AclScreen({super.key});
@@ -1175,15 +1178,26 @@ class _AclScreenState extends State<AclScreen> {
       if (_allNodes.isEmpty) _allNodes = nodes;
       
       // Clean up obsolete lan-sharer tags before ACL generation
-      final cleanedNodes = await _cleanupObsoleteLanSharerTags(nodes);
+      final cleanedNodes =
+          await TagCapabilityHelper.cleanupObsoleteLanSharerTags(
+        apiService,
+        nodes,
+      );
 
-      _currentAclPolicy = _aclOrchestrator.generatePolicy(
+      final generatedPolicy = _aclOrchestrator.generatePolicy(
         engineMode: appProvider.aclEngineMode,
         users: users,
         nodes: cleanedNodes,
         temporaryRules: _temporaryRules,
         taildriveShares: appProvider.taildriveShares,
         serverVersion: appProvider.serverVersion,
+      );
+      final serverPolicy = await PolicyPreserver.fetchServerPolicySafely(
+        apiService,
+      );
+      _currentAclPolicy = PolicyPreserver.merge(
+        generatedPolicy,
+        serverPolicy,
       );
       _users = users;
       _lastGeneratedPolicy =
@@ -1304,8 +1318,9 @@ class _AclScreenState extends State<AclScreen> {
     if (showConfirmation) {
       Map<String, dynamic> editedPolicy;
       try {
-        editedPolicy =
-            json.decode(_aclController.text) as Map<String, dynamic>;
+        editedPolicy = json.decode(
+          JsonUtils.cleanJsonComments(_aclController.text),
+        ) as Map<String, dynamic>;
       } catch (_) {
         editedPolicy = _currentAclPolicy;
       }
@@ -1368,7 +1383,9 @@ class _AclScreenState extends State<AclScreen> {
       final appProvider = context.read<AppProvider>();
       final apiService = appProvider.apiService;
       final aclJsonString = await apiService.getAclPolicy();
-      _currentAclPolicy = json.decode(aclJsonString);
+      _currentAclPolicy = json.decode(
+        JsonUtils.cleanJsonComments(aclJsonString),
+      ) as Map<String, dynamic>;
       _updateAclControllerText();
       final locale = appProvider.locale;
       final isFr = locale.languageCode == 'fr';
@@ -1729,66 +1746,5 @@ class _AclScreenState extends State<AclScreen> {
 
   Future<void> _shareAclFile() async {
     await _exportPolicyBackup();
-  }
-
-  List<String> _removeCapabilities(List<String> tags,
-      {bool removeExitNode = false, bool removeLanSharer = false}) {
-    List<String> newTags = List.from(tags);
-    int clientTagIndex = newTags.indexWhere((t) => t.contains('-client'));
-
-    if (clientTagIndex != -1) {
-      final oldClientTag = newTags[clientTagIndex];
-      final parts = oldClientTag
-          .replaceFirst('tag:', '')
-          .split(';')
-          .where((p) => p.isNotEmpty)
-          .toSet();
-
-      if (removeExitNode) parts.remove('exit-node');
-      if (removeLanSharer) parts.remove('lan-sharer');
-
-      final clientPart =
-          parts.firstWhere((p) => p.contains('-client'), orElse: () => '');
-      if (clientPart.isEmpty) return newTags;
-
-      final otherParts = parts.where((p) => p != clientPart).toList()..sort();
-
-      final newClientTagBuilder = StringBuffer('tag:$clientPart');
-      if (otherParts.isNotEmpty) {
-        newClientTagBuilder.write(';${otherParts.join(';')}');
-      }
-      newTags[clientTagIndex] = newClientTagBuilder.toString();
-    } else {
-      if (removeExitNode) newTags.remove('tag:exit-node');
-      if (removeLanSharer) newTags.remove('tag:lan-sharer');
-    }
-    return newTags;
-  }
-
-  /// Clean up obsolete lan-sharer tags from nodes that no longer have shared routes
-  /// This prevents orphaned route warnings and VPN disconnections
-  Future<List<Node>> _cleanupObsoleteLanSharerTags(List<Node> nodes) async {
-    if (!mounted) return nodes;
-    final appProvider = context.read<AppProvider>();
-    final apiService = appProvider.apiService;
-    
-    // Find nodes with lan-sharer tags but no shared routes
-    final nodesToCleanup = nodes.where((node) {
-      final hasLanSharerTag = node.tags.any((tag) => 
-        tag.contains(';lan-sharer') || 
-        tag == 'tag:lan-sharer' ||
-        (tag.startsWith('tag:') && tag.contains('lan-sharer'))
-      );
-      return hasLanSharerTag && node.sharedRoutes.isEmpty;
-    }).toList();
-    
-    // Clean up each affected node
-    for (final node in nodesToCleanup) {
-      final newTags = _removeCapabilities(List.from(node.tags), removeLanSharer: true);
-      await apiService.setTags(node.id, newTags);
-    }
-    
-    // Return refreshed nodes list
-    return await apiService.getNodes();
   }
 }

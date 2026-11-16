@@ -47,7 +47,9 @@ class _ClientCommandsScreenState extends State<ClientCommandsScreen> {
     try {
       final serverUrl = appProvider.activeServer?.url;
       final nodes = await appProvider.apiService.getNodes();
-      final authKeys = await appProvider.apiService.getPreAuthKeys();
+      final authKeys = await appProvider.apiService.getPreAuthKeys(
+        serverVersion: appProvider.serverVersion,
+      );
       final users = await appProvider.apiService.getUsers();
 
       _allCommands = DynamicCommandGenerator.generateAllCommands(

@@ -5,7 +5,7 @@ import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
-import 'dart:convert';
+import 'package:headscalemanager/services/acl/policy_preserver.dart';
 
 /// Dialogue pour renommer un nœud.
 ///
@@ -139,7 +139,10 @@ class _RenameNodeDialogState extends State<RenameNodeDialog> {
                     serverVersion: appProvider.serverVersion,
                   );
 
-                  await apiService.setAclPolicy(jsonEncode(newPolicyMap));
+                  await PolicyPreserver.applyPreservingPolicy(
+                    apiService: apiService,
+                    generatedPolicy: newPolicyMap,
+                  );
                 }
 
                 if (!context.mounted) return;

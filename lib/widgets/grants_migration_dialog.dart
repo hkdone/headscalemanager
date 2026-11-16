@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
+import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:provider/provider.dart';
 
 class GrantsMigrationDialog extends StatefulWidget {
@@ -161,9 +161,11 @@ class _GrantsMigrationDialogState extends State<GrantsMigrationDialog> {
       );
 
       _log(_isFr ? 'Envoi vers le serveur…' : 'Pushing to server…');
-      final jsonPolicy =
-          const JsonEncoder.withIndent('  ').convert(policy);
-      await provider.apiService.setAclPolicy(jsonPolicy);
+      await PolicyPreserver.applyPreservingPolicy(
+        apiService: provider.apiService,
+        generatedPolicy: policy,
+        pretty: true,
+      );
 
       await provider.storageService.setGrantsMigrationCompleted(serverId, true);
       await provider.storageService.setGrantsMigrationDismissed(serverId, false);

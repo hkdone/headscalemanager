@@ -1,10 +1,11 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
+import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
+import 'package:headscalemanager/utils/tag_capability_helper.dart';
 import 'package:provider/provider.dart';
 
 /// Dialogue pour configurer un nœud comme nœud de sortie.
@@ -180,44 +181,17 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog>
               // Show loading or just wait
               try {
                 // 1. Update Tags (add exit-node capability)
-                final useStandardEngine = appProvider.useStandardAclEngine;
-                List<String> currentTags = List.from(widget.node.tags);
-                List<String> newTags = [];
+                final List<String> currentTags = List.from(widget.node.tags);
+                final List<String> newTags = TagCapabilityHelper.addCapabilities(
+                  currentTags,
+                  engineMode: appProvider.aclEngineMode,
+                  normalizedUser: widget.node.getNormalizedOwner(),
+                  addExitNode: true,
+                );
 
-                if (useStandardEngine) {
-                  // Standard Mode
-                  final clientTag = currentTags.firstWhere(
-                      (t) => t.contains('-client'),
-                      orElse: () => '');
-                  if (clientTag.isNotEmpty) {
-                    final normUser = widget.node.getNormalizedOwner();
-                    final capTag = 'tag:$normUser-exit-node';
-                    if (!currentTags.contains(capTag)) {
-                      newTags = [...currentTags, capTag];
-                    } else {
-                      newTags = currentTags;
-                    }
-                  } else {
-                    newTags = currentTags; // Fallback
-                  }
-                } else {
-                  // Legacy Mode
-                  final clientTagIndex =
-                      currentTags.indexWhere((t) => t.contains('-client'));
-                  if (clientTagIndex != -1) {
-                    final oldTag = currentTags[clientTagIndex];
-                    if (!oldTag.contains('exit-node')) {
-                      newTags = List.from(currentTags);
-                      newTags[clientTagIndex] = '$oldTag;exit-node';
-                    } else {
-                      newTags = currentTags;
-                    }
-                  } else {
-                    newTags = currentTags;
-                  }
-                }
-
-                if (newTags != currentTags) {
+                if (newTags.length != currentTags.length ||
+                    !newTags.asMap().entries.every(
+                        (e) => currentTags[e.key] == e.value)) {
                   await appProvider.apiService.setTags(widget.node.id, newTags);
                 }
 
@@ -236,8 +210,9 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog>
 
                 // 3. Update ACLs if in ACL Mode
                 bool aclMode = true;
+                String? rawServerPolicy;
                 try {
-                  await appProvider.apiService.getAclPolicy();
+                  rawServerPolicy = await appProvider.apiService.getAclPolicy();
                 } catch (e) {
                   aclMode = false;
                 }
@@ -267,8 +242,11 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog>
                       serverVersion: appProvider.serverVersion,
                     );
 
-                    final newPolicyJson = jsonEncode(newPolicyMap);
-                    await appProvider.apiService.setAclPolicy(newPolicyJson);
+                    await PolicyPreserver.applyPreservingPolicy(
+                      apiService: appProvider.apiService,
+                      generatedPolicy: newPolicyMap,
+                      rawServerPolicy: rawServerPolicy,
+                    );
                   }
                 }
 

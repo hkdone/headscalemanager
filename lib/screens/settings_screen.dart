@@ -7,6 +7,7 @@ import 'package:headscalemanager/screens/help_screen.dart';
 import 'package:headscalemanager/screens/help_screen_en.dart';
 import 'package:headscalemanager/screens/security_settings_screen.dart';
 import 'package:headscalemanager/services/notification_service.dart';
+import 'package:headscalemanager/services/route_conflict_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:headscalemanager/screens/add_edit_server_screen.dart';
@@ -146,8 +147,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 subtitle: isFr
                                     ? 'Tags fusionnés (ancien format).'
                                     : 'Merged tags (legacy format).',
-                                onChanged: (mode) =>
-                                    appProvider.setAclEngineMode(mode),
+                                onChanged: (mode) => _handleSwitchEngineMode(
+                                    context, appProvider, mode, isFr),
                               ),
                               _AclEngineModeTile(
                                 isFr: isFr,
@@ -157,8 +158,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 subtitle: isFr
                                     ? 'Tags séparés (Identity vs Capability).'
                                     : 'Split tags (Identity vs Capability).',
-                                onChanged: (mode) =>
-                                    appProvider.setAclEngineMode(mode),
+                                onChanged: (mode) => _handleSwitchEngineMode(
+                                    context, appProvider, mode, isFr),
                               ),
                               _AclEngineModeTile(
                                 isFr: isFr,
@@ -174,8 +175,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   appProvider.serverVersion,
                                   '0.29.0',
                                 ),
-                                onChanged: (mode) =>
-                                    appProvider.setAclEngineMode(mode),
+                                onChanged: (mode) => _handleSwitchEngineMode(
+                                    context, appProvider, mode, isFr),
                               ),
                               if (!VersionInfo.checkVersionAtLeast(
                                 appProvider.serverVersion,
@@ -259,28 +260,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     color: Colors.orange),
                                 onTap: appProvider.aclEngineMode ==
                                         AclEngineMode.grantsV29
-                                    ? () => _confirmAction(
+                                    ? () => _handleSwitchEngineMode(
                                           context,
-                                          isFr
-                                              ? 'Revenir au moteur Standard ?'
-                                              : 'Revert to Standard engine?',
-                                          isFr
-                                              ? 'Les grants via ne seront plus générés. Régénérez la politique ACL ensuite.'
-                                              : 'Via grants will no longer be generated. Regenerate ACL policy afterwards.',
-                                          () async {
-                                            await appProvider.setAclEngineMode(
-                                                AclEngineMode.standard);
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                SnackBar(
-                                                  content: Text(isFr
-                                                      ? 'Moteur Standard activé.'
-                                                      : 'Standard engine enabled.'),
-                                                ),
-                                              );
-                                            }
-                                          },
+                                          appProvider,
+                                          AclEngineMode.standard,
+                                          isFr,
+                                          forceConfirm: true,
                                         )
                                     : null,
                               ),
@@ -590,6 +575,101 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _handleSwitchEngineMode(
+    BuildContext context,
+    AppProvider appProvider,
+    AclEngineMode targetMode,
+    bool isFr, {
+    bool forceConfirm = false,
+  }) async {
+    if (appProvider.aclEngineMode == targetMode && !forceConfirm) return;
+
+    if (appProvider.aclEngineMode == AclEngineMode.grantsV29 &&
+        targetMode != AclEngineMode.grantsV29) {
+      Map<String, List<dynamic>> duplicates = {};
+      try {
+        final nodes = await appProvider.apiService.getNodes();
+        duplicates = RouteConflictService.findCrossUserDuplicateCidrs(nodes);
+      } catch (_) {
+        // Serveur inaccessible : poursuivre vers la confirmation standard.
+      }
+
+      if (!context.mounted) return;
+
+      if (duplicates.isNotEmpty) {
+        final details = duplicates.entries.map((entry) {
+          final users = entry.value.map((n) => '${n.name} (${n.user})').join(', ');
+          return '• ${entry.key} → $users';
+        }).join('\n');
+
+        final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text(
+                  isFr
+                      ? 'Conflit de CIDR détecté avant rollback'
+                      : 'CIDR Conflict Detected Before Rollback',
+                ),
+                content: SingleChildScrollView(
+                  child: Text(
+                    isFr
+                        ? 'Attention : plusieurs utilisateurs partagent actuellement des sous-réseaux identiques grâce à l\'isolation "via" de Grants V29 :\n\n$details\n\nRevenir au mode Standard ou Legacy entraînera un routage ambigu ou des conflits de routes. Voulez-vous vraiment continuer ?'
+                        : 'Warning: multiple users currently share identical subnets using Grants V29 "via" isolation:\n\n$details\n\nSwitching back to Standard or Legacy will cause ambiguous routing or route conflicts. Do you really want to continue?',
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: Text(isFr ? 'Annuler' : 'Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: Text(
+                      isFr ? 'Continuer quand même' : 'Continue anyway',
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+        if (!confirmed || !context.mounted) return;
+      } else if (forceConfirm) {
+        _confirmAction(
+          context,
+          isFr ? 'Revenir au moteur Standard ?' : 'Revert to Standard engine?',
+          isFr
+              ? 'Les grants via ne seront plus générés. Régénérez la politique ACL ensuite.'
+              : 'Via grants will no longer be generated. Regenerate ACL policy afterwards.',
+          () async {
+            await appProvider.setAclEngineMode(targetMode);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(isFr
+                      ? 'Moteur Standard activé.'
+                      : 'Standard engine enabled.'),
+                ),
+              );
+            }
+          },
+        );
+        return;
+      }
+    }
+
+    await appProvider.setAclEngineMode(targetMode);
+    if (forceConfirm && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isFr
+              ? 'Moteur Standard activé.'
+              : 'Standard engine enabled.'),
+        ),
+      );
+    }
   }
 
   Widget _buildHelpSection(BuildContext context, String title, String content) {

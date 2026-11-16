@@ -1,11 +1,11 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
-import 'package:headscalemanager/services/tag_migration_service.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
+import 'package:headscalemanager/services/acl/policy_preserver.dart';
+import 'package:headscalemanager/services/tag_migration_service.dart';
 import 'package:provider/provider.dart';
 
 class LegacyMigrationDialog extends StatefulWidget {
@@ -273,10 +273,13 @@ class _LegacyMigrationDialogState extends State<LegacyMigrationDialog> {
           taildriveShares: appProvider.taildriveShares,
           serverVersion: appProvider.serverVersion);
 
-      // 4. Push to Server
+      // 4. Push to Server (non-destructive merge)
       log("Envoi de la configuration au serveur...",
           "Pushing configuration to server...");
-      await appProvider.apiService.setAclPolicy(jsonEncode(policy));
+      await PolicyPreserver.applyPreservingPolicy(
+        apiService: appProvider.apiService,
+        generatedPolicy: policy,
+      );
       log("Configuration ACL appliquée avec succès.",
           "ACL configuration applied successfully.");
 

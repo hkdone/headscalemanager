@@ -1,11 +1,12 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
+import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
+import 'package:headscalemanager/utils/tag_capability_helper.dart';
 import 'package:provider/provider.dart';
 
 class MoveNodeDialog extends StatefulWidget {
@@ -43,31 +44,22 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
       await provider.apiService.moveNode(widget.node.id, _selectedUser!);
       if (!mounted) return;
 
-      // 2. Update tags to reflect the new owner
-      final List<String> oldTags = List.from(widget.node.tags);
-      String capabilities = '';
-      final clientTag =
-          oldTags.firstWhere((t) => t.contains('-client'), orElse: () => '');
-
-      if (clientTag.isNotEmpty) {
-        if (clientTag.contains(';')) {
-          capabilities = clientTag.substring(clientTag.indexOf(';'));
-        }
-      }
-
+      // 2. Update tags to reflect the new owner (y compris -exit-node / -lan-sharer séparés)
       final newUserName = normalizeUserName(_selectedUser!.name);
-      final newClientTag = 'tag:$newUserName-client$capabilities';
-
-      final newTags = oldTags.where((tag) => !tag.contains('-client')).toList();
-      newTags.add(newClientTag);
+      final newTags = TagCapabilityHelper.reassignOwnerTags(
+        widget.node.tags,
+        newNormalizedUser: newUserName,
+        engineMode: provider.aclEngineMode,
+      );
 
       await provider.apiService.setTags(widget.node.id, newTags);
       if (!mounted) return;
 
       // 3. Handle ACLs if necessary
       bool aclMode = true;
+      String? rawServerPolicy;
       try {
-        await provider.apiService.getAclPolicy();
+        rawServerPolicy = await provider.apiService.getAclPolicy();
       } catch (e) {
         aclMode = false;
       }
@@ -120,8 +112,11 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
             taildriveShares: provider.taildriveShares,
             serverVersion: provider.serverVersion,
           );
-          final newPolicyJson = jsonEncode(newPolicyMap);
-          await provider.apiService.setAclPolicy(newPolicyJson);
+          await PolicyPreserver.applyPreservingPolicy(
+            apiService: provider.apiService,
+            generatedPolicy: newPolicyMap,
+            rawServerPolicy: rawServerPolicy,
+          );
 
           if (!mounted) return;
           showSafeSnackBar(
