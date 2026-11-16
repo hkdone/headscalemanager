@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
+import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:provider/provider.dart';
 
 class ManageSpecificRulesDialog extends StatefulWidget {
@@ -125,10 +125,11 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
         serverVersion: appProvider.serverVersion,
       );
 
-      const encoder = JsonEncoder.withIndent('  ');
-      final policyString = encoder.convert(newPolicy);
-
-      await apiService.setAclPolicy(policyString);
+      await PolicyPreserver.applyPreservingPolicy(
+        apiService: apiService,
+        generatedPolicy: newPolicy,
+        pretty: true,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

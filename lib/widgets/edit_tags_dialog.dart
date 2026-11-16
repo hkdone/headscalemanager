@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
+import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:provider/provider.dart';
@@ -243,7 +243,10 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
               }
             }
 
-            await apiService.setAclPolicy(jsonEncode(newPolicyMap));
+            await PolicyPreserver.applyPreservingPolicy(
+              apiService: apiService,
+              generatedPolicy: newPolicyMap,
+            );
             // Retenter l'assignation des tags maintenant que tagOwners est à jour
             await apiService.setTags(widget.node.id, _currentTags);
           } else {
@@ -259,8 +262,9 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
 
       // Check for ACL mode
       bool aclMode = true;
+      String? rawServerPolicy;
       try {
-        await apiService.getAclPolicy();
+        rawServerPolicy = await apiService.getAclPolicy();
       } catch (e) {
         aclMode = false;
       }
@@ -361,8 +365,11 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
             }
           }
 
-          final newPolicyJson = jsonEncode(newPolicyMap);
-          await apiService.setAclPolicy(newPolicyJson);
+          await PolicyPreserver.applyPreservingPolicy(
+            apiService: apiService,
+            generatedPolicy: newPolicyMap,
+            rawServerPolicy: rawServerPolicy,
+          );
 
           if (!mounted) return;
           showSafeSnackBar(

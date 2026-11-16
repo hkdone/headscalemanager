@@ -9,10 +9,13 @@ import 'package:headscalemanager/models/acl_puzzle_model.dart';
 import 'package:headscalemanager/utils/json_utils.dart';
 import 'package:headscalemanager/services/acl_puzzle_service.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
+import 'package:headscalemanager/services/acl/hujson_comment_service.dart';
+import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/utils/string_utils.dart'; // For normalizeUserName
+import 'package:headscalemanager/utils/tag_capability_helper.dart';
 import 'package:headscalemanager/services/security_service.dart';
 
 void _showEntityRenameDialog(BuildContext context, PuzzleEntity entity, VoidCallback onSaved) {
@@ -117,9 +120,11 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
 
       // Load current policy
       Map<String, dynamic> currentPolicy = {};
+      Map<String, String> ruleComments = const {};
       try {
         final policyString = await apiService.getAclPolicy();
         if (policyString.isNotEmpty) {
+          ruleComments = HuJsonCommentService.extractRuleComments(policyString);
           try {
             currentPolicy =
                 json.decode(JsonUtils.cleanJsonComments(policyString));
@@ -143,6 +148,7 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
           _puzzleRules.addAll(_puzzleService.parseJsonToPuzzle(
             jsonPolicy: currentPolicy,
             availableEntities: _availableEntities,
+            ruleComments: ruleComments,
           ));
         }
 
@@ -150,6 +156,20 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
       });
 
       await appProvider.reconcilePuzzleMetadataForRules(_puzzleRules);
+
+      // Synchroniser les commentaires HuJSON du serveur -> nom des blocs Puzzle
+      for (final rule in _puzzleRules) {
+        final serverComment = rule.comment?.trim();
+        if (serverComment != null && serverComment.isNotEmpty) {
+          final existingName =
+              (appProvider.getBlockMeta(rule.signature)?['name'] as String?)
+                  ?.trim();
+          if (existingName != serverComment) {
+            await appProvider.setBlockMeta(rule.signature, name: serverComment);
+          }
+        }
+      }
+
       if (mounted) setState(() {});
     } catch (e) {
       if (mounted) {
@@ -304,10 +324,14 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
   Future<void> _applyPolicy() async {
     final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
     final appProvider = context.read<AppProvider>();
-    
+
     // Clean up obsolete lan-sharer tags before ACL generation
-    final cleanedNodes = await _cleanupObsoleteLanSharerTags(_nodes);
-    
+    final cleanedNodes =
+        await TagCapabilityHelper.cleanupObsoleteLanSharerTags(
+      appProvider.apiService,
+      _nodes,
+    );
+
     // 1. Generate Base Policy (Infrastructure)
     final basePolicy = _aclOrchestrator.generatePolicy(
       engineMode: appProvider.aclEngineMode,
@@ -324,13 +348,32 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
       emitGrants: appProvider.aclEngineMode == AclEngineMode.grantsV29,
     );
 
-    // 3. Export to Server
+    // 3. Collecter les noms des règles Puzzle -> commentaires // HuJSON
+    final puzzleComments = <String, String>{};
+    final removedCommentSigs = <String>{};
+    for (final rule in _puzzleRules) {
+      final metaName =
+          (appProvider.getBlockMeta(rule.signature)?['name'] as String?)
+                  ?.trim() ??
+              '';
+      if (metaName.isNotEmpty) {
+        puzzleComments[rule.signature] = metaName;
+      } else {
+        removedCommentSigs.add(rule.signature);
+      }
+    }
+
+    // 4. Export to Server (non-destructive merge + préservation/écriture commentaires)
     try {
       if (!mounted) return;
       final appProvider = context.read<AppProvider>();
-      final String jsonPolicy =
-          const JsonEncoder.withIndent('  ').convert(finalPolicy);
-      await appProvider.apiService.setAclPolicy(jsonPolicy);
+      await PolicyPreserver.applyPreservingPolicy(
+        apiService: appProvider.apiService,
+        generatedPolicy: finalPolicy,
+        overrideRuleComments: puzzleComments,
+        removedCommentSignatures: removedCommentSigs,
+        pretty: true,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -468,67 +511,6 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
         label: Text(isFr ? 'Ajouter une pièce' : 'Add Piece'),
       ),
     );
-  }
-
-  List<String> _removeCapabilities(List<String> tags,
-      {bool removeExitNode = false, bool removeLanSharer = false}) {
-    List<String> newTags = List.from(tags);
-    int clientTagIndex = newTags.indexWhere((t) => t.contains('-client'));
-
-    if (clientTagIndex != -1) {
-      final oldClientTag = newTags[clientTagIndex];
-      final parts = oldClientTag
-          .replaceFirst('tag:', '')
-          .split(';')
-          .where((p) => p.isNotEmpty)
-          .toSet();
-
-      if (removeExitNode) parts.remove('exit-node');
-      if (removeLanSharer) parts.remove('lan-sharer');
-
-      final clientPart =
-          parts.firstWhere((p) => p.contains('-client'), orElse: () => '');
-      if (clientPart.isEmpty) return newTags;
-
-      final otherParts = parts.where((p) => p != clientPart).toList()..sort();
-
-      final newClientTagBuilder = StringBuffer('tag:$clientPart');
-      if (otherParts.isNotEmpty) {
-        newClientTagBuilder.write(';${otherParts.join(';')}');
-      }
-      newTags[clientTagIndex] = newClientTagBuilder.toString();
-    } else {
-      if (removeExitNode) newTags.remove('tag:exit-node');
-      if (removeLanSharer) newTags.remove('tag:lan-sharer');
-    }
-    return newTags;
-  }
-
-  /// Clean up obsolete lan-sharer tags from nodes that no longer have shared routes
-  /// This prevents orphaned route warnings and VPN disconnections
-  Future<List<Node>> _cleanupObsoleteLanSharerTags(List<Node> nodes) async {
-    if (!mounted) return nodes;
-    final appProvider = context.read<AppProvider>();
-    final apiService = appProvider.apiService;
-    
-    // Find nodes with lan-sharer tags but no shared routes
-    final nodesToCleanup = nodes.where((node) {
-      final hasLanSharerTag = node.tags.any((tag) => 
-        tag.contains(';lan-sharer') || 
-        tag == 'tag:lan-sharer' ||
-        (tag.startsWith('tag:') && tag.contains('lan-sharer'))
-      );
-      return hasLanSharerTag && node.sharedRoutes.isEmpty;
-    }).toList();
-    
-    // Clean up each affected node
-    for (final node in nodesToCleanup) {
-      final newTags = _removeCapabilities(List.from(node.tags), removeLanSharer: true);
-      await apiService.setTags(node.id, newTags);
-    }
-    
-    // Return refreshed nodes list
-    return await apiService.getNodes();
   }
 }
 

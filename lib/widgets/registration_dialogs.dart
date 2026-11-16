@@ -6,6 +6,7 @@ import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
+import 'package:headscalemanager/utils/tag_capability_helper.dart';
 import 'package:provider/provider.dart';
 
 /// Affiche un dialogue pour guider l'utilisateur dans l'enregistrement d'un appareil.
@@ -714,16 +715,15 @@ Future<void> _showAddTagsDialog(BuildContext context, Node node) async {
                 child: Text(isFr ? 'Appliquer les Tags' : 'Apply Tags'),
                 onPressed: () async {
                   final provider = context.read<AppProvider>();
-                  String baseTag = 'tag:${normalizeUserName(node.user)}-client';
-                  if (isExitNode) {
-                    baseTag += ';exit-node';
-                  }
-                  if (isLanSharer) {
-                    baseTag += ';lan-sharer';
-                  }
+                  final tags = TagCapabilityHelper.buildInitialTags(
+                    engineMode: provider.aclEngineMode,
+                    normalizedUser: normalizeUserName(node.user),
+                    isExitNode: isExitNode,
+                    isLanSharer: isLanSharer,
+                  );
 
                   try {
-                    await provider.apiService.setTags(node.id, [baseTag]);
+                    await provider.apiService.setTags(node.id, tags);
                     if (!context.mounted) return;
                     Navigator.of(dialogContext).pop();
                     showSafeSnackBar(

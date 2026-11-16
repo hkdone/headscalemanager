@@ -82,6 +82,7 @@ class AclPuzzleService {
   List<PuzzleRule> parseJsonToPuzzle({
     required Map<String, dynamic> jsonPolicy,
     required List<PuzzleEntity> availableEntities,
+    Map<String, String> ruleComments = const {},
   }) {
     final rules = <PuzzleRule>[];
     final seen = <String>{};
@@ -94,7 +95,7 @@ class AclPuzzleService {
     if (acls is List) {
       for (var acl in acls) {
         if (acl is! Map<String, dynamic>) continue;
-        final parsed = _parseAclRule(acl, availableEntities);
+        final parsed = _parseAclRule(acl, availableEntities, ruleComments);
         if (parsed != null) addRule(parsed);
       }
     }
@@ -105,7 +106,7 @@ class AclPuzzleService {
         if (grant is! Map<String, dynamic>) continue;
         if (grant['app'] != null) continue;
         if (!grant.containsKey('ip')) continue;
-        final parsed = _parseGrantRule(grant, availableEntities);
+        final parsed = _parseGrantRule(grant, availableEntities, ruleComments);
         if (parsed != null) addRule(parsed);
       }
     }
@@ -116,36 +117,58 @@ class AclPuzzleService {
   PuzzleRule? _parseAclRule(
     Map<String, dynamic> acl,
     List<PuzzleEntity> availableEntities,
+    Map<String, String> ruleComments,
   ) {
     final action = acl['action']?.toString() ?? 'accept';
     final srcList = acl['src'];
     final dstList = acl['dst'];
     if (srcList is! List || dstList is! List) return null;
 
-    return PuzzleRule(
+    final temp = PuzzleRule(
       sources: _mapEntities(srcList, availableEntities),
       destinations: _mapDestinations(dstList, availableEntities),
       action: action,
       isGrant: false,
+    );
+    final comment = ruleComments[temp.signature];
+    if (comment == null || comment.isEmpty) return temp;
+    return PuzzleRule(
+      id: temp.id,
+      sources: temp.sources,
+      destinations: temp.destinations,
+      action: temp.action,
+      isGrant: false,
+      comment: comment,
     );
   }
 
   PuzzleRule? _parseGrantRule(
     Map<String, dynamic> grant,
     List<PuzzleEntity> availableEntities,
+    Map<String, String> ruleComments,
   ) {
     final srcList = grant['src'];
     final dstList = grant['dst'];
     if (srcList is! List || dstList is! List) return null;
     final viaList = grant['via'];
 
-    return PuzzleRule(
+    final temp = PuzzleRule(
       sources: _mapEntities(srcList, availableEntities),
       via: viaList is List
           ? _mapEntities(viaList, availableEntities)
           : const [],
       destinations: _mapDestinations(dstList, availableEntities, stripPort: false),
       isGrant: true,
+    );
+    final comment = ruleComments[temp.signature];
+    if (comment == null || comment.isEmpty) return temp;
+    return PuzzleRule(
+      id: temp.id,
+      sources: temp.sources,
+      via: temp.via,
+      destinations: temp.destinations,
+      isGrant: true,
+      comment: comment,
     );
   }
 

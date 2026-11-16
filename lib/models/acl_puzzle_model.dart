@@ -42,6 +42,7 @@ class PuzzleRule {
   final List<PuzzleEntity> destinations;
   final String action;
   final bool isGrant;
+  final String? comment;
 
   PuzzleRule({
     String? id,
@@ -50,6 +51,7 @@ class PuzzleRule {
     required this.destinations,
     this.action = 'accept',
     this.isGrant = false,
+    this.comment,
   }) : id = id ?? const Uuid().v4();
 
   String get signature {
@@ -75,6 +77,7 @@ class PuzzleRule {
           .toList(),
       action: json['action'] ?? 'accept',
       isGrant: json['isGrant'] ?? false,
+      comment: json['comment'] as String?,
     );
   }
 
@@ -86,6 +89,7 @@ class PuzzleRule {
       'destinations': destinations.map((e) => e.toJson()).toList(),
       'action': action,
       'isGrant': isGrant,
+      if (comment != null && comment!.isNotEmpty) 'comment': comment,
     };
   }
 }

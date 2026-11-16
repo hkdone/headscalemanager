@@ -150,19 +150,29 @@ class StorageService {
     return [];
   }
 
-  Future<void> setStandardAclEngineEnabled(bool enabled) async {
+  Future<void> setStandardAclEngineEnabled(bool enabled,
+      {String? serverId}) async {
     await saveAclEngineMode(
       enabled ? AclEngineMode.standard : AclEngineMode.legacy,
+      serverId: serverId,
     );
   }
 
-  Future<bool> getStandardAclEngineEnabled() async {
-    final mode = await getAclEngineMode();
+  Future<bool> getStandardAclEngineEnabled({String? serverId}) async {
+    final mode = await getAclEngineMode(serverId: serverId);
     return mode != AclEngineMode.legacy;
   }
 
-  Future<AclEngineMode> getAclEngineMode() async {
+  /// Lit le mode ACL du serveur [serverId], avec repli automatique sur l'ancienne
+  /// clé globale si le serveur n'a pas encore de configuration dédiée.
+  Future<AclEngineMode> getAclEngineMode({String? serverId}) async {
     final prefs = await SharedPreferences.getInstance();
+    if (serverId != null) {
+      final serverStored = prefs.getString('${_aclEngineModeKey}_$serverId');
+      if (serverStored != null) {
+        return AclEngineModeStorage.fromStorageKey(serverStored);
+      }
+    }
     final stored = prefs.getString(_aclEngineModeKey);
     if (stored != null) {
       return AclEngineModeStorage.fromStorageKey(stored);
@@ -171,9 +181,18 @@ class StorageService {
     return legacyStandard ? AclEngineMode.standard : AclEngineMode.legacy;
   }
 
+  /// Sauvegarde le mode ACL, isolé par [serverId] lorsqu'il est fourni.
   Future<void> saveAclEngineMode(AclEngineMode mode,
-      {bool explicit = true}) async {
+      {bool explicit = true, String? serverId}) async {
     final prefs = await SharedPreferences.getInstance();
+    if (serverId != null) {
+      await prefs.setString('${_aclEngineModeKey}_$serverId', mode.storageKey);
+      if (explicit) {
+        await prefs.setBool('${_aclEngineExplicitKey}_$serverId', true);
+      }
+      return;
+    }
+
     await prefs.setString(_aclEngineModeKey, mode.storageKey);
     await prefs.setBool(_aclEngineKey, mode != AclEngineMode.legacy);
     if (explicit) {
@@ -181,8 +200,12 @@ class StorageService {
     }
   }
 
-  Future<bool> hasExplicitAclEngineMode() async {
+  Future<bool> hasExplicitAclEngineMode({String? serverId}) async {
     final prefs = await SharedPreferences.getInstance();
+    if (serverId != null &&
+        prefs.containsKey('${_aclEngineModeKey}_$serverId')) {
+      return prefs.getBool('${_aclEngineExplicitKey}_$serverId') ?? false;
+    }
     return prefs.getBool(_aclEngineExplicitKey) ?? false;
   }
 

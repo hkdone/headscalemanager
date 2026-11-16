@@ -459,6 +459,7 @@ class AppProvider extends ChangeNotifier {
       apiKey: _activeServer!.apiKey,
       baseUrl: _activeServer!.url,
     );
+    await _loadAclEnginePreference();
     await _loadTaildriveShares();
     await _loadPuzzleMetadata();
     await _loadCustomDeviceData();
@@ -496,13 +497,18 @@ class AppProvider extends ChangeNotifier {
   bool get useStandardAclEngine => _aclEngineMode != AclEngineMode.legacy;
 
   Future<void> _loadAclEnginePreference() async {
-    _aclEngineMode = await _storageService.getAclEngineMode();
+    _aclEngineMode = await _storageService.getAclEngineMode(
+      serverId: _activeServer?.id,
+    );
     notifyListeners();
   }
 
   Future<void> setAclEngineMode(AclEngineMode mode) async {
     _aclEngineMode = mode;
-    await _storageService.saveAclEngineMode(mode);
+    await _storageService.saveAclEngineMode(
+      mode,
+      serverId: _activeServer?.id,
+    );
     notifyListeners();
   }
 
@@ -516,12 +522,17 @@ class AppProvider extends ChangeNotifier {
     if (_activeServer == null) return;
     if (!VersionInfo.checkVersionAtLeast(serverVersion, '0.29.0')) return;
     if (_aclEngineMode == AclEngineMode.grantsV29) return;
-    if (await _storageService.hasExplicitAclEngineMode()) return;
+    if (await _storageService.hasExplicitAclEngineMode(
+      serverId: _activeServer!.id,
+    )) {
+      return;
+    }
     if (_aclEngineMode == AclEngineMode.standard) {
       _aclEngineMode = AclEngineMode.grantsV29;
       await _storageService.saveAclEngineMode(
         AclEngineMode.grantsV29,
         explicit: false,
+        serverId: _activeServer!.id,
       );
       await _storageService.setGrantsMigrationCompleted(_activeServer!.id, true);
       await _storageService.setGrantsMigrationDate(

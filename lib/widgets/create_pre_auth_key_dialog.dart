@@ -3,6 +3,7 @@ import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
+import 'package:headscalemanager/utils/tag_capability_helper.dart';
 import 'package:provider/provider.dart';
 
 /// Dialogue pour créer une nouvelle clé de pré-authentification avec gestion des tags ACL.
@@ -159,19 +160,13 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
               final expiration =
                   DateTime.now().add(Duration(days: expirationDays));
 
-              // Construction des tags ACL
-              final List<String> aclTags = [];
-              if (_selectedUser != null) {
-                String baseTag =
-                    'tag:${normalizeUserName(_selectedUser!.name)}-client';
-                if (_isExitNode) {
-                  baseTag += ';exit-node';
-                }
-                if (_isLanSharer) {
-                  baseTag += ';lan-sharer';
-                }
-                aclTags.add(baseTag);
-              }
+              // Construction des tags ACL selon le moteur actif
+              final List<String> aclTags = TagCapabilityHelper.buildInitialTags(
+                engineMode: provider.aclEngineMode,
+                normalizedUser: normalizeUserName(_selectedUser!.name),
+                isExitNode: _isExitNode,
+                isLanSharer: _isLanSharer,
+              );
 
               try {
                 final key = await provider.apiService.createPreAuthKey(

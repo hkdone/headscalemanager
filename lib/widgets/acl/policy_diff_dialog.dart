@@ -4,12 +4,16 @@ import 'package:flutter/material.dart';
 class PolicyDiffDialog extends StatelessWidget {
   final Map<String, dynamic> currentPolicy;
   final Map<String, dynamic> newPolicy;
+  final String? rawCurrentText;
+  final String? rawNewText;
   final bool isFr;
 
   const PolicyDiffDialog({
     super.key,
     required this.currentPolicy,
     required this.newPolicy,
+    this.rawCurrentText,
+    this.rawNewText,
     required this.isFr,
   });
 
@@ -17,6 +21,8 @@ class PolicyDiffDialog extends StatelessWidget {
     BuildContext context, {
     required Map<String, dynamic> currentPolicy,
     required Map<String, dynamic> newPolicy,
+    String? rawCurrentText,
+    String? rawNewText,
     required bool isFr,
   }) {
     return showDialog<bool>(
@@ -24,6 +30,8 @@ class PolicyDiffDialog extends StatelessWidget {
       builder: (_) => PolicyDiffDialog(
         currentPolicy: currentPolicy,
         newPolicy: newPolicy,
+        rawCurrentText: rawCurrentText,
+        rawNewText: rawNewText,
         isFr: isFr,
       ),
     );
@@ -38,10 +46,37 @@ class PolicyDiffDialog extends StatelessWidget {
         : '$grants grants, $acls acls, $groups groups';
   }
 
+  String _normalizeRaw(String text) =>
+      text.replaceAll('\r\n', '\n').trim();
+
   @override
   Widget build(BuildContext context) {
     const encoder = JsonEncoder.withIndent('  ');
-    final changed = encoder.convert(currentPolicy) != encoder.convert(newPolicy);
+    final structChanged =
+        encoder.convert(currentPolicy) != encoder.convert(newPolicy);
+    final rawChanged = rawCurrentText != null &&
+        rawNewText != null &&
+        _normalizeRaw(rawCurrentText!) != _normalizeRaw(rawNewText!);
+    final changed = structChanged || rawChanged;
+
+    final String statusText;
+    final Color statusColor;
+    if (structChanged) {
+      statusText = isFr
+          ? 'Le JSON sera modifié avant export.'
+          : 'JSON will be modified before export.';
+      statusColor = Colors.orange;
+    } else if (rawChanged) {
+      statusText = isFr
+          ? 'Commentaires ou formatage HuJSON modifiés.'
+          : 'HuJSON comments or formatting modified.';
+      statusColor = Colors.teal;
+    } else {
+      statusText = isFr
+          ? 'Aucune différence détectée.'
+          : 'No difference detected.';
+      statusColor = Colors.green;
+    }
 
     return AlertDialog(
       title: Text(isFr ? 'Aperçu des changements' : 'Change preview'),
@@ -61,15 +96,9 @@ class PolicyDiffDialog extends StatelessWidget {
               Text(_summarize(newPolicy)),
               const SizedBox(height: 12),
               Text(
-                changed
-                    ? (isFr
-                        ? 'Le JSON sera modifié avant export.'
-                        : 'JSON will be modified before export.')
-                    : (isFr
-                        ? 'Aucune différence détectée.'
-                        : 'No difference detected.'),
+                statusText,
                 style: TextStyle(
-                  color: changed ? Colors.orange : Colors.green,
+                  color: statusColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),

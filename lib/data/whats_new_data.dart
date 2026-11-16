@@ -14,6 +14,18 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '2.3.0',
+        title: isFr
+            ? 'Release 2.3.0 — Fusion ACL Non-Destructive & Compatibilité Multi-Versions'
+            : 'Release 2.3.0 — Non-Destructive ACL Merge & Multi-Version Compatibility',
+        description: isFr
+            ? 'Préservation automatique des blocs manuels serveur (ssh, tests, hosts, ipsets, derpMap, nodeAttrs) lors des régénérations ACL, support HuJSON complet, gestion unifiée des tags, autorisation des CIDR partagés via Grants V29 (0.29+), isolation du moteur ACL par serveur et compatibilité PreAuthKey v0.28+.'
+            : 'Automatic preservation of manual server policy blocks (ssh, tests, hosts, ipsets, derpMap, nodeAttrs) during ACL regenerations, full HuJSON parser, unified tag capability handling, shared CIDR support via Grants V29 (0.29+), per-server ACL engine isolation, and PreAuthKey v0.28+ compatibility.',
+        verification: isFr
+            ? 'ACLs > Générer / Paramètres > Moteur ACL par serveur'
+            : 'ACLs > Generate / Settings > Per-server ACL engine',
+      ),
+      WhatsNewVersion(
         version: '2.2.0',
         title: isFr
             ? 'Release 2.2.0 — Durcissement Cybersécurité & Résilience'

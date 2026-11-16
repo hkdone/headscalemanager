@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:headscalemanager/utils/json_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:http/http.dart' as http;
 import 'package:headscalemanager/models/node.dart';
@@ -64,7 +65,7 @@ class HeadscaleApiService {
 
     final response = await http
         .get(
-          Uri.parse('$_baseUrl/api/v1/node/$nodeId'),
+          Uri.parse('$_baseUrl/api/v1/node/${Uri.encodeComponent(nodeId)}'),
           headers: _getHeaders(),
         )
         .timeout(_requestTimeout);
@@ -78,11 +79,16 @@ class HeadscaleApiService {
 
   Future<Node> registerMachine(String machineKey, String userName) async {
     final String baseDomain = _baseUrl.extractBaseDomain() ?? 'headscale.local';
+    final uri = Uri.parse('$_baseUrl/api/v1/node/register').replace(
+      queryParameters: {
+        'user': userName,
+        'key': machineKey,
+      },
+    );
 
     final response = await http
         .post(
-          Uri.parse(
-              '$_baseUrl/api/v1/node/register?user=$userName&key=$machineKey'),
+          uri,
           headers: _getHeaders(),
         )
         .timeout(_requestTimeout);
@@ -186,7 +192,8 @@ class HeadscaleApiService {
   Future<void> setAclPolicy(String aclPolicy) async {
     String payload = aclPolicy;
     try {
-      final decoded = jsonDecode(aclPolicy);
+      final cleaned = JsonUtils.cleanJsonComments(aclPolicy);
+      final decoded = jsonDecode(cleaned);
       if (decoded is Map<String, dynamic>) {
         bool modified = false;
 
@@ -237,7 +244,7 @@ class HeadscaleApiService {
   Future<void> deleteUser(String userId) async {
     final response = await http
         .delete(
-          Uri.parse('$_baseUrl/api/v1/user/$userId'),
+          Uri.parse('$_baseUrl/api/v1/user/${Uri.encodeComponent(userId)}'),
           headers: _getHeaders(),
         )
         .timeout(_requestTimeout);
@@ -250,7 +257,7 @@ class HeadscaleApiService {
   Future<void> deleteNode(String nodeId) async {
     final response = await http
         .delete(
-          Uri.parse('$_baseUrl/api/v1/node/$nodeId'),
+          Uri.parse('$_baseUrl/api/v1/node/${Uri.encodeComponent(nodeId)}'),
           headers: _getHeaders(),
         )
         .timeout(_requestTimeout);
@@ -263,7 +270,8 @@ class HeadscaleApiService {
   Future<void> setNodeRoutes(String nodeId, List<String> routes) async {
     final response = await http
         .post(
-          Uri.parse('$_baseUrl/api/v1/node/$nodeId/approve_routes'),
+          Uri.parse(
+              '$_baseUrl/api/v1/node/${Uri.encodeComponent(nodeId)}/approve_routes'),
           headers: _getHeaders(),
           body: jsonEncode(<String, dynamic>{'routes': routes}),
         )
@@ -277,7 +285,8 @@ class HeadscaleApiService {
   Future<void> renameNode(String nodeId, String newName) async {
     final response = await http
         .post(
-          Uri.parse('$_baseUrl/api/v1/node/$nodeId/rename/$newName'),
+          Uri.parse(
+              '$_baseUrl/api/v1/node/${Uri.encodeComponent(nodeId)}/rename/${Uri.encodeComponent(newName)}'),
           headers: _getHeaders(),
         )
         .timeout(_requestTimeout);
@@ -290,7 +299,8 @@ class HeadscaleApiService {
   Future<void> moveNode(String nodeId, User newUser) async {
     final response = await http
         .post(
-          Uri.parse('$_baseUrl/api/v1/node/$nodeId/user'),
+          Uri.parse(
+              '$_baseUrl/api/v1/node/${Uri.encodeComponent(nodeId)}/user'),
           headers: _getHeaders(),
           body: jsonEncode(<String, String>{'user': newUser.id}),
         )
@@ -304,7 +314,8 @@ class HeadscaleApiService {
   Future<void> renameUser(String oldId, String newName) async {
     final response = await http
         .post(
-          Uri.parse('$_baseUrl/api/v1/user/$oldId/rename/$newName'),
+          Uri.parse(
+              '$_baseUrl/api/v1/user/${Uri.encodeComponent(oldId)}/rename/${Uri.encodeComponent(newName)}'),
           headers: _getHeaders(),
         )
         .timeout(_requestTimeout);
@@ -342,9 +353,12 @@ class HeadscaleApiService {
     final users = await getUsers();
 
     for (final user in users) {
+      final uri = Uri.parse('$_baseUrl/api/v1/preauthkey').replace(
+        queryParameters: {'user': user.id},
+      );
       final response = await http
           .get(
-            Uri.parse('$_baseUrl/api/v1/preauthkey?user=${user.id}'),
+            uri,
             headers: _getHeaders(),
           )
           .timeout(_requestTimeout);
@@ -456,7 +470,7 @@ class HeadscaleApiService {
   Future<void> deleteApiKey(String prefix) async {
     final response = await http
         .delete(
-          Uri.parse('$_baseUrl/api/v1/apikey/$prefix'),
+          Uri.parse('$_baseUrl/api/v1/apikey/${Uri.encodeComponent(prefix)}'),
           headers: _getHeaders(),
         )
         .timeout(_requestTimeout);
@@ -471,7 +485,8 @@ class HeadscaleApiService {
 
     final response = await http
         .post(
-          Uri.parse('$_baseUrl/api/v1/node/$nodeId/tags'),
+          Uri.parse(
+              '$_baseUrl/api/v1/node/${Uri.encodeComponent(nodeId)}/tags'),
           headers: _getHeaders(),
           body: jsonEncode(<String, dynamic>{'tags': tags}),
         )

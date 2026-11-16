@@ -26,10 +26,12 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
   }
 
   void _refreshData() {
+    final appProvider = context.read<AppProvider>();
     setState(() {
-      _preAuthKeysFuture =
-          context.read<AppProvider>().apiService.getPreAuthKeys();
-      _usersFuture = context.read<AppProvider>().apiService.getUsers();
+      _preAuthKeysFuture = appProvider.apiService.getPreAuthKeys(
+        serverVersion: appProvider.serverVersion,
+      );
+      _usersFuture = appProvider.apiService.getUsers();
     });
   }
 
@@ -170,8 +172,13 @@ class _PreAuthKeysScreenState extends State<PreAuthKeysScreen> {
                 style: theme.textTheme.labelLarge?.copyWith(color: Colors.red)),
             onPressed: () async {
               try {
-                final apiService = context.read<AppProvider>().apiService;
-                await apiService.expirePreAuthKey(key.user!.id, key.key);
+                final appProvider = context.read<AppProvider>();
+                await appProvider.apiService.expirePreAuthKey(
+                  key.user?.id ?? '',
+                  key.key,
+                  serverVersion: appProvider.serverVersion,
+                  keyId: key.id,
+                );
                 if (!context.mounted) return;
                 _refreshData();
                 Navigator.of(context).pop();

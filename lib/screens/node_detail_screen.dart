@@ -1,11 +1,12 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
+import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/services/route_conflict_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
+import 'package:headscalemanager/utils/tag_capability_helper.dart';
 import 'package:provider/provider.dart';
 import 'package:dart_ping/dart_ping.dart';
 import 'dart:async';
@@ -166,8 +167,11 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         policy = GrantComposerService.appendNetworkGrant(policy, result);
       }
 
-      final jsonPolicy = const JsonEncoder.withIndent('  ').convert(policy);
-      await provider.apiService.setAclPolicy(jsonPolicy);
+      await PolicyPreserver.applyPreservingPolicy(
+        apiService: provider.apiService,
+        generatedPolicy: policy,
+        pretty: true,
+      );
 
       if (context.mounted) {
         showSafeSnackBar(
@@ -698,16 +702,25 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       final newRoutes =
           _selectedRoutes.difference(Set.from(_currentNode.sharedRoutes));
       List<String> conflictRoutes = [];
+      List<String> warningMessages = [];
 
       for (var route in newRoutes) {
         // Ignorer les routes exit node
         if (route == '0.0.0.0/0' || route == '::/0') continue;
 
         final validation = RouteConflictService.validateRouteApproval(
-            route, _currentNode.id, allNodes);
+          route,
+          _currentNode.id,
+          allNodes,
+          engineMode: appProvider.aclEngineMode,
+          serverVersion: appProvider.serverVersion,
+          isFr: isFr,
+        );
 
         if (validation.isConflict) {
           conflictRoutes.add(route);
+        } else if (validation.hasWarning) {
+          warningMessages.add(validation.message);
         }
       }
 
@@ -769,7 +782,11 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           await appProvider.storageService.getTemporaryRules(serverId);
       
       // Clean up obsolete lan-sharer tags before ACL generation
-      final cleanedNodes = await _cleanupObsoleteLanSharerTags(updatedNodes);
+      final cleanedNodes =
+          await TagCapabilityHelper.cleanupObsoleteLanSharerTags(
+        apiService,
+        updatedNodes,
+      );
 
       final aclOrchestrator = AclPolicyOrchestrator();
       final newPolicyMap = aclOrchestrator.generatePolicy(
@@ -780,15 +797,19 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         taildriveShares: appProvider.taildriveShares,
         serverVersion: appProvider.serverVersion,
       );
-      final newPolicyJson = jsonEncode(newPolicyMap);
-      await apiService.setAclPolicy(newPolicyJson);
+      await PolicyPreserver.applyPreservingPolicy(
+        apiService: apiService,
+        generatedPolicy: newPolicyMap,
+      );
 
       if (mounted) {
-        showSafeSnackBar(
-            context,
-            isFr
-                ? 'Routes et ACLs mises à jour avec succès !'
-                : 'Routes and ACLs updated successfully!');
+        final baseMsg = isFr
+            ? 'Routes et ACLs mises à jour avec succès !'
+            : 'Routes and ACLs updated successfully!';
+        final fullMsg = warningMessages.isNotEmpty
+            ? '$baseMsg (${warningMessages.first})'
+            : baseMsg;
+        showSafeSnackBar(context, fullMsg);
 
         // Rafraîchir l'état local
         final freshlyUpdatedNode =
@@ -1064,67 +1085,6 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         ),
       ),
     );
-  }
-
-  List<String> _removeCapabilities(List<String> tags,
-      {bool removeExitNode = false, bool removeLanSharer = false}) {
-    List<String> newTags = List.from(tags);
-    int clientTagIndex = newTags.indexWhere((t) => t.contains('-client'));
-
-    if (clientTagIndex != -1) {
-      final oldClientTag = newTags[clientTagIndex];
-      final parts = oldClientTag
-          .replaceFirst('tag:', '')
-          .split(';')
-          .where((p) => p.isNotEmpty)
-          .toSet();
-
-      if (removeExitNode) parts.remove('exit-node');
-      if (removeLanSharer) parts.remove('lan-sharer');
-
-      final clientPart =
-          parts.firstWhere((p) => p.contains('-client'), orElse: () => '');
-      if (clientPart.isEmpty) return newTags;
-
-      final otherParts = parts.where((p) => p != clientPart).toList()..sort();
-
-      final newClientTagBuilder = StringBuffer('tag:$clientPart');
-      if (otherParts.isNotEmpty) {
-        newClientTagBuilder.write(';${otherParts.join(';')}');
-      }
-      newTags[clientTagIndex] = newClientTagBuilder.toString();
-    } else {
-      if (removeExitNode) newTags.remove('tag:exit-node');
-      if (removeLanSharer) newTags.remove('tag:lan-sharer');
-    }
-    return newTags;
-  }
-
-  /// Clean up obsolete lan-sharer tags from nodes that no longer have shared routes
-  /// This prevents orphaned route warnings and VPN disconnections
-  Future<List<Node>> _cleanupObsoleteLanSharerTags(List<Node> nodes) async {
-    if (!mounted) return nodes;
-    final appProvider = context.read<AppProvider>();
-    final apiService = appProvider.apiService;
-    
-    // Find nodes with lan-sharer tags but no shared routes
-    final nodesToCleanup = nodes.where((node) {
-      final hasLanSharerTag = node.tags.any((tag) => 
-        tag.contains(';lan-sharer') || 
-        tag == 'tag:lan-sharer' ||
-        (tag.startsWith('tag:') && tag.contains('lan-sharer'))
-      );
-      return hasLanSharerTag && node.sharedRoutes.isEmpty;
-    }).toList();
-    
-    // Clean up each affected node
-    for (final node in nodesToCleanup) {
-      final newTags = _removeCapabilities(List.from(node.tags), removeLanSharer: true);
-      await apiService.setTags(node.id, newTags);
-    }
-    
-    // Return refreshed nodes list
-    return await apiService.getNodes();
   }
 }
 

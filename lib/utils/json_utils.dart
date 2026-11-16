@@ -1,43 +1,128 @@
+import 'dart:convert';
+
 class JsonUtils {
-  /// Nettoie une chaîne JSON contenant des commentaires (HuJSON) pour la rendre compatible avec le parser strict de Dart.
-  /// Enlève les commentaires de ligne commençant par //
+  /// Nettoie une chaîne HuJSON / JSONC pour la rendre compatible avec `jsonDecode` :
+  /// - préserve intégralement les chaînes littérales `"..."` (avec gestion des échappements `\"` et `\\`),
+  /// - supprime les commentaires `//...` et `/* ... */` hors chaînes,
+  /// - supprime les virgules finales (trailing commas) avant `}` ou `]` hors chaînes.
   static String cleanJsonComments(String jsonString) {
     if (jsonString.isEmpty) return jsonString;
 
+    final withoutComments = _stripCommentsOutsideStrings(jsonString);
+    return _stripTrailingCommasOutsideStrings(withoutComments);
+  }
+
+  /// Nettoie puis décode une chaîne HuJSON en objet Dart (`Map`, `List`, etc.).
+  static dynamic decodeHuJson(String raw) {
+    return jsonDecode(cleanJsonComments(raw));
+  }
+
+  static String _stripCommentsOutsideStrings(String input) {
     final buffer = StringBuffer();
-    final lines = jsonString.split('\n');
+    bool inString = false;
+    bool escaped = false;
+    final int len = input.length;
 
-    for (var line in lines) {
-      // Expression régulière pour trouver // qui n'est pas dans une chaîne de caractères
-      // C'est complexe à faire parfaitement en une regex simple, donc on va faire une approche pragmatique
-      // pour les fichiers de config Headscale : on suppose que // marque le début d'un commentaire
-      // sauf si c'est une URL (http://...).
-      //
-      // Une approche plus robuste ligne par ligne :
-      int commentIndex = line.indexOf('//');
+    for (int i = 0; i < len; i++) {
+      final char = input[i];
 
-      // Si on trouve un //
-      if (commentIndex != -1) {
-        // Vérification basique pour ne pas casser les URLs (http://, https://)
-        bool isUrl = false;
-        if (commentIndex > 0 && line[commentIndex - 1] == ':') {
-          // Probablement une URL type "http://"
-          isUrl = true;
+      if (inString) {
+        buffer.write(char);
+        if (escaped) {
+          escaped = false;
+        } else if (char == '\\') {
+          escaped = true;
+        } else if (char == '"') {
+          inString = false;
         }
-
-        if (!isUrl) {
-          // On garde tout ce qui est avant le commentaire
-          buffer.writeln(line.substring(0, commentIndex));
-        } else {
-          // C'était une URL, on garde la ligne (ou on cherche un autre // plus loin ?
-          // Pour l'instant on garde la ligne telle quelle, cas rare dans les ACLs sauf pour les hosts)
-          buffer.writeln(line);
-        }
-      } else {
-        buffer.writeln(line);
+        continue;
       }
+
+      if (char == '"') {
+        inString = true;
+        buffer.write(char);
+        continue;
+      }
+
+      if (char == '/' && i + 1 < len) {
+        final next = input[i + 1];
+        // Commentaire ligne // ...
+        if (next == '/') {
+          i += 2;
+          while (i < len && input[i] != '\n') {
+            i++;
+          }
+          if (i < len && input[i] == '\n') {
+            buffer.write('\n');
+          }
+          continue;
+        }
+        // Commentaire bloc /* ... */
+        if (next == '*') {
+          i += 2;
+          while (i + 1 < len && !(input[i] == '*' && input[i + 1] == '/')) {
+            if (input[i] == '\n') {
+              buffer.write('\n');
+            }
+            i++;
+          }
+          i++; // Saute le '/' fermant (ou termine proprement en fin de chaîne)
+          continue;
+        }
+      }
+
+      buffer.write(char);
     }
 
     return buffer.toString();
+  }
+
+  static String _stripTrailingCommasOutsideStrings(String input) {
+    final buffer = StringBuffer();
+    bool inString = false;
+    bool escaped = false;
+    final int len = input.length;
+
+    for (int i = 0; i < len; i++) {
+      final char = input[i];
+
+      if (inString) {
+        buffer.write(char);
+        if (escaped) {
+          escaped = false;
+        } else if (char == '\\') {
+          escaped = true;
+        } else if (char == '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (char == '"') {
+        inString = true;
+        buffer.write(char);
+        continue;
+      }
+
+      if (char == ',') {
+        int lookahead = i + 1;
+        while (lookahead < len && _isWhitespace(input[lookahead])) {
+          lookahead++;
+        }
+        if (lookahead < len &&
+            (input[lookahead] == '}' || input[lookahead] == ']')) {
+          // Virgule finale détectée hors chaîne : on l'omet
+          continue;
+        }
+      }
+
+      buffer.write(char);
+    }
+
+    return buffer.toString();
+  }
+
+  static bool _isWhitespace(String ch) {
+    return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
   }
 }
