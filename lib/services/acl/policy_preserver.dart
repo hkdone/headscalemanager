@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:headscalemanager/api/headscale_api_service.dart';
+import 'package:headscalemanager/services/acl/hujson_comment_service.dart';
 import 'package:headscalemanager/utils/json_utils.dart';
 
 /// Préserve les blocs manuels ou hors périmètre d'une politique ACL serveur
@@ -88,40 +89,108 @@ class PolicyPreserver {
   static Future<Map<String, dynamic>?> fetchServerPolicySafely(
     HeadscaleApiService apiService,
   ) async {
+    final bundle = await fetchServerPolicyBundleSafely(apiService);
+    return bundle.policy;
+  }
+
+  /// Récupère le texte HuJSON brut, le Map décodé ainsi que les commentaires
+  /// extraits du serveur (règles + en-tête).
+  static Future<({
+    String rawText,
+    Map<String, dynamic>? policy,
+    Map<String, String> ruleComments,
+    String? leadingComments,
+  })> fetchServerPolicyBundleSafely(
+    HeadscaleApiService apiService,
+  ) async {
     try {
       final raw = await apiService.getAclPolicy();
-      return parseServerPolicy(raw);
+      return (
+        rawText: raw,
+        policy: parseServerPolicy(raw),
+        ruleComments: HuJsonCommentService.extractRuleComments(raw),
+        leadingComments: HuJsonCommentService.extractLeadingComments(raw),
+      );
     } catch (e) {
       final msg = e.toString().toLowerCase();
       if (msg.contains('statut : 404') ||
           msg.contains('status: 404') ||
           msg.contains('not found')) {
-        return null;
+        return (
+          rawText: '',
+          policy: null,
+          ruleComments: const <String, String>{},
+          leadingComments: null,
+        );
       }
       rethrow;
     }
   }
 
   /// Récupère (si nécessaire) la politique serveur, fusionne avec [generatedPolicy],
+  /// préserve les commentaires HuJSON existants (et ceux de [overrideRuleComments]),
   /// puis envoie le résultat via `setAclPolicy`.
   static Future<Map<String, dynamic>> applyPreservingPolicy({
     required HeadscaleApiService apiService,
     required Map<String, dynamic> generatedPolicy,
     Map<String, dynamic>? serverPolicy,
     String? rawServerPolicy,
+    Map<String, String>? overrideRuleComments,
+    Set<String> removedCommentSignatures = const {},
     bool pretty = false,
   }) async {
     Map<String, dynamic>? existing = serverPolicy;
-    if (existing == null && rawServerPolicy != null) {
-      existing = parseServerPolicy(rawServerPolicy);
+    Map<String, String> serverRuleComments = const {};
+    String? leadingComments;
+
+    if (rawServerPolicy != null) {
+      existing ??= parseServerPolicy(rawServerPolicy);
+      serverRuleComments =
+          HuJsonCommentService.extractRuleComments(rawServerPolicy);
+      leadingComments =
+          HuJsonCommentService.extractLeadingComments(rawServerPolicy);
+    } else if (existing == null) {
+      final bundle = await fetchServerPolicyBundleSafely(apiService);
+      existing = bundle.policy;
+      serverRuleComments = bundle.ruleComments;
+      leadingComments = bundle.leadingComments;
     } else {
-      existing ??= await fetchServerPolicySafely(apiService);
+      // Uniquement si seul serverPolicy est passé, tenter de préserver les commentaires serveur
+      try {
+        final bundle = await fetchServerPolicyBundleSafely(apiService);
+        serverRuleComments = bundle.ruleComments;
+        leadingComments = bundle.leadingComments;
+      } catch (_) {}
     }
 
     final merged = merge(generatedPolicy, existing);
-    final payload = pretty
-        ? const JsonEncoder.withIndent('  ').convert(merged)
-        : jsonEncode(merged);
+
+    final finalComments = <String, String>{...serverRuleComments};
+    for (final sig in removedCommentSignatures) {
+      finalComments.remove(sig);
+    }
+    if (overrideRuleComments != null) {
+      overrideRuleComments.forEach((sig, comment) {
+        if (comment.trim().isEmpty) {
+          finalComments.remove(sig);
+        } else {
+          finalComments[sig] = comment.trim();
+        }
+      });
+    }
+
+    final hasComments = finalComments.isNotEmpty ||
+        (leadingComments != null && leadingComments.trim().isNotEmpty);
+
+    final payload = hasComments
+        ? HuJsonCommentService.formatPolicyWithComments(
+            merged,
+            ruleComments: finalComments,
+            leadingComments: leadingComments,
+          )
+        : (pretty
+            ? const JsonEncoder.withIndent('  ').convert(merged)
+            : jsonEncode(merged));
     await apiService.setAclPolicy(payload);
     return merged;
   }

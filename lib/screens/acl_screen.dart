@@ -27,6 +27,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:headscalemanager/services/acl/policy_file_service.dart';
 import 'package:headscalemanager/widgets/acl/acl_workflow_guide.dart';
 import 'package:headscalemanager/screens/acl_puzzle_screen.dart';
+import 'package:headscalemanager/services/acl/hujson_comment_service.dart';
 import 'package:headscalemanager/services/acl/policy_orphan_cleaner.dart';
 import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/services/security_service.dart';
@@ -49,6 +50,9 @@ class _AclScreenState extends State<AclScreen> {
   List<Node> _allNodes = [];
   List<User> _users = [];
   Map<String, dynamic> _serverPolicySnapshot = {};
+  String _serverRawPolicyText = '';
+  Map<String, String> _knownRuleComments = {};
+  String? _leadingComments;
   List<Node> _destinationNodes = [];
   Node? _selectedSourceNode;
   Node? _selectedDestinationNode;
@@ -116,15 +120,19 @@ class _AclScreenState extends State<AclScreen> {
       if (_users.isEmpty) {
         _users = await apiService.getUsers();
       }
-      final serverPolicy =
-          await PolicyPreserver.fetchServerPolicySafely(apiService);
+      final bundle =
+          await PolicyPreserver.fetchServerPolicyBundleSafely(apiService);
       if (!mounted) return;
+      final serverPolicy = bundle.policy;
       if (serverPolicy != null && serverPolicy.isNotEmpty) {
         _serverPolicySnapshot = PolicyPreserver.deepCopyMap(serverPolicy);
         _currentAclPolicy = PolicyPreserver.deepCopyMap(serverPolicy);
+        _serverRawPolicyText = bundle.rawText;
+        _knownRuleComments = Map<String, String>.from(bundle.ruleComments);
+        _leadingComments = bundle.leadingComments;
         _jsonParseError = null;
         _isLocalDraft = false;
-        _updateAclControllerText();
+        _setRawPolicyControllerText(bundle.rawText);
         if (mounted) setState(() => _isLoading = false);
         return;
       }
@@ -153,10 +161,24 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   void _updateAclControllerText() {
-    const JsonEncoder encoder = JsonEncoder.withIndent('  ');
-    _aclController.text = encoder.convert(_currentAclPolicy);
+    _aclController.text = HuJsonCommentService.formatPolicyWithComments(
+      _currentAclPolicy,
+      ruleComments: _knownRuleComments,
+      leadingComments: _leadingComments,
+    );
     if (mounted) {
       setState(() {});
+    }
+  }
+
+  void _setRawPolicyControllerText(String rawText) {
+    if (rawText.trim().isNotEmpty) {
+      _aclController.text = rawText;
+      if (mounted) {
+        setState(() {});
+      }
+    } else {
+      _updateAclControllerText();
     }
   }
 
@@ -292,12 +314,18 @@ class _AclScreenState extends State<AclScreen> {
   }
 
   void _resetToServerSnapshot() {
-    if (_serverPolicySnapshot.isEmpty) return;
+    if (_serverPolicySnapshot.isEmpty && _serverRawPolicyText.trim().isEmpty) {
+      return;
+    }
     setState(() {
       _currentAclPolicy = PolicyPreserver.deepCopyMap(_serverPolicySnapshot);
+      _knownRuleComments =
+          HuJsonCommentService.extractRuleComments(_serverRawPolicyText);
+      _leadingComments =
+          HuJsonCommentService.extractLeadingComments(_serverRawPolicyText);
       _jsonParseError = null;
       _isLocalDraft = false;
-      _updateAclControllerText();
+      _setRawPolicyControllerText(_serverRawPolicyText);
     });
   }
 
@@ -544,13 +572,24 @@ class _AclScreenState extends State<AclScreen> {
               maxLines: null,
               minLines: 16,
               onChanged: (value) {
+                final normalizedNew = value.replaceAll('\r\n', '\n').trim();
+                final normalizedServer =
+                    _serverRawPolicyText.replaceAll('\r\n', '\n').trim();
+                final textChanged = _serverRawPolicyText.isNotEmpty
+                    ? normalizedNew != normalizedServer
+                    : true;
                 try {
                   final decoded = JsonUtils.decodeHuJson(value);
                   if (decoded is Map) {
+                    final parsedMap = Map<String, dynamic>.from(decoded);
                     setState(() {
-                      _currentAclPolicy = Map<String, dynamic>.from(decoded);
+                      _currentAclPolicy = parsedMap;
+                      _knownRuleComments =
+                          HuJsonCommentService.extractRuleComments(value);
+                      _leadingComments =
+                          HuJsonCommentService.extractLeadingComments(value);
                       _jsonParseError = null;
-                      _isLocalDraft = true;
+                      _isLocalDraft = textChanged;
                     });
                   } else {
                     setState(() {
@@ -1398,9 +1437,17 @@ class _AclScreenState extends State<AclScreen> {
         taildriveShares: appProvider.taildriveShares,
         serverVersion: appProvider.serverVersion,
       );
-      final serverPolicy = await PolicyPreserver.fetchServerPolicySafely(
-        apiService,
-      );
+      final bundle =
+          await PolicyPreserver.fetchServerPolicyBundleSafely(apiService);
+      final serverPolicy = bundle.policy;
+      _serverRawPolicyText = bundle.rawText;
+      if (bundle.ruleComments.isNotEmpty) {
+        _knownRuleComments = {
+          ...bundle.ruleComments,
+          ..._knownRuleComments,
+        };
+      }
+      _leadingComments ??= bundle.leadingComments;
       _serverPolicySnapshot = PolicyPreserver.deepCopyMap(
         serverPolicy ?? const {},
       );
@@ -1413,9 +1460,14 @@ class _AclScreenState extends State<AclScreen> {
 
       _updateAclControllerText();
       if (mounted) {
+        final normCurrent =
+            _aclController.text.replaceAll('\r\n', '\n').trim();
+        final normServer =
+            _serverRawPolicyText.replaceAll('\r\n', '\n').trim();
         setState(() {
           _isLocalDraft = json.encode(_currentAclPolicy) !=
-              json.encode(_serverPolicySnapshot);
+                  json.encode(_serverPolicySnapshot) ||
+              normCurrent != normServer;
         });
       }
 
@@ -1555,12 +1607,17 @@ class _AclScreenState extends State<AclScreen> {
 
     if (showConfirmation) {
       Map<String, dynamic> baseline = _serverPolicySnapshot;
+      String baselineRaw = _serverRawPolicyText;
       try {
-        final liveServerPolicy =
-            await PolicyPreserver.fetchServerPolicySafely(apiService);
-        if (liveServerPolicy != null) {
-          baseline = liveServerPolicy;
-          _serverPolicySnapshot = PolicyPreserver.deepCopyMap(liveServerPolicy);
+        final liveBundle =
+            await PolicyPreserver.fetchServerPolicyBundleSafely(apiService);
+        if (liveBundle.policy != null) {
+          baseline = liveBundle.policy!;
+          _serverPolicySnapshot = PolicyPreserver.deepCopyMap(baseline);
+        }
+        if (liveBundle.rawText.isNotEmpty) {
+          baselineRaw = liveBundle.rawText;
+          _serverRawPolicyText = liveBundle.rawText;
         }
       } catch (_) {
         // Repli sur le dernier snapshot serveur connu en cas d'erreur réseau transitoire
@@ -1571,6 +1628,8 @@ class _AclScreenState extends State<AclScreen> {
         context,
         currentPolicy: baseline,
         newPolicy: editedPolicy,
+        rawCurrentText: baselineRaw,
+        rawNewText: _aclController.text,
         isFr: isFr,
       );
       if (confirmed != true) return;
@@ -1585,6 +1644,13 @@ class _AclScreenState extends State<AclScreen> {
         setState(() {
           _currentAclPolicy = PolicyPreserver.deepCopyMap(editedPolicy);
           _serverPolicySnapshot = PolicyPreserver.deepCopyMap(editedPolicy);
+          _serverRawPolicyText = _aclController.text;
+          _knownRuleComments = HuJsonCommentService.extractRuleComments(
+            _aclController.text,
+          );
+          _leadingComments = HuJsonCommentService.extractLeadingComments(
+            _aclController.text,
+          );
           _jsonParseError = null;
           _isLocalDraft = false;
         });
@@ -1633,8 +1699,13 @@ class _AclScreenState extends State<AclScreen> {
           : <String, dynamic>{};
       _currentAclPolicy = PolicyPreserver.deepCopyMap(parsed);
       _serverPolicySnapshot = PolicyPreserver.deepCopyMap(parsed);
+      _serverRawPolicyText = aclJsonString;
+      _knownRuleComments =
+          HuJsonCommentService.extractRuleComments(aclJsonString);
+      _leadingComments =
+          HuJsonCommentService.extractLeadingComments(aclJsonString);
       _jsonParseError = null;
-      _updateAclControllerText();
+      _setRawPolicyControllerText(aclJsonString);
       final locale = appProvider.locale;
       final isFr = locale.languageCode == 'fr';
       if (mounted) {

@@ -9,6 +9,7 @@ import 'package:headscalemanager/models/acl_puzzle_model.dart';
 import 'package:headscalemanager/utils/json_utils.dart';
 import 'package:headscalemanager/services/acl_puzzle_service.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
+import 'package:headscalemanager/services/acl/hujson_comment_service.dart';
 import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/models/node.dart';
@@ -119,9 +120,11 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
 
       // Load current policy
       Map<String, dynamic> currentPolicy = {};
+      Map<String, String> ruleComments = const {};
       try {
         final policyString = await apiService.getAclPolicy();
         if (policyString.isNotEmpty) {
+          ruleComments = HuJsonCommentService.extractRuleComments(policyString);
           try {
             currentPolicy =
                 json.decode(JsonUtils.cleanJsonComments(policyString));
@@ -145,6 +148,7 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
           _puzzleRules.addAll(_puzzleService.parseJsonToPuzzle(
             jsonPolicy: currentPolicy,
             availableEntities: _availableEntities,
+            ruleComments: ruleComments,
           ));
         }
 
@@ -152,6 +156,20 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
       });
 
       await appProvider.reconcilePuzzleMetadataForRules(_puzzleRules);
+
+      // Synchroniser les commentaires HuJSON du serveur -> nom des blocs Puzzle
+      for (final rule in _puzzleRules) {
+        final serverComment = rule.comment?.trim();
+        if (serverComment != null && serverComment.isNotEmpty) {
+          final existingName =
+              (appProvider.getBlockMeta(rule.signature)?['name'] as String?)
+                  ?.trim();
+          if (existingName != serverComment) {
+            await appProvider.setBlockMeta(rule.signature, name: serverComment);
+          }
+        }
+      }
+
       if (mounted) setState(() {});
     } catch (e) {
       if (mounted) {
@@ -330,13 +348,30 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
       emitGrants: appProvider.aclEngineMode == AclEngineMode.grantsV29,
     );
 
-    // 3. Export to Server (non-destructive merge)
+    // 3. Collecter les noms des règles Puzzle -> commentaires // HuJSON
+    final puzzleComments = <String, String>{};
+    final removedCommentSigs = <String>{};
+    for (final rule in _puzzleRules) {
+      final metaName =
+          (appProvider.getBlockMeta(rule.signature)?['name'] as String?)
+                  ?.trim() ??
+              '';
+      if (metaName.isNotEmpty) {
+        puzzleComments[rule.signature] = metaName;
+      } else {
+        removedCommentSigs.add(rule.signature);
+      }
+    }
+
+    // 4. Export to Server (non-destructive merge + préservation/écriture commentaires)
     try {
       if (!mounted) return;
       final appProvider = context.read<AppProvider>();
       await PolicyPreserver.applyPreservingPolicy(
         apiService: appProvider.apiService,
         generatedPolicy: finalPolicy,
+        overrideRuleComments: puzzleComments,
+        removedCommentSignatures: removedCommentSigs,
         pretty: true,
       );
 
