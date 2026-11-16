@@ -1,6 +1,6 @@
 # Suivi d'Implémentation — Ordre Logique & Graduel (du moins risqué au plus risqué)
 
-**Branche de référence (stable) :** `master` *(version actuelle en production : `2.1.9+155`)*  
+**Branche de référence (stable) :** `master` *(version actuelle : `2.2.0+157`)*  
 **Dernière mise à jour :** 16 novembre 2026  
 
 ---
@@ -43,7 +43,7 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 
 | Ordre | Plan | Version de release | Branche Git dédiée | Dépendances | Risque Prod | Statut |
 |---|---|---|---|---|---|---|
-| **1** | [Plan 10 — Cybersécurité & Résilience](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_10_v2.4.0_cybersecurite_et_resilience.md) | `2.2.0+157` | `sec/hardening-pin-network-sast` | Aucune | 🟢 Très Faible | 🧪 En test interne |
+| **1** | [Plan 10 — Cybersécurité & Résilience](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_10_v2.4.0_cybersecurite_et_resilience.md) | `2.2.0+157` | `sec/hardening-pin-network-sast` | Aucune | 🟢 Très Faible | ✅ Validé & Mergé |
 | **2** | [Plan 08 — Compatibilité & Non-Destructif](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_08_v2.2.0_compatibilite_et_securite_acl.md) | `2.3.0+157` | `fix/compat-non-destructive-acl` | Aucune | 🟡 Moyen | ⬜ À faire |
 | **3** | [Plan 11 — Diff, Simulateur, SSH & API](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_11_v2.5.0_simulateur_diff_ssh_et_api.md) | `2.4.0+158` | `feat/acl-simulator-diff-ssh-api` | Plan 08 | 🟢 Très Faible | ⬜ À faire |
 | **4** | [Plan 09 — Mode Sans Tags & Hybride](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_v2.3.0_acl_sans_tags_et_hybride.md) | `2.5.0+159` | `feat/acl-tagless-and-hybrid` | Plan 08 *(Plan 11 rec.)* | 🟠 Moyen-Élevé | ⬜ À faire |
@@ -59,7 +59,7 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 - [x] **10.2** Re-verrouillage automatique en arrière-plan (`main.dart` + `SecuritySettingsScreen` + protection `FilePicker`/`ImagePicker`/biométrie)
 - [x] **10.3** Timeouts HTTP 20s + alerte `http://` public (`AddEditServerScreen`) + remédiation 3 alertes SAST (`SecurityService`, `StorageService`, `AclScreen`) + `.gitignore`
 - [x] **10.4** `NetworkOverviewScreen` : diagnostic IP publique / traceroute déclenché uniquement sur clic utilisateur
-- [ ] **Gate 1 (Validation avant merge)** : `flutter analyze` (0 erreur/info) ✅ • 36/36 tests unitaires ✅ • Test manuel interne sur appareil (ancien PIN migré, auto-lock, alerte HTTP, diagnostic sortie Internet) ⬜ • Merge `sec/hardening-pin-network-sast` → `master` ⬜
+- [x] **Gate 1 (Validation avant merge)** : `flutter analyze` (0 erreur/info) ✅ • 36/36 tests unitaires ✅ • Test manuel interne sur appareil (ancien PIN migré, auto-lock, alerte HTTP, diagnostic sortie Internet) ✅ • Merge `sec/hardening-pin-network-sast` → `master` ✅
 
 ### Étape 2 — Plan 08 (`fix/compat-non-destructive-acl` → `2.3.0+157`)
 - [ ] **08.1** `PolicyPreserver` : fusion non-destructive (`ssh`, `tests`, `ipsets`, `derpMap`, `hosts`, `nodeAttrs`) sur **tous** les appels `setAclPolicy` (y compris `RenameNodeDialog`, `ManageSpecificRulesDialog`, `LegacyMigrationDialog`)
@@ -91,4 +91,4 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 | Date | Étape / Plan | Branche | Résultat / Observations de test interne |
 |---|---|---|---|
 | 2026-11-16 | Initialisation & Audit | `master` | Création et audit croisé des plans 08 à 11 ; mise en place de l'ordre graduel 10 $\rightarrow$ 08 $\rightarrow$ 11 $\rightarrow$ 09. |
-| 2026-11-16 | Étape 1 — Plan 10 | `sec/hardening-pin-network-sast` | Implémentation PBKDF2 + migration PIN, lockout, auto-lock arrière-plan, timeouts HTTP 20s, alerte HTTP, diagnostic opt-in, remédiation SAST. `flutter analyze` (0 issue) & 36/36 tests passés. En attente de validation manuelle interne avant merge. |
+| 2026-11-16 | Étape 1 — Plan 10 | `sec/hardening-pin-network-sast` | Implémentation PBKDF2 + migration PIN, lockout, auto-lock arrière-plan, timeouts HTTP 20s, alerte HTTP, diagnostic opt-in, remédiation SAST. `flutter analyze` (0 issue), 36/36 tests passés, test manuel interne validé. Mergé dans `master`. |
