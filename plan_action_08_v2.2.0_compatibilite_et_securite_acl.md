@@ -1,8 +1,9 @@
 # Plan d'Action 08 — Version 2.2.0 : Compatibilité Multi-Versions (v0.22–v0.29.7+), Fusion Non-Destructive & Cohérence des Tags
 
 **Date de création** : 16 novembre 2026  
-**Version cible** : `2.2.0+156` *(actuelle : `2.1.9+155`)*  
-**Branche Git dédiée** : `fix/v2.2.0-compat-non-destructive-acl` *(créée depuis `master`)*  
+**Version cible** : `2.3.0+157` *(Étape 2 recommandée — voir `SUIVI_IMPLEMENTATION.md`)*  
+**Branche Git dédiée** : `fix/compat-non-destructive-acl` *(créée depuis `master`)*  
+**Prérequis** : Aucun *(mais prérequis technique des Plans 11 et 09)*  
 **Priorité** : **P0 — Critique (Stabilité & Zéro Coupure en Production)**  
 **Niveau de risque global** : 🟡 **Moyen** *(touche au pipeline d'export ACL et aux tags, sécurisé par fusion conservatrice et garde-fous)*
 
@@ -39,7 +40,7 @@ Sécuriser et fiabiliser les mécanismes existants pour les administrateurs util
   - Préserve intégralement toutes les clés hors périmètre du générateur : `ssh`, `tests`, `ipsets`, `derpMap`, `randomizeClientPort`, ainsi que toute clé future inconnue.
   - Fusionne `hosts` : conserve les entrées manuelles du serveur et ajoute uniquement les nouvelles clés sans écraser l'existant.
   - Fusionne `nodeAttrs` : conserve les entrées existantes ne portant pas `drive:share` / `drive:access`, et y ajoute les `nodeAttrs` produits par `TaildriveBuilder`.
-- Avant tout appel automatique à `setAclPolicy` (approbation depuis `DashboardScreen`, sauvegarde de routes dans `NodeDetailScreen`, `EditTagsDialog`, `ExitNodeCommandDialog`, `ShareSubnetDialog`, `MoveNodeDialog`, `AclScreen`, `AclPuzzleScreen`), récupérer d'abord la politique serveur via `getAclPolicy()`, la parser via `JsonUtils.cleanJsonComments()`, puis appeler `PolicyPreserver.merge(...)`.
+- Avant tout appel automatique à `setAclPolicy` (approbation depuis `DashboardScreen`, sauvegarde de routes dans `NodeDetailScreen`, `EditTagsDialog`, `ExitNodeCommandDialog`, `ShareSubnetDialog`, `MoveNodeDialog`, `RenameNodeDialog`, `ManageSpecificRulesDialog`, `LegacyMigrationDialog`, `AclScreen`, `AclPuzzleScreen`), récupérer d'abord la politique serveur via `getAclPolicy()`, la parser via `JsonUtils.cleanJsonComments()`, puis appeler `PolicyPreserver.merge(...)`.
 
 ### Tâche 08.2 — Centralisation et Correction de la Gestion des Tags (`TagCapabilityHelper`)
 - Créer `lib/utils/tag_capability_helper.dart` pour supprimer les 4 copies divergentes de `_addCapabilities` / `_removeCapabilities` / `_cleanupObsoleteLanSharerTags`.
@@ -72,6 +73,10 @@ Sécuriser et fiabiliser les mécanismes existants pour les administrateurs util
   - `lib/widgets/delete_pre_auth_key_dialog.dart` (ligne 47)
 - Utiliser `Uri.encodeComponent(...)` sur les paramètres interpolés dans `HeadscaleApiService` (`registerMachine`, `renameNode`, `renameUser`, `deleteApiKey`, `getPreAuthKeys`).
 
+### Tâche 08.6 — Isolation du Moteur ACL par Serveur (`StorageService` & `AppProvider`)
+- Actuellement (`lib/services/storage_service.dart:163-186`), `ACL_ENGINE_MODE` est global à toute l'application. Si un utilisateur administre plusieurs serveurs hétérogènes (ex: Serveur A en Headscale 0.25 `legacy`, Serveur B en 0.29 `grantsV29`), changer de serveur risque de modifier le mauvais moteur.
+- Stocker `ACL_ENGINE_MODE_<serverId>` et `ACL_ENGINE_MODE_EXPLICIT_<serverId>` dans `StorageService` (et recharger le mode dans `AppProvider.switchServer()`), avec **fallback automatique** sur l'ancienne clé globale `ACL_ENGINE_MODE` si la clé du serveur n'existe pas encore, afin de préserver à 100% la configuration existante des utilisateurs.
+
 ---
 
 ## 4. Fichiers Concernés
@@ -80,6 +85,7 @@ Sécuriser et fiabiliser les mécanismes existants pour les administrateurs util
 |---|---|---|
 | **Nouveau** | `lib/services/acl/policy_preserver.dart` | Fusion non-destructive des clés serveur (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `nodeAttrs`) |
 | **Nouveau** | `lib/utils/tag_capability_helper.dart` | Gestion unifiée des tags Legacy vs Standard/GrantsV29 + nettoyage |
+| **Modifié** | `lib/services/storage_service.dart` & `lib/providers/app_provider.dart` | Isolation `aclEngineMode` par `serverId` avec fallback global |
 | **Modifié** | `lib/utils/json_utils.dart` | Support HuJSON complet (`//`, `/* */`, trailing commas) |
 | **Modifié** | `lib/services/route_conflict_service.dart` | Autorisation sous avertissement en mode `grantsV29` ($\ge 0.29$) |
 | **Modifié** | `lib/api/headscale_api_service.dart` | Encodage `Uri.encodeComponent` + nettoyage HuJSON |
@@ -96,6 +102,9 @@ Sécuriser et fiabiliser les mécanismes existants pour les administrateurs util
 | **Modifié** | `lib/widgets/exit_node_command_dialog.dart` | `TagCapabilityHelper` + `PolicyPreserver` |
 | **Modifié** | `lib/widgets/share_subnet_dialog.dart` | `TagCapabilityHelper` + `PolicyPreserver` |
 | **Modifié** | `lib/widgets/move_node_dialog.dart` | Réattribution tags séparés + `PolicyPreserver` |
+| **Modifié** | `lib/widgets/rename_node_dialog.dart` | `PolicyPreserver` lors de la régénération ACL |
+| **Modifié** | `lib/widgets/manage_specific_rules_dialog.dart` | `PolicyPreserver` lors de la régénération ACL |
+| **Modifié** | `lib/widgets/legacy_migration_dialog.dart` | `PolicyPreserver` lors de la migration |
 | **Modifié** | `lib/widgets/delete_pre_auth_key_dialog.dart` | Passage de `serverVersion` et `keyId` |
 | **Tests** | `test/utils/json_utils_test.dart`, `test/services/acl/policy_preserver_test.dart` | Tests unitaires dédiés *(Nouveaux)* |
 
@@ -114,11 +123,11 @@ Sécuriser et fiabiliser les mécanismes existants pour les administrateurs util
 ```bash
 # Création de la branche depuis master
 git checkout master && git pull
-git checkout -b fix/v2.2.0-compat-non-destructive-acl
+git checkout -b fix/compat-non-destructive-acl
 
 # Rollback immédiat en cas de problème avant merge
 git checkout master
-git branch -D fix/v2.2.0-compat-non-destructive-acl
+git branch -D fix/compat-non-destructive-acl
 
 # Rollback après merge si régression détectée en test interne
 git revert -m 1 <commit_merge_sha>

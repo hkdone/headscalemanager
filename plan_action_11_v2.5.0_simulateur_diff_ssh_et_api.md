@@ -1,9 +1,9 @@
 # Plan d'Action 11 — Version 2.5.0 : Simulateur ACL, Diff Visuel Ligne-par-Ligne, Tailscale SSH & Nouveautés API
 
 **Date de création** : 16 novembre 2026  
-**Version cible** : `2.5.0+159`  
-**Branche Git dédiée** : `feat/v2.5.0-simulator-diff-ssh-api-tools` *(créée depuis `master`)*  
-**Prérequis** : Plans d'Action 08 (`v2.2.0`) et 09 (`v2.3.0`) mergés  
+**Version cible** : `2.4.0+158` *(Étape 3 recommandée — voir `SUIVI_IMPLEMENTATION.md`)*  
+**Branche Git dédiée** : `feat/acl-simulator-diff-ssh-api` *(créée depuis `master` après Plan 08)*  
+**Prérequis** : Plan d'Action 08 (`PolicyPreserver` & HuJSON) mergé *(indépendant du Plan 09 ; sert au contraire à sécuriser visuellement le Plan 09)*  
 **Priorité** : **P2 — Évolution Produit (Confiance Admin & Adoption Utilisateurs)**  
 **Niveau de risque global** : 🟢 **Très Faible** *(fonctionnalités purement additives et déclenchées à la demande par l'utilisateur)*
 
@@ -91,13 +91,13 @@ Apporter les outils visuels et d'audit qui donnent aux administrateurs une **con
 
 ### Commandes Git de branche & rollback :
 ```bash
-# Création de la branche depuis master
+# Création de la branche depuis master (après merge du Plan 08)
 git checkout master && git pull
-git checkout -b feat/v2.5.0-simulator-diff-ssh-api-tools
+git checkout -b feat/acl-simulator-diff-ssh-api
 
 # Rollback immédiat avant merge
 git checkout master
-git branch -D feat/v2.5.0-simulator-diff-ssh-api-tools
+git branch -D feat/acl-simulator-diff-ssh-api
 
 # Rollback après merge
 git revert -m 1 <commit_merge_sha>

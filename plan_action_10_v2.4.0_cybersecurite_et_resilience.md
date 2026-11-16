@@ -1,11 +1,11 @@
 # Plan d'Action 10 — Version 2.4.0 : Durcissement Cybersécurité & Résilience Réseau
 
 **Date de création** : 16 novembre 2026  
-**Version cible** : `2.4.0+158`  
-**Branche Git dédiée** : `sec/v2.4.0-cybersecurity-network-hardening` *(créée depuis `master`)*  
-**Prérequis** : Indépendant *(recommandé après Plan 08)*  
-**Priorité** : **P1 — Haute (Sécurité OWASP Mobile & Remédiation Audit SAST)**  
-**Niveau de risque global** : 🟢 **Faible** *(durcissement côté client uniquement, aucune modification du protocole ou des ACLs serveur)*
+**Version cible** : `2.2.0+156` *(Étape 1 recommandée — voir `SUIVI_IMPLEMENTATION.md`)*  
+**Branche Git dédiée** : `sec/hardening-pin-network-sast` *(créée depuis `master`)*  
+**Prérequis** : **Aucun** (100% indépendant des moteurs ACL)  
+**Priorité** : **P1 — Haute (Sécurité OWASP Mobile & Remédiation Audit SAST — à appliquer en premier car risque minimal)**  
+**Niveau de risque global** : 🟢 **Très Faible** *(durcissement côté client uniquement, aucune modification des ACLs ni des tags serveur)*
 
 ---
 
@@ -100,11 +100,11 @@ Protéger la clé API maître de l'administrateur et corriger les faiblesses cry
 ```bash
 # Création de la branche depuis master
 git checkout master && git pull
-git checkout -b sec/v2.4.0-cybersecurity-network-hardening
+git checkout -b sec/hardening-pin-network-sast
 
 # Rollback immédiat avant merge
 git checkout master
-git branch -D sec/v2.4.0-cybersecurity-network-hardening
+git branch -D sec/hardening-pin-network-sast
 
 # Rollback après merge
 git revert -m 1 <commit_merge_sha>

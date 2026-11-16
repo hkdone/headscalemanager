@@ -1,66 +1,94 @@
-# Suivi d'Implémentation — Plans d'Action 08 à 11 (`v2.2.0` → `v2.5.0`)
+# Suivi d'Implémentation — Ordre Logique & Graduel (du moins risqué au plus risqué)
 
 **Branche de référence (stable) :** `master` *(version actuelle en production : `2.1.9+155`)*  
 **Dernière mise à jour :** 16 novembre 2026  
 
+---
+
+## 1. Ordre d'Exécution Recommandé & Dépendances
+
+L'ordre ci-dessous classe les plans **du risque de casse en production le plus faible au plus élevé**, tout en respectant strictement les **dépendances techniques** :
+
+```text
+[Étape 1] Plan 10 : Cybersécurité & Résilience (0 dépendance • Risque 🟢 Très Faible)
+    │  (Hardening local : PIN PBKDF2 migré sans coupure, timeouts HTTP, SAST 100/100)
+    ▼
+[Étape 2] Plan 08 : Compatibilité Multi-Versions & Fusion Non-Destructive (0 dépendance • Risque 🟡 Moyen)
+    │  (Prérequis fondamental : PolicyPreserver, HuJSON, TagCapabilityHelper, aclEngineMode par serveur)
+    ├──────────────────────────────────────────┐
+    ▼                                          │
+[Étape 3] Plan 11 : Outils Visuels & API       │ (Dépend de Plan 08 • Risque 🟢 Très Faible)
+    │  (Diff Visuel + Simulateur ACL + SSH + expireNode + backfillips)
+    │  👉 Fournit le Diff & Simulateur pour vérifier visuellement l'Étape 4 !
+    ▼                                          ▼
+[Étape 4] Plan 09 : Mode ACL Sans Tags & Stop Auto-Tagging (Dépend de Plan 08 • Risque 🟠 Moyen-Élevé)
+       (Moteur tagless, arrêt auto-tagging PreAuthKey/Registration/Dashboard, filet Hybride)
+```
+
+### Pourquoi cet ordre est le plus sûr ?
+1. **Étape 1 ([Plan 10](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_10_v2.4.0_cybersecurite_et_resilience.md))** ne touche **ni aux ACLs, ni aux tags, ni aux routes serveur**. Aucun trafic VPN utilisateur ne peut être coupé. Il corrige l'audit SAST à 100/100 et protège le PIN avec migration transparente.
+2. **Étape 2 ([Plan 08](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_08_v2.2.0_compatibilite_et_securite_acl.md))** pose les fondations indispensables avant toute nouvelle fonctionnalité ACL : il empêche d'écraser les règles `ssh`/`hosts`/`tests` du serveur (`PolicyPreserver`), corrige les tags `;` résiduels, isole `aclEngineMode` par serveur, et répare le parseur HuJSON.
+3. **Étape 3 ([Plan 11](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_11_v2.5.0_simulateur_diff_ssh_et_api.md))** est **100% additive** (risque très faible) et ne dépend que du Plan 08. Le faire **avant** le Plan 09 permet d'utiliser le **Diff Visuel ligne-par-ligne** et le **Simulateur ACL** pour vérifier en interne chaque JSON généré par le futur mode Sans Tags !
+4. **Étape 4 ([Plan 09](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_v2.3.0_acl_sans_tags_et_hybride.md))** est le chantier le plus sensible (il change le flux PreAuthKey/Enregistrement/Approbation pour stopper l'auto-tagging et ajoute le moteur `tagless` + filet Hybride). Le faire en dernier, protégé par `PolicyPreserver` (Plan 08) et contrôlable via le `Diff Visuel` + `Simulateur` (Plan 11), réduit drastiquement le risque de casse en production.
+
 > [!IMPORTANT]
-> **Règle de déploiement prudent (1 Plan = 1 Branche = 1 Validation) :**
-> Ne jamais développer deux plans simultanément sur la même branche. Chaque plan doit être :
-> 1. Développé sur sa branche dédiée créée depuis `master`.
-> 2. Validé par `flutter analyze`, `flutter test` et tests manuels sur serveur interne (versions `< 0.28` et `0.29.x`).
-> 3. Mergé dans `master` (avec tag Git de version) uniquement une fois tous les critères de non-coupure validés.
+> **Règle d'or entre chaque étape :**
+> - Créer la branche depuis `master` à jour.
+> - À chaque release mergée dans `master`, aligner `pubspec.yaml`, `lib/screens/home_screen.dart` (`currentVersion`) et `lib/data/whats_new_data.dart` avec le numéro de version séquentiel (`2.2.0+156` $\rightarrow$ `2.3.0+157` $\rightarrow$ `2.4.0+158` $\rightarrow$ `2.5.0+159`).
+> - **Ne jamais démarrer l'étape N+1 avant d'avoir exécuté la checklist de validation interne de l'étape N.**
 
 ---
 
-## 1. Vue d'Ensemble des Plans & Branches
+## 2. Tableau de Bord des Étapes & Branches
 
-| Plan | Version cible | Branche Git dédiée | Objectif principal | Risque Prod | Statut |
-|---|---|---|---|---|---|
-| [Plan 08](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_08_v2.2.0_compatibilite_et_securite_acl.md) | `2.2.0+156` | `fix/v2.2.0-compat-non-destructive-acl` | Fusion non-destructive (`ssh`/`hosts`/`tests`), cohérence tags, routes `via` 0.29, HuJSON, PreAuthKey API | 🟡 Moyen | ⬜ À faire |
-| [Plan 09](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_v2.3.0_acl_sans_tags_et_hybride.md) | `2.3.0+157` | `feat/v2.3.0-tagless-hybrid-acl` | Mode ACL **Sans Tags (`tagless`)** + Filet de sécurité Hybride pour nœuds sans tag | 🟠 Moyen-Élevé | ⬜ À faire |
-| [Plan 10](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_10_v2.4.0_cybersecurite_et_resilience.md) | `2.4.0+158` | `sec/v2.4.0-cybersecurity-network-hardening` | PIN PBKDF2 + sel (migration transparente), anti-bruteforce, auto-lock, timeouts, SAST 100/100 | 🟢 Faible | ⬜ À faire |
-| [Plan 11](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_11_v2.5.0_simulateur_diff_ssh_et_api.md) | `2.5.0+159` | `feat/v2.5.0-simulator-diff-ssh-api-tools` | Diff visuel ligne-par-ligne, Simulateur ACL + `tests`, Onglet SSH, `expireNode`, `backfillips` | 🟢 Très Faible | ⬜ À faire |
+| Ordre | Plan | Version de release | Branche Git dédiée | Dépendances | Risque Prod | Statut |
+|---|---|---|---|---|---|---|
+| **1** | [Plan 10 — Cybersécurité & Résilience](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_10_v2.4.0_cybersecurite_et_resilience.md) | `2.2.0+156` | `sec/hardening-pin-network-sast` | Aucune | 🟢 Très Faible | ⬜ À faire |
+| **2** | [Plan 08 — Compatibilité & Non-Destructif](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_08_v2.2.0_compatibilite_et_securite_acl.md) | `2.3.0+157` | `fix/compat-non-destructive-acl` | Aucune | 🟡 Moyen | ⬜ À faire |
+| **3** | [Plan 11 — Diff, Simulateur, SSH & API](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_11_v2.5.0_simulateur_diff_ssh_et_api.md) | `2.4.0+158` | `feat/acl-simulator-diff-ssh-api` | Plan 08 | 🟢 Très Faible | ⬜ À faire |
+| **4** | [Plan 09 — Mode Sans Tags & Hybride](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_v2.3.0_acl_sans_tags_et_hybride.md) | `2.5.0+159` | `feat/acl-tagless-and-hybrid` | Plan 08 *(Plan 11 rec.)* | 🟠 Moyen-Élevé | ⬜ À faire |
 
 **Légende des statuts :** `⬜ À faire` • `🔄 En cours` • `🧪 En test interne` • `✅ Validé & Mergé` • `⏪ Rollback effectué`
 
 ---
 
-## 2. Checklist Détaillée d'Implémentation
+## 3. Checklists Détaillées par Étape
 
-### Plan 08 (`2.2.0+156`) — Branche `fix/v2.2.0-compat-non-destructive-acl`
-- [ ] **08.1** `PolicyPreserver` : fusion non-destructive (`ssh`, `tests`, `ipsets`, `derpMap`, `hosts`, `nodeAttrs`) sur tous les points d'appel `setAclPolicy`
+### Étape 1 — Plan 10 (`sec/hardening-pin-network-sast` → `2.2.0+156`)
+- [ ] **10.1** `SecurityService` : PBKDF2-HMAC-SHA256 + sel aléatoire + comparaison temps constant + migration transparente depuis SHA-256 + lockout anti-bruteforce (`LockScreen`)
+- [ ] **10.2** Re-verrouillage automatique en arrière-plan (`main.dart` + `SecuritySettingsScreen` + protection `FilePicker`/biométrie)
+- [ ] **10.3** Timeouts HTTP 20s + alerte `http://` public (`AddEditServerScreen`) + remédiation 3 alertes SAST (`SecurityService`, `StorageService`, `AclScreen`) + `.gitignore`
+- [ ] **10.4** `NetworkOverviewScreen` : diagnostic IP publique / traceroute déclenché uniquement sur clic utilisateur
+- [ ] **Gate 1 (Validation avant merge)** : `flutter analyze` OK • Test unitaire migration PIN SHA-256 $\rightarrow$ PBKDF2 OK • Test lockout 5 essais OK • Re-scan SAST 100/100 • Versionning `2.2.0+156`
+
+### Étape 2 — Plan 08 (`fix/compat-non-destructive-acl` → `2.3.0+157`)
+- [ ] **08.1** `PolicyPreserver` : fusion non-destructive (`ssh`, `tests`, `ipsets`, `derpMap`, `hosts`, `nodeAttrs`) sur **tous** les appels `setAclPolicy` (y compris `RenameNodeDialog`, `ManageSpecificRulesDialog`, `LegacyMigrationDialog`)
 - [ ] **08.2** `TagCapabilityHelper` : unification gestion tags Legacy vs Standard/GrantsV29 + fix nettoyage `tag:<user>-lan-sharer` + fix `registration_dialogs.dart`, `create_pre_auth_key_dialog.dart`, `move_node_dialog.dart`
 - [ ] **08.3** `RouteConflictService` : autoriser CIDR partagés entre users différents en mode `grantsV29` ($\ge 0.29$) + alerte pré-rollback dans `SettingsScreen`
 - [ ] **08.4** `JsonUtils` : parseur lexical HuJSON complet (`//`, `/* */`, trailing commas) + application dans `AclScreen._fetchAclPolicyFromServer`
 - [ ] **08.5** API `PreAuthKey` v0.28+ (`serverVersion` + `keyId`) + encodage `Uri.encodeComponent`
-- [ ] **Validation 08** : `flutter analyze` OK • Tests unitaires OK • Test interne approbation route + HuJSON + conservation `ssh` OK
+- [ ] **08.6** Isolation `aclEngineMode` par `serverId` dans `StorageService` / `AppProvider` (avec fallback sur la clé globale existante)
+- [ ] **Gate 2 (Validation avant merge)** : `flutter analyze` OK • Tests unitaires HuJSON & `PolicyPreserver` OK • Test interne conservation `ssh`/`hosts`, approbation route 0.29, et bascule multi-serveurs • Versionning `2.3.0+157`
 
-### Plan 09 (`2.3.0+157`) — Branche `feat/v2.3.0-tagless-hybrid-acl`
-- [ ] **09.1** `AclEngineMode.tagless` + `TaglessAclGeneratorService` (`group:` + `hosts` + `autoApprovers` sans tags)
-- [ ] **09.2** Filet de sécurité Hybride dans `StandardAclGeneratorService` & `GrantsV29GeneratorService` (+ option désactivable)
-- [ ] **09.3** Support `hosts` et `group:` sans tag dans `AclParserService`, `AclGraphWidget`, `GrantComposerService`, `AclPuzzleScreen` (+ fix normalisation `group:` dans Puzzle)
-- [ ] **09.4** Adaptation UI : `SettingsScreen`, `AclEngineBanner`, `registration_dialogs.dart` (tags optionnels en mode `tagless`)
-- [ ] **Validation 09** : Test non-régression JSON identique sur flotte 100% taguée • Test flotte 100% sans tags • Test flotte mixte • Test Graphe/Puzzle OK
-
-### Plan 10 (`2.4.0+158`) — Branche `sec/v2.4.0-cybersecurity-network-hardening`
-- [ ] **10.1** `SecurityService` : PBKDF2-HMAC-SHA256 + sel aléatoire + migration transparente depuis SHA-256 + lockout anti-bruteforce (`LockScreen`)
-- [ ] **10.2** Re-verrouillage automatique en arrière-plan (`main.dart` + `SecuritySettingsScreen` + protection `FilePicker`/biométrie)
-- [ ] **10.3** Timeouts HTTP 20s + alerte `http://` public (`AddEditServerScreen`) + remédiation 3 alertes SAST (`catch` silencieux) + `.gitignore`
-- [ ] **10.4** `NetworkOverviewScreen` : diagnostic IP publique / traceroute déclenché uniquement sur action utilisateur
-- [ ] **Validation 10** : Test unitaire migration PIN SHA-256 $\rightarrow$ PBKDF2 • Test lockout 5 essais • Re-scan SAST 100/100
-
-### Plan 11 (`2.5.0+159`) — Branche `feat/v2.5.0-simulator-diff-ssh-api-tools`
+### Étape 3 — Plan 11 (`feat/acl-simulator-diff-ssh-api` → `2.4.0+158`)
 - [ ] **11.1** `JsonDiffUtils` + `PolicyDiffDialog` v2 (comparateur coloré `+`/`-` face à la policy serveur réelle)
 - [ ] **11.2** `AclSimulatorSheet` + `AclParserService.simulateConnection` + génération/validation du bloc `"tests"` (Headscale $\ge 0.29$)
 - [ ] **11.3** Onglet SSH dans `AclScreen` (`SshRulesListView` + validation Tailscale SSH)
 - [ ] **11.4** API `expireNode` (dans `NodeDetailScreen` & `UserDetailScreen`) + `backfillNodeIps` (dans `SettingsScreen`)
-- [ ] **Validation 11** : Tests unitaires Diff & Simulateur • Test interne `expireNode` + `tests` Headscale 0.29.7
+- [ ] **Gate 3 (Validation avant merge)** : `flutter analyze` OK • Tests unitaires Diff & Simulateur OK • Test interne `expireNode`, `ssh` et `tests` sur Headscale 0.29.7 • Versionning `2.4.0+158`
+
+### Étape 4 — Plan 09 (`feat/acl-tagless-and-hybrid` → `2.5.0+159`)
+- [ ] **09.1** `AclEngineMode.tagless` + `TaglessAclGeneratorService` (`group:` + `hosts` + `autoApprovers` + tolérance rétroactive machines déjà taguées)
+- [ ] **09.2** Stopper l'auto-tagging en mode `tagless` dans `CreatePreAuthKeyDialog` (`aclTags: null` par défaut), `registration_dialogs.dart` (sauter étape tags), `DashboardScreen` (y compris fix bug `tag:exit-node` sans user), `ExitNodeCommandDialog`, `ShareSubnetDialog` + guide ré-auth sans tag dans `EditTagsDialog`
+- [ ] **09.3** Filet de sécurité Hybride dans `StandardAclGeneratorService` & `GrantsV29GeneratorService` (+ option désactivable)
+- [ ] **09.4** Empêcher popup/auto-bascule `GrantsMigrationDialog` si mode `tagless` (`HomeScreen` & `AppProvider`), ouvrir `GrantsV29Gate` / `GrantEditSheet` au mode `tagless`, support `hosts` & `group:` dans `AclParserService` (Graphe + Simulateur), `GrantComposerService`, `AclPuzzleScreen` (+ fix normalisation `group:` dans Puzzle), `SettingsScreen` & `AclEngineBanner`
+- [ ] **Gate 4 (Validation avant merge)** : Test non-régression JSON identique sur flotte 100% taguée • Test enregistrement + PreAuthKey sans tag • Test flotte mixte (tagués + non-tagués) • Vérification via Diff Visuel & Simulateur (Plan 11) • Versionning `2.5.0+159`
 
 ---
 
-## 3. Journal de Progression & Incidents
+## 4. Journal de Progression & Incidents
 
-| Date | Plan / Tâche | Branche | Auteur | Résultat / Observations de test interne |
-|---|---|---|---|---|
-| 2026-11-16 | Initialisation | `master` | Architecture & Sécurité | Création des plans 08 à 11 et du suivi d'implémentation après audit complet du codebase (`2.1.9+155`). |
-| — | — | — | — | — |
+| Date | Étape / Plan | Branche | Résultat / Observations de test interne |
+|---|---|---|---|
+| 2026-11-16 | Initialisation & Audit | `master` | Création et audit croisé des plans 08 à 11 ; mise en place de l'ordre graduel 10 $\rightarrow$ 08 $\rightarrow$ 11 $\rightarrow$ 09. |
+| — | — | — | — |
