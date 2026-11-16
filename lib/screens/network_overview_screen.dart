@@ -32,6 +32,7 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
   bool _isTracingRoute = false;
   Node? _exitNodeInUse;
   int _traceRouteGeneration = 0;
+  String _traceTargetIp = '1.1.1.1';
 
   @override
   void initState() {
@@ -44,23 +45,19 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
     final isFr = locale.languageCode == 'fr';
     // Incrémente la génération pour invalider les traceroutes précédents.
     _traceRouteGeneration++;
-    final currentGeneration = _traceRouteGeneration;
 
     setState(() {
       _isLoading = true;
+      _isTracingRoute = false;
       _exitNodeInUse = null;
+      _publicIp = null;
       _traceRouteHops.clear();
     });
 
     try {
-      // Étape 1: Toujours récupérer les nœuds en premier.
+      // Seul le ping interne du Tailnet est lancé automatiquement.
+      // Les diagnostics externes (IP publique / traceroute) restent opt-in.
       await _fetchNodes();
-
-      // Si l'écran est toujours monté et que la génération est actuelle.
-      if (mounted && _traceRouteGeneration == currentGeneration) {
-        // Étape 2: Récupérer l'IP publique et ENSUITE lancer le traceroute.
-        await _fetchPublicIpAndTrace(currentGeneration);
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -76,6 +73,12 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
         });
       }
     }
+  }
+
+  Future<void> _runExternalExitDiagnostic() async {
+    _traceRouteGeneration++;
+    final currentGeneration = _traceRouteGeneration;
+    await _fetchPublicIpAndTrace(currentGeneration);
   }
 
   Future<void> _fetchNodes() async {
@@ -111,16 +114,23 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
   }
 
   Future<void> _fetchPublicIpAndTrace(int generation) async {
+    if (!mounted || _traceRouteGeneration != generation) return;
+    setState(() {
+      _isTracingRoute = true;
+      _publicIp = null;
+      _traceRouteHops.clear();
+      _exitNodeInUse = null;
+    });
+
     try {
-      final response =
-          await http.get(Uri.parse('https://api.ipify.org?format=json'));
+      final response = await http
+          .get(Uri.parse('https://api.ipify.org?format=json'))
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         if (!mounted || _traceRouteGeneration != generation) return;
         setState(() {
           _publicIp = json.decode(response.body)['ip'];
         });
-        // Le traceroute est lancé ici, après que _fetchNodes soit terminé.
-        _startTraceRoute(generation);
       }
     } catch (e) {
       if (mounted) {
@@ -133,23 +143,24 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
         );
       }
     }
+
+    if (mounted && _traceRouteGeneration == generation) {
+      _startTraceRoute(generation);
+    }
   }
 
   void _startTraceRoute(int generation) async {
-    // Si une autre actualisation a été lancée, on ne commence pas un nouveau traceroute.
     if (_traceRouteGeneration != generation) return;
 
     setState(() {
       _isTracingRoute = true;
-      // On s'assure de vider les données pour la nouvelle trace.
       _traceRouteHops.clear();
       _exitNodeInUse = null;
     });
 
-    const String targetIp = '8.8.8.8'; // Google DNS
+    final String targetIp = _traceTargetIp;
 
     for (int ttl = 1; ttl <= 30; ttl++) {
-      // Vérifie à chaque itération si une nouvelle actualisation a été demandée.
       if (_traceRouteGeneration != generation || !mounted) break;
 
       final ping = Ping(targetIp, count: 1, ttl: ttl, timeout: 2);
@@ -161,7 +172,6 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
         }
       });
 
-      // Gère le cas où aucun paquet n'est reçu (timeout)
       Future.delayed(const Duration(seconds: 3), () {
         if (!completer.isCompleted) {
           completer.complete(null);
@@ -169,49 +179,36 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
       });
 
       final PingData? data = await completer.future;
-      sub.cancel(); // Annule l'abonnement pour éviter les fuites
+      sub.cancel();
 
       String hopIp = '*';
       if (data?.response?.ip != null) {
         hopIp = data!.response!.ip!;
-        // Correction: La librairie de ping ajoute parfois un ':' à la fin de l'IP en mode traceroute.
         if (hopIp.endsWith(':')) {
           hopIp = hopIp.substring(0, hopIp.length - 1);
         }
       }
 
-      // Log de débogage : Affiche chaque saut.
-      // print('Génération $generation - Saut $ttl: $hopIp');
-
-      // N'applique les changements que si la génération est toujours valide.
       if (_traceRouteGeneration == generation && mounted) {
         setState(() {
-          // Crée une nouvelle liste pour garantir la reconstruction du widget.
           _traceRouteHops = [..._traceRouteHops, hopIp];
-          // Vérifie si le saut correspond à un exit node
           if (hopIp != '*') {
             try {
-              // On cherche si le saut correspond à N'IMPORTE QUEL nœud du réseau.
               final gatewayNode = _nodes.firstWhere(
                 (node) => node.ipAddresses.contains(hopIp),
               );
               _exitNodeInUse = gatewayNode;
-            } catch (e) {
-              // Pas un exit node, on continue
-            }
+            } catch (_) {}
           }
         });
       }
 
-      // On s'arrête uniquement si on atteint la destination finale.
-      // La détection d'un exit node ne doit pas interrompre le traceroute complet.
       if (hopIp == targetIp) {
         break;
       }
     }
 
     if (mounted && _traceRouteGeneration == generation) {
-      // print('--- Fin du Traceroute (Génération $generation) ---');
       setState(() {
         _isTracingRoute = false;
       });
@@ -232,7 +229,6 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
 
         _pingSubscriptions[node.id] = ping.stream.listen(
           (PingData data) {
-            // On ne compte que les réponses valides (avec un temps de réponse) et sans erreur.
             if (data.response != null && data.error == null) {
               responses.add(data.response!);
             }
@@ -287,7 +283,6 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
   }
 
   Widget _buildContent() {
-    // Exclut le nœud sélectionné de la liste à afficher pour le ping.
     final nodesToDisplay =
         _nodes.where((node) => node.id != _selectedNode?.id).toList();
 
@@ -350,7 +345,7 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
                     context,
                     isFr ? 'Mon Appareil' : 'My Device',
                     Icons.phone_iphone,
-                    _selectedNode?.name ?? (isFr ? 'N/A' : 'N/A')),
+                    _selectedNode?.name ?? 'N/A'),
                 if (_exitNodeInUse != null) ...[
                   Icon(Icons.arrow_forward,
                       color: Theme.of(context).textTheme.bodyMedium?.color),
@@ -360,7 +355,45 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
                 Icon(Icons.arrow_forward,
                     color: Theme.of(context).textTheme.bodyMedium?.color),
                 _buildVisualizerNode(
-                    context, 'Internet', Icons.cloud, _publicIp ?? '...'),
+                    context,
+                    'Internet',
+                    Icons.cloud,
+                    _publicIp ??
+                        (isFr ? 'Non testé (opt-in)' : 'Not tested (opt-in)')),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              alignment: WrapAlignment.center,
+              children: [
+                DropdownButton<String>(
+                  value: _traceTargetIp,
+                  onChanged: _isTracingRoute
+                      ? null
+                      : (val) {
+                          if (val != null) {
+                            setState(() => _traceTargetIp = val);
+                          }
+                        },
+                  items: const [
+                    DropdownMenuItem(
+                        value: '1.1.1.1', child: Text('Cloudflare (1.1.1.1)')),
+                    DropdownMenuItem(
+                        value: '8.8.8.8', child: Text('Google (8.8.8.8)')),
+                    DropdownMenuItem(
+                        value: '9.9.9.9', child: Text('Quad9 (9.9.9.9)')),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: _isTracingRoute ? null : _runExternalExitDiagnostic,
+                  icon: const Icon(Icons.route),
+                  label: Text(isFr
+                      ? 'Tester la sortie Internet'
+                      : 'Test Internet Exit'),
+                ),
               ],
             ),
             if (_isTracingRoute) ...[
@@ -383,9 +416,7 @@ class _NetworkOverviewScreenState extends State<NetworkOverviewScreen> {
                     final node =
                         _nodes.firstWhere((n) => n.ipAddresses.contains(hop));
                     nodeName = ' (${node.name})';
-                  } catch (e) {
-                    // Ce n'est pas un nœud connu
-                  }
+                  } catch (_) {}
                   return ListTile(
                     dense: true,
                     title: Text(

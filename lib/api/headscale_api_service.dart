@@ -11,6 +11,8 @@ class HeadscaleApiService {
   final String _apiKey;
   final String _baseUrl;
 
+  static const Duration _requestTimeout = Duration(seconds: 20);
+
   HeadscaleApiService({required String apiKey, required String baseUrl})
       : _apiKey = apiKey,
         _baseUrl = baseUrl.endsWith('/')
@@ -25,17 +27,25 @@ class HeadscaleApiService {
     };
   }
 
+  String _sanitizeErrorBody(String body) {
+    final compact = body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (compact.length <= 300) return compact;
+    return '${compact.substring(0, 300)}…';
+  }
+
   String _handleError(String functionName, http.Response response) {
-    return 'Échec de $functionName. Statut : ${response.statusCode}, Corps : ${response.body}';
+    return 'Échec de $functionName. Statut : ${response.statusCode}, Corps : ${_sanitizeErrorBody(response.body)}';
   }
 
   Future<List<Node>> getNodes() async {
     final String baseDomain = _baseUrl.extractBaseDomain() ?? 'headscale.local';
 
-    final response = await http.get(
-      Uri.parse('$_baseUrl/api/v1/node'),
-      headers: _getHeaders(),
-    );
+    final response = await http
+        .get(
+          Uri.parse('$_baseUrl/api/v1/node'),
+          headers: _getHeaders(),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -52,10 +62,12 @@ class HeadscaleApiService {
   Future<Node> getNodeDetails(String nodeId) async {
     final String baseDomain = _baseUrl.extractBaseDomain() ?? 'headscale.local';
 
-    final response = await http.get(
-      Uri.parse('$_baseUrl/api/v1/node/$nodeId'),
-      headers: _getHeaders(),
-    );
+    final response = await http
+        .get(
+          Uri.parse('$_baseUrl/api/v1/node/$nodeId'),
+          headers: _getHeaders(),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       return Node.fromJson(json.decode(response.body)['node'], baseDomain);
@@ -67,11 +79,13 @@ class HeadscaleApiService {
   Future<Node> registerMachine(String machineKey, String userName) async {
     final String baseDomain = _baseUrl.extractBaseDomain() ?? 'headscale.local';
 
-    final response = await http.post(
-      Uri.parse(
-          '$_baseUrl/api/v1/node/register?user=$userName&key=$machineKey'),
-      headers: _getHeaders(),
-    );
+    final response = await http
+        .post(
+          Uri.parse(
+              '$_baseUrl/api/v1/node/register?user=$userName&key=$machineKey'),
+          headers: _getHeaders(),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -82,10 +96,12 @@ class HeadscaleApiService {
   }
 
   Future<List<User>> getUsers() async {
-    final response = await http.get(
-      Uri.parse('$_baseUrl/api/v1/user'),
-      headers: _getHeaders(),
-    );
+    final response = await http
+        .get(
+          Uri.parse('$_baseUrl/api/v1/user'),
+          headers: _getHeaders(),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -97,11 +113,13 @@ class HeadscaleApiService {
   }
 
   Future<User> createUser(String name) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/v1/user'),
-      headers: _getHeaders(),
-      body: jsonEncode(<String, String>{'name': name}),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/api/v1/user'),
+          headers: _getHeaders(),
+          body: jsonEncode(<String, String>{'name': name}),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       return User.fromJson(json.decode(response.body));
@@ -127,11 +145,13 @@ class HeadscaleApiService {
       body['aclTags'] = aclTags;
     }
 
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/v1/preauthkey'),
-      headers: _getHeaders(),
-      body: jsonEncode(body),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/api/v1/preauthkey'),
+          headers: _getHeaders(),
+          body: jsonEncode(body),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -144,10 +164,12 @@ class HeadscaleApiService {
   }
 
   Future<String> getAclPolicy() async {
-    final response = await http.get(
-      Uri.parse('$_baseUrl/api/v1/policy'),
-      headers: _getHeaders(),
-    );
+    final response = await http
+        .get(
+          Uri.parse('$_baseUrl/api/v1/policy'),
+          headers: _getHeaders(),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -199,11 +221,13 @@ class HeadscaleApiService {
 
     final body = jsonEncode({'policy': payload});
 
-    final response = await http.put(
-      Uri.parse('$_baseUrl/api/v1/policy'),
-      headers: _getHeaders(),
-      body: body,
-    );
+    final response = await http
+        .put(
+          Uri.parse('$_baseUrl/api/v1/policy'),
+          headers: _getHeaders(),
+          body: body,
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       throw Exception(_handleError('sauvegarder la politique ACL', response));
@@ -211,10 +235,12 @@ class HeadscaleApiService {
   }
 
   Future<void> deleteUser(String userId) async {
-    final response = await http.delete(
-      Uri.parse('$_baseUrl/api/v1/user/$userId'),
-      headers: _getHeaders(),
-    );
+    final response = await http
+        .delete(
+          Uri.parse('$_baseUrl/api/v1/user/$userId'),
+          headers: _getHeaders(),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       throw Exception(_handleError('supprimer l\'utilisateur', response));
@@ -222,10 +248,12 @@ class HeadscaleApiService {
   }
 
   Future<void> deleteNode(String nodeId) async {
-    final response = await http.delete(
-      Uri.parse('$_baseUrl/api/v1/node/$nodeId'),
-      headers: _getHeaders(),
-    );
+    final response = await http
+        .delete(
+          Uri.parse('$_baseUrl/api/v1/node/$nodeId'),
+          headers: _getHeaders(),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       throw Exception(_handleError('supprimer le nœud', response));
@@ -233,11 +261,13 @@ class HeadscaleApiService {
   }
 
   Future<void> setNodeRoutes(String nodeId, List<String> routes) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/v1/node/$nodeId/approve_routes'),
-      headers: _getHeaders(),
-      body: jsonEncode(<String, dynamic>{'routes': routes}),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/api/v1/node/$nodeId/approve_routes'),
+          headers: _getHeaders(),
+          body: jsonEncode(<String, dynamic>{'routes': routes}),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       throw Exception(_handleError('définir les routes du nœud', response));
@@ -245,10 +275,12 @@ class HeadscaleApiService {
   }
 
   Future<void> renameNode(String nodeId, String newName) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/v1/node/$nodeId/rename/$newName'),
-      headers: _getHeaders(),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/api/v1/node/$nodeId/rename/$newName'),
+          headers: _getHeaders(),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       throw Exception(_handleError('renommer le nœud', response));
@@ -256,11 +288,13 @@ class HeadscaleApiService {
   }
 
   Future<void> moveNode(String nodeId, User newUser) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/v1/node/$nodeId/user'),
-      headers: _getHeaders(),
-      body: jsonEncode(<String, String>{'user': newUser.id}),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/api/v1/node/$nodeId/user'),
+          headers: _getHeaders(),
+          body: jsonEncode(<String, String>{'user': newUser.id}),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       throw Exception(_handleError('déplacer le nœud', response));
@@ -268,10 +302,12 @@ class HeadscaleApiService {
   }
 
   Future<void> renameUser(String oldId, String newName) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/v1/user/$oldId/rename/$newName'),
-      headers: _getHeaders(),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/api/v1/user/$oldId/rename/$newName'),
+          headers: _getHeaders(),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       throw Exception(_handleError('renommer l\'utilisateur', response));
@@ -284,10 +320,12 @@ class HeadscaleApiService {
     // HEADSCALE v0.28+ : Endpoint global /api/v1/preauthkey
     if (serverVersion != null &&
         VersionInfo.checkVersionAtLeast(serverVersion, '0.28.0')) {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/v1/preauthkey'),
-        headers: _getHeaders(),
-      );
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/api/v1/preauthkey'),
+            headers: _getHeaders(),
+          )
+          .timeout(_requestTimeout);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -304,10 +342,12 @@ class HeadscaleApiService {
     final users = await getUsers();
 
     for (final user in users) {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/v1/preauthkey?user=${user.id}'),
-        headers: _getHeaders(),
-      );
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/api/v1/preauthkey?user=${user.id}'),
+            headers: _getHeaders(),
+          )
+          .timeout(_requestTimeout);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -328,13 +368,15 @@ class HeadscaleApiService {
     if (serverVersion != null &&
         VersionInfo.checkVersionAtLeast(serverVersion, '0.28.0') &&
         keyId != null) {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/v1/preauthkey/expire'),
-        headers: _getHeaders(),
-        body: jsonEncode(<String, dynamic>{
-          'id': keyId, // Nouveau paramètre v0.28
-        }),
-      );
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/api/v1/preauthkey/expire'),
+            headers: _getHeaders(),
+            body: jsonEncode(<String, dynamic>{
+              'id': keyId, // Nouveau paramètre v0.28
+            }),
+          )
+          .timeout(_requestTimeout);
       if (response.statusCode != 200) {
         throw Exception(_handleError('expirer la clé (ID $keyId)', response));
       }
@@ -342,14 +384,16 @@ class HeadscaleApiService {
     }
 
     // LEGACY / v0.27 : Expiration par User + Key
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/v1/preauthkey/expire'),
-      headers: _getHeaders(),
-      body: jsonEncode(<String, String>{
-        'user': userId,
-        'key': key,
-      }),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/api/v1/preauthkey/expire'),
+          headers: _getHeaders(),
+          body: jsonEncode(<String, String>{
+            'user': userId,
+            'key': key,
+          }),
+        )
+        .timeout(_requestTimeout);
     if (response.statusCode != 200) {
       throw Exception(
           _handleError('expirer la clé de pré-authentification', response));
@@ -357,10 +401,12 @@ class HeadscaleApiService {
   }
 
   Future<List<ApiKey>> listApiKeys() async {
-    final response = await http.get(
-      Uri.parse('$_baseUrl/api/v1/apikey'),
-      headers: _getHeaders(),
-    );
+    final response = await http
+        .get(
+          Uri.parse('$_baseUrl/api/v1/apikey'),
+          headers: _getHeaders(),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -377,11 +423,13 @@ class HeadscaleApiService {
       body['expiration'] = expiration.toUtc().toIso8601String();
     }
 
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/v1/apikey'),
-      headers: _getHeaders(),
-      body: jsonEncode(body),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/api/v1/apikey'),
+          headers: _getHeaders(),
+          body: jsonEncode(body),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -392,11 +440,13 @@ class HeadscaleApiService {
   }
 
   Future<void> expireApiKey(String prefix) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/v1/apikey/expire'),
-      headers: _getHeaders(),
-      body: jsonEncode(<String, String>{'prefix': prefix}),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/api/v1/apikey/expire'),
+          headers: _getHeaders(),
+          body: jsonEncode(<String, String>{'prefix': prefix}),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       throw Exception(_handleError('expirer la clé API', response));
@@ -404,10 +454,12 @@ class HeadscaleApiService {
   }
 
   Future<void> deleteApiKey(String prefix) async {
-    final response = await http.delete(
-      Uri.parse('$_baseUrl/api/v1/apikey/$prefix'),
-      headers: _getHeaders(),
-    );
+    final response = await http
+        .delete(
+          Uri.parse('$_baseUrl/api/v1/apikey/$prefix'),
+          headers: _getHeaders(),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       throw Exception(_handleError('supprimer la clé API', response));
@@ -417,11 +469,13 @@ class HeadscaleApiService {
   Future<Node> setTags(String nodeId, List<String> tags) async {
     final String baseDomain = _baseUrl.extractBaseDomain() ?? 'headscale.local';
 
-    final response = await http.post(
-      Uri.parse('$_baseUrl/api/v1/node/$nodeId/tags'),
-      headers: _getHeaders(),
-      body: jsonEncode(<String, dynamic>{'tags': tags}),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/api/v1/node/$nodeId/tags'),
+          headers: _getHeaders(),
+          body: jsonEncode(<String, dynamic>{'tags': tags}),
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -432,12 +486,14 @@ class HeadscaleApiService {
   }
 
   Future<VersionInfo> getVersion() async {
-    final response = await http.get(
-      Uri.parse('$_baseUrl/version'),
-      headers: {
-        'Accept': 'application/json',
-      },
-    );
+    final response = await http
+        .get(
+          Uri.parse('$_baseUrl/version'),
+          headers: {
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(_requestTimeout);
 
     if (response.statusCode == 200) {
       return VersionInfo.fromJson(json.decode(response.body));

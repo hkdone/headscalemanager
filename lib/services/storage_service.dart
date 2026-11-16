@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/models/server.dart';
@@ -377,6 +378,7 @@ class _SafeSecureStorage {
     try {
       return await _storage.read(key: key);
     } catch (e) {
+      debugPrint('StorageService read error ($key): ${e.runtimeType}');
       return null;
     }
   }
@@ -385,16 +387,24 @@ class _SafeSecureStorage {
     try {
       await _storage.write(key: key, value: value);
     } catch (e) {
+      debugPrint('StorageService write retry ($key): ${e.runtimeType}');
       try {
         await _storage.delete(key: key);
         await _storage.write(key: key, value: value);
-      } catch (_) {}
+      } catch (retryError) {
+        debugPrint(
+            'StorageService write failed ($key): ${retryError.runtimeType}');
+        rethrow;
+      }
     }
   }
 
   Future<void> delete({required String key}) async {
     try {
       await _storage.delete(key: key);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('StorageService delete error ($key): ${e.runtimeType}');
+      rethrow;
+    }
   }
 }
