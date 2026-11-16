@@ -267,6 +267,53 @@ class HeadscaleApiService {
     }
   }
 
+  /// Expire la session d'un nœud sans le supprimer (déconnexion propre).
+  Future<Node> expireNode(String nodeId) async {
+    final String baseDomain =
+        _baseUrl.extractBaseDomain() ?? 'headscale.local';
+    final response = await http
+        .post(
+          Uri.parse(
+              '$_baseUrl/api/v1/node/${Uri.encodeComponent(nodeId)}/expire'),
+          headers: _getHeaders(),
+        )
+        .timeout(_requestTimeout);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return Node.fromJson(data['node'], baseDomain);
+    } else {
+      throw Exception(_handleError('expirer la session du nœud', response));
+    }
+  }
+
+  /// Prévisualise (`confirmed: false`) ou applique (`confirmed: true`)
+  /// l'attribution des IPs manquantes sur les nœuds existants.
+  Future<List<String>> backfillNodeIps({bool confirmed = true}) async {
+    final uri = Uri.parse('$_baseUrl/api/v1/node/backfillips').replace(
+      queryParameters: {
+        'confirmed': confirmed ? 'true' : 'false',
+      },
+    );
+    final response = await http
+        .post(
+          uri,
+          headers: _getHeaders(),
+        )
+        .timeout(_requestTimeout);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final changes = data['changes'];
+      if (changes is List) {
+        return changes.map((e) => e.toString()).toList();
+      }
+      return const [];
+    } else {
+      throw Exception(_handleError('attribuer les IPs manquantes', response));
+    }
+  }
+
   Future<void> setNodeRoutes(String nodeId, List<String> routes) async {
     final response = await http
         .post(

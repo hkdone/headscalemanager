@@ -217,6 +217,13 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
               tooltip: isFr ? 'Composer une règle' : 'Compose a rule',
               onPressed: () => _openGrantComposer(context),
             ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: isFr
+                ? 'Expirer la session (Déconnecter)'
+                : 'Expire session (Disconnect)',
+            onPressed: () => _confirmExpireNode(context),
+          ),
         ],
       ),
       body: SafeArea(
@@ -236,10 +243,109 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
             _buildTagsAndRoutesCard(context),
             const SizedBox(height: 16),
             _buildPingCard(context),
+            const SizedBox(height: 16),
+            _buildSessionActionsCard(context),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildSessionActionsCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final isFr = context.watch<AppProvider>().locale.languageCode == 'fr';
+    return _SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isFr ? 'Gestion de session' : 'Session Management',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isFr
+                ? 'Expire immédiatement la clé de session du nœud sans le supprimer ni effacer ses tags et routes.'
+                : 'Immediately expires the node session without deleting the machine or losing its tags and routes.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onPrimary.withValues(alpha: 0.85),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _confirmExpireNode(context),
+              icon: const Icon(Icons.logout, color: Colors.orangeAccent),
+              label: Text(
+                isFr
+                    ? 'Expirer la session (Déconnecter sans supprimer)'
+                    : 'Expire session (Disconnect without deleting)',
+                style: TextStyle(color: theme.colorScheme.onPrimary),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(
+                  color: Colors.orangeAccent.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmExpireNode(BuildContext context) async {
+    final provider = context.read<AppProvider>();
+    final isFr = provider.locale.languageCode == 'fr';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: Text(
+          isFr ? 'Expirer la session du nœud ?' : 'Expire node session?',
+        ),
+        content: Text(
+          isFr
+              ? 'La machine "${_currentNode.name}" sera déconnectée du réseau VPN jusqu\'à sa prochaine réauthentification, tout en conservant ses tags, IPs et routes.'
+              : 'Device "${_currentNode.name}" will be disconnected from the VPN until it re-authenticates, while keeping its tags, IPs and routes.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: Text(isFr ? 'Annuler' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.orange),
+            child: Text(isFr ? 'Expirer' : 'Expire'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      final updated = await provider.apiService.expireNode(_currentNode.id);
+      if (!context.mounted) return;
+      setState(() {
+        _currentNode = updated;
+      });
+      showSafeSnackBar(
+        context,
+        isFr
+            ? 'Session expirée pour ${_currentNode.name}.'
+            : 'Session expired for ${_currentNode.name}.',
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      showSafeSnackBar(
+        context,
+        isFr ? 'Erreur lors de l\'expiration : $e' : 'Failed to expire: $e',
+      );
+    }
   }
 
   Widget _buildMainInfoCard(BuildContext context) {

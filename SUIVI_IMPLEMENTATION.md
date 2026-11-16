@@ -45,7 +45,7 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 |---|---|---|---|---|---|---|
 | **1** | [Plan 10 — Cybersécurité & Résilience](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_10_v2.4.0_cybersecurite_et_resilience.md) | `2.2.0+157` | `sec/hardening-pin-network-sast` | Aucune | 🟢 Très Faible | ✅ Validé & Mergé |
 | **2** | [Plan 08 — Compatibilité & Non-Destructif](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_08_v2.2.0_compatibilite_et_securite_acl.md) | `2.3.0+158` | `fix/compat-non-destructive-acl` | Aucune | 🟡 Moyen | ✅ Validé & Mergé |
-| **3** | [Plan 11 — Diff, Simulateur, SSH & API](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_11_v2.5.0_simulateur_diff_ssh_et_api.md) | `2.4.0+159` | `feat/acl-simulator-diff-ssh-api` | Plan 08 | 🟢 Très Faible | ⬜ À faire |
+| **3** | [Plan 11 — Diff, Simulateur, SSH & API](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_11_v2.5.0_simulateur_diff_ssh_et_api.md) | `2.4.0+160` | `feat/acl-simulator-diff-ssh-api` | Plan 08 | 🟢 Très Faible | 🧪 En test interne |
 | **4** | [Plan 09 — Mode Sans Tags & Hybride](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_v2.3.0_acl_sans_tags_et_hybride.md) | `2.5.0+160` | `feat/acl-tagless-and-hybrid` | Plan 08 *(Plan 11 rec.)* | 🟠 Moyen-Élevé | ⬜ À faire |
 
 **Légende des statuts :** `⬜ À faire` • `🔄 En cours` • `🧪 En test interne` • `✅ Validé & Mergé` • `⏪ Rollback effectué`
@@ -70,12 +70,12 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 - [x] **08.6** Isolation `aclEngineMode` par `serverId` dans `StorageService` / `AppProvider` (avec fallback sur la clé globale existante)
 - [x] **Gate 2 (Validation avant merge)** : `flutter analyze` (0 erreur/info) ✅ • 55/55 tests unitaires ✅ • Versionning `2.3.0+158` ✅ • Test interne conservation `ssh`/`hosts`, approbation route 0.29, synchro éditeur JSON/orphelins et bascule multi-serveurs ✅ (commentaires HuJSON ↔ Puzzle et détail 6-7 différés au test conjoint Étape 3)
 
-### Étape 3 — Plan 11 (`feat/acl-simulator-diff-ssh-api` → `2.4.0+159`)
-- [ ] **11.1** `JsonDiffUtils` + `PolicyDiffDialog` v2 (comparateur coloré `+`/`-` face à la policy serveur réelle)
-- [ ] **11.2** `AclSimulatorSheet` + `AclParserService.simulateConnection` + génération/validation du bloc `"tests"` (Headscale $\ge 0.29$)
-- [ ] **11.3** Onglet SSH dans `AclScreen` (`SshRulesListView` + validation Tailscale SSH)
-- [ ] **11.4** API `expireNode` (dans `NodeDetailScreen` & `UserDetailScreen`) + `backfillNodeIps` (dans `SettingsScreen`)
-- [ ] **Gate 3 (Validation avant merge)** : `flutter analyze` OK • Tests unitaires Diff & Simulateur OK • Test interne `expireNode`, `ssh` et `tests` sur Headscale 0.29.7 • Versionning `2.4.0+159`
+### Étape 3 — Plan 11 (`feat/acl-simulator-diff-ssh-api` → `2.4.0+160`)
+- [x] **11.1** `JsonDiffUtils` + `PolicyDiffDialog` v2 (comparateur coloré `+`/`-` face à la policy serveur réelle)
+- [x] **11.2** `AclSimulatorSheet` + `AclParserService.simulateConnection` + génération/validation du bloc `"tests"` (Headscale $\ge 0.29$)
+- [x] **11.3** Onglet SSH dans `AclScreen` (`SshRulesListView` + validation Tailscale SSH)
+- [x] **11.4** API `expireNode` (dans `NodeDetailScreen` & `UserDetailScreen`) + `backfillNodeIps` (dans `SettingsScreen`)
+- [ ] **Gate 3 (Validation avant merge)** : `flutter analyze` OK • Tests unitaires Diff & Simulateur OK • Test interne `expireNode`, `ssh` et `tests` sur Headscale 0.29.7 • Versionning `2.4.0+160`
 
 ### Étape 4 — Plan 09 (`feat/acl-tagless-and-hybrid` → `2.5.0+160`)
 - [ ] **09.1** `AclEngineMode.tagless` + `TaglessAclGeneratorService` (`group:` + `hosts` + `autoApprovers` + tolérance rétroactive machines déjà taguées)

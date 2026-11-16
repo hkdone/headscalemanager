@@ -30,9 +30,13 @@ import 'package:headscalemanager/screens/acl_puzzle_screen.dart';
 import 'package:headscalemanager/services/acl/hujson_comment_service.dart';
 import 'package:headscalemanager/services/acl/policy_orphan_cleaner.dart';
 import 'package:headscalemanager/services/acl/policy_preserver.dart';
+import 'package:headscalemanager/services/acl_parser_service.dart';
 import 'package:headscalemanager/services/security_service.dart';
 import 'package:headscalemanager/utils/json_utils.dart';
 import 'package:headscalemanager/utils/tag_capability_helper.dart';
+import 'package:headscalemanager/models/version_info.dart';
+import 'package:headscalemanager/widgets/acl/acl_simulator_sheet.dart';
+import 'package:headscalemanager/widgets/acl/ssh_rules_list_view.dart';
 
 class AclScreen extends StatefulWidget {
   const AclScreen({super.key});
@@ -522,6 +526,125 @@ class _AclScreenState extends State<AclScreen> {
     );
   }
 
+  Widget _buildSshTab({
+    required bool isFr,
+    required AppProvider appProvider,
+  }) {
+    final grantCount =
+        GrantComposerService.countNetworkGrants(_currentAclPolicy);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildScrollHeader(
+            isFr: isFr,
+            appProvider: appProvider,
+            grantCount: grantCount,
+          ),
+          SshRulesListView(
+            sshRules: (_currentAclPolicy['ssh'] as List?) ?? const [],
+            allNodes: _allNodes,
+            allUsers: _users,
+            policy: _currentAclPolicy,
+            isFr: isFr,
+            onAddRule: (rule) => _mutateSshRules((list) => list.add(rule)),
+            onEditRule: (index, updated) => _mutateSshRules((list) {
+              if (index >= 0 && index < list.length) {
+                list[index] = updated;
+              }
+            }),
+            onDeleteRule: (index) => _mutateSshRules((list) {
+              if (index >= 0 && index < list.length) {
+                list.removeAt(index);
+              }
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mutateSshRules(void Function(List<dynamic> sshList) mutator) {
+    final updated = PolicyPreserver.deepCopyMap(_currentAclPolicy);
+    final list = List<dynamic>.from((updated['ssh'] as List?) ?? const []);
+    mutator(list);
+    if (list.isEmpty) {
+      updated.remove('ssh');
+    } else {
+      updated['ssh'] = list;
+    }
+    setState(() {
+      _currentAclPolicy = updated;
+      _isLocalDraft = true;
+      _jsonParseError = null;
+      _updateAclControllerText();
+    });
+  }
+
+  Future<void> _openAclSimulator() async {
+    final provider = context.read<AppProvider>();
+    final isFr = provider.locale.languageCode == 'fr';
+    if (_users.isEmpty) {
+      try {
+        _users = await provider.apiService.getUsers();
+      } catch (e) {
+        debugPrint('AclScreen._openAclSimulator getUsers error: $e');
+      }
+    }
+    if (!mounted) return;
+
+    final supportsTests = VersionInfo.checkVersionAtLeast(
+      provider.serverVersion,
+      '0.29.0',
+    );
+    await AclSimulatorSheet.show(
+      context,
+      policy: _currentAclPolicy,
+      nodes: _allNodes,
+      users: _users,
+      isFr: isFr,
+      composerAvailable: _isComposerAvailable(provider),
+      supportsTestsBlock: supportsTests,
+      onPinTest: _handlePinTest,
+      onRemoveTest: _handleRemoveTest,
+      onAuthorizeWithComposer: (_, __) => _openGrantComposer(),
+    );
+  }
+
+  void _handlePinTest(Map<String, dynamic> entry) {
+    final updated = PolicyPreserver.deepCopyMap(_currentAclPolicy);
+    final tests = List<dynamic>.from((updated['tests'] as List?) ?? const []);
+    tests.add(entry);
+    updated['tests'] = tests;
+    setState(() {
+      _currentAclPolicy = updated;
+      _isLocalDraft = true;
+      _jsonParseError = null;
+      _updateAclControllerText();
+    });
+  }
+
+  void _handleRemoveTest(int index) {
+    final updated = PolicyPreserver.deepCopyMap(_currentAclPolicy);
+    final tests = List<dynamic>.from((updated['tests'] as List?) ?? const []);
+    if (index >= 0 && index < tests.length) {
+      tests.removeAt(index);
+    }
+    if (tests.isEmpty) {
+      updated.remove('tests');
+    } else {
+      updated['tests'] = tests;
+    }
+    setState(() {
+      _currentAclPolicy = updated;
+      _isLocalDraft = true;
+      _jsonParseError = null;
+      _updateAclControllerText();
+    });
+  }
+
   Widget _buildJsonTab({required bool isFr}) {
     final appProvider = context.read<AppProvider>();
     final grantCount =
@@ -674,13 +797,14 @@ class _AclScreenState extends State<AclScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : DefaultTabController(
-              length: 3,
+              length: 4,
               child: Column(
                 children: [
                   TabBar(
                     tabs: [
                       Tab(text: isFr ? 'Grants' : 'Grants'),
                       Tab(text: isFr ? 'ACLs' : 'ACLs'),
+                      const Tab(text: 'SSH'),
                       Tab(text: isFr ? 'JSON' : 'JSON'),
                     ],
                   ),
@@ -695,6 +819,7 @@ class _AclScreenState extends State<AclScreen> {
                           composerAvailable: composerAvailable,
                         ),
                         _buildAclsTab(isFr: isFr, appProvider: appProvider),
+                        _buildSshTab(isFr: isFr, appProvider: appProvider),
                         _buildJsonTab(isFr: isFr),
                       ],
                     ),
@@ -706,6 +831,13 @@ class _AclScreenState extends State<AclScreen> {
         animatedIcon: AnimatedIcons.menu_close,
         backgroundColor: Theme.of(context).colorScheme.primary,
         children: [
+          SpeedDialChild(
+            child: const Icon(Icons.radar),
+            label: isFr ? 'Simulateur de flux ACL' : 'ACL Flow Simulator',
+            backgroundColor: Colors.indigo,
+            foregroundColor: Colors.white,
+            onTap: _openAclSimulator,
+          ),
           if (composerAvailable)
             SpeedDialChild(
               child: const Icon(Icons.auto_fix_high),
@@ -779,6 +911,9 @@ class _AclScreenState extends State<AclScreen> {
           case 'fetch':
             _fetchAclPolicyFromServer();
             break;
+          case 'simulate':
+            _openAclSimulator();
+            break;
           case 'backup':
             _exportPolicyBackup();
             break;
@@ -806,6 +941,13 @@ class _AclScreenState extends State<AclScreen> {
           child: ListTile(
               leading: const Icon(Icons.cloud_download),
               title: Text(isFr ? 'Récupérer du serveur' : 'Fetch from Server')),
+        ),
+        PopupMenuItem<String>(
+          value: 'simulate',
+          child: ListTile(
+              leading: const Icon(Icons.radar),
+              title: Text(
+                  isFr ? 'Simulateur de flux ACL' : 'ACL Flow Simulator')),
         ),
         const PopupMenuDivider(),
         PopupMenuItem<String>(
@@ -1581,7 +1723,7 @@ class _AclScreenState extends State<AclScreen> {
     final isFr = locale.languageCode == 'fr';
     final apiService = context.read<AppProvider>().apiService;
 
-    late final Map<String, dynamic> editedPolicy;
+    late Map<String, dynamic> editedPolicy;
     try {
       final decoded = JsonUtils.decodeHuJson(_aclController.text);
       if (decoded is! Map) {
@@ -1603,6 +1745,81 @@ class _AclScreenState extends State<AclScreen> {
         );
       }
       return;
+    }
+
+    // Garde-fou : valider que les IPs/tags référencés dans "tests" existent toujours
+    final testsValidation = AclParserService.validatePolicyTests(
+      editedPolicy,
+      allNodes: _allNodes,
+      allUsers: _users,
+    );
+    if (!testsValidation.isValid && mounted) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(
+            isFr
+                ? 'Tests ACL obsolètes détectés'
+                : 'Obsolete ACL tests detected',
+          ),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isFr
+                        ? 'Le bloc "tests" référence des nœuds ou tags absents du serveur, ce qui peut provoquer un rejet :'
+                        : 'The "tests" block references missing nodes or tags which could cause a server rejection:',
+                  ),
+                  const SizedBox(height: 8),
+                  ...testsValidation.issues.map(
+                    (issue) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '• ${isFr ? issue.reasonFr : issue.reasonEn}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'cancel'),
+              child: Text(isFr ? 'Annuler' : 'Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'keep'),
+              child: Text(isFr ? 'Exporter tel quel' : 'Export anyway'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, 'clean'),
+              child: Text(
+                isFr ? 'Nettoyer et continuer' : 'Clean & continue',
+              ),
+            ),
+          ],
+        ),
+      );
+      if (choice == null || choice == 'cancel') return;
+      if (choice == 'clean') {
+        editedPolicy = AclParserService.pruneObsoletePolicyTests(
+          editedPolicy,
+          allNodes: _allNodes,
+          allUsers: _users,
+        );
+        _currentAclPolicy = PolicyPreserver.deepCopyMap(editedPolicy);
+        _knownRuleComments =
+            HuJsonCommentService.extractRuleComments(_aclController.text);
+        _leadingComments =
+            HuJsonCommentService.extractLeadingComments(_aclController.text);
+        _updateAclControllerText();
+      }
     }
 
     if (showConfirmation) {

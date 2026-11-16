@@ -14,6 +14,18 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '2.4.0',
+        title: isFr
+            ? 'Release 2.4.0 — Diff Visuel, Simulateur ACL, Tailscale SSH & API'
+            : 'Release 2.4.0 — Visual Diff, ACL Simulator, Tailscale SSH & API',
+        description: isFr
+            ? 'Comparateur visuel ligne-par-ligne coloré (+/-) avec garde-fou >1500 lignes, simulateur interactif de flux ACL ("Qui peut parler à qui ?") et épinglage dans le bloc "tests" (Headscale 0.29+), onglet dédié Tailscale SSH ("ssh"), expiration de session d\'un nœud sans suppression et outil de maintenance Backfill IPs.'
+            : 'Colored line-by-line visual Diff (+/-) with >1500-line fallback, interactive ACL flow simulator with regression "tests" pinning (Headscale 0.29+), dedicated Tailscale SSH tab, non-destructive node session expiration, and Backfill IPs maintenance tool.',
+        verification: isFr
+            ? 'ACLs > Simulateur / Onglet SSH / Aperçu Diff • Paramètres > Backfill IPs'
+            : 'ACLs > Simulator / SSH Tab / Diff Preview • Settings > Backfill IPs',
+      ),
+      WhatsNewVersion(
         version: '2.3.0',
         title: isFr
             ? 'Release 2.3.0 — Fusion ACL Non-Destructive & Compatibilité Multi-Versions'
