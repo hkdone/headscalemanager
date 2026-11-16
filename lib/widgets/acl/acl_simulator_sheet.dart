@@ -161,20 +161,32 @@ class _AclSimulatorSheetState extends State<AclSimulatorSheet> {
     setState(() => _result = result);
   }
 
-  void _pinCurrentTest() {
+  Future<void> _pinCurrentTest() async {
     final src = _sourceNode;
     final res = _result;
     if (src == null || res == null || widget.onPinTest == null) return;
 
+    final isFr = widget.isFr;
     final srcAddr = src.ipAddresses.isNotEmpty ? src.ipAddresses.first : src.name;
     var dstAddr = res.normalizedDestination;
     if (dstAddr == 'autogroup:internet') {
       // Headscale/Tailscale "tests" évalue les sorties Internet via une IP publique
       dstAddr = '8.8.8.8';
+    } else if (IpUtils.isCIDR(dstAddr)) {
+      // Headscale exige une IP concrète (et non un CIDR /24) dans "tests"
+      dstAddr = dstAddr.split('/').first;
     }
+
+    var targetPort = res.requestedPort.trim();
+    final parsedPort = int.tryParse(targetPort);
+    if (parsedPort == null || parsedPort < 1 || parsedPort > 65535) {
+      targetPort = await _askSinglePortDialog(isFr) ?? '';
+      if (targetPort.isEmpty || !mounted) return;
+    }
+
     final formattedDst = IpUtils.isIPv6(dstAddr)
-        ? '[$dstAddr]:${res.requestedPort}'
-        : '$dstAddr:${res.requestedPort}';
+        ? '[$dstAddr]:$targetPort'
+        : '$dstAddr:$targetPort';
 
     final entry = <String, dynamic>{
       'src': srcAddr,
@@ -189,9 +201,86 @@ class _AclSimulatorSheetState extends State<AclSimulatorSheet> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          widget.isFr
-              ? 'Test de non-régression ajouté au bloc "tests".'
-              : 'Regression test pinned to "tests" block.',
+          isFr
+              ? 'Test de non-régression ajouté au bloc "tests" ($formattedDst).'
+              : 'Regression test pinned to "tests" block ($formattedDst).',
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _askSinglePortDialog(bool isFr) async {
+    final controller = TextEditingController(text: '443');
+    String? errorText;
+
+    return showDialog<String>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(
+            isFr ? 'Port requis pour le bloc "tests"' : 'Port required for "tests"',
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isFr
+                    ? 'Headscale refuse le joker "*" dans le bloc "tests" et exige un port numérique unique (ex: 443 ou 22).'
+                    : 'Headscale rejects "*" in the "tests" block and requires a single numeric port (e.g. 443 or 22).',
+                style: const TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                children: ['22', '80', '443', '5432']
+                    .map((p) => ActionChip(
+                          label: Text(p),
+                          onPressed: () {
+                            controller.text = p;
+                            setDialogState(() => errorText = null);
+                          },
+                        ))
+                    .toList(),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: isFr ? 'Port TCP/UDP (1-65535)' : 'Port (1-65535)',
+                  errorText: errorText,
+                  border: const OutlineInputBorder(),
+                ),
+                onChanged: (_) {
+                  if (errorText != null) {
+                    setDialogState(() => errorText = null);
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: Text(isFr ? 'Annuler' : 'Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final val = int.tryParse(controller.text.trim());
+                if (val == null || val < 1 || val > 65535) {
+                  setDialogState(() {
+                    errorText = isFr
+                        ? 'Entrez un entier entre 1 et 65535.'
+                        : 'Enter an integer between 1 and 65535.';
+                  });
+                  return;
+                }
+                Navigator.of(dialogCtx).pop(val.toString());
+              },
+              child: Text(isFr ? 'Épingler' : 'Pin test'),
+            ),
+          ],
         ),
       ),
     );
@@ -232,6 +321,19 @@ class _AclSimulatorSheetState extends State<AclSimulatorSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Card(
+                    color: Colors.indigo.withValues(alpha: 0.08),
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Text(
+                        isFr
+                            ? 'Simule localement si la machine source peut joindre la cible sans rien modifier sur le serveur. L\'épinglage "tests" est facultatif : il ajoute une règle de vérification automatique que Headscale rejouera à chaque export.'
+                            : 'Locally simulates whether the source machine can reach the target without changing anything on the server. Pinning to "tests" is optional: Headscale re-verifies pinned assertions on every export.',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   DropdownButtonFormField<Node>(
                     initialValue: _sourceNode,
                     isExpanded: true,

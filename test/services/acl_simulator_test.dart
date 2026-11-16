@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
+import 'package:headscalemanager/services/acl/grants_v29_generator.dart';
 import 'package:headscalemanager/services/acl_parser_service.dart';
+import 'package:headscalemanager/services/standard_acl_generator_service.dart';
 import 'package:headscalemanager/widgets/acl/ssh_rules_list_view.dart';
 
 void main() {
@@ -169,11 +171,11 @@ void main() {
           {
             'src': '100.64.0.10',
             'accept': ['100.64.0.99:443', '192.168.10.50:443'],
-            'deny': ['tag:ghost-tag:22'],
+            'deny': ['tag:ghost-tag:22', '100.64.0.20:*'],
           },
           {
             'src': '100.64.0.250',
-            'accept': ['100.64.0.10:*'],
+            'accept': ['100.64.0.10:443'],
           },
         ],
       };
@@ -184,7 +186,7 @@ void main() {
         allUsers: users,
       );
       expect(validation.isValid, isFalse);
-      expect(validation.issues.length, 3);
+      expect(validation.issues.length, 4);
 
       final cleaned = AclParserService.pruneObsoletePolicyTests(
         policy,
@@ -195,6 +197,73 @@ void main() {
       expect(tests.length, 1);
       expect((tests.first as Map)['accept'], ['192.168.10.50:443']);
       expect((tests.first as Map).containsKey('deny'), isFalse);
+    });
+  });
+
+  group('OIDC multi-identifier ACL generation', () {
+    test('keeps rules for OIDC user whose node tag uses email or has no tags', () {
+      final oidcEmailUser = User(
+        id: 'u-oidc-1',
+        name: 'oidc_sub_123',
+        email: 'marine.leclerc@example.com',
+        displayName: 'Marine Leclerc',
+        createdAt: DateTime(2026),
+      );
+      final oidcUntaggedUser = User(
+        id: 'u-oidc-2',
+        name: 'paul.oidc',
+        email: 'paul@example.com',
+        createdAt: DateTime(2026),
+      );
+
+      final oidcTaggedNode = makeNode(
+        id: '201',
+        name: 'marine-phone',
+        user: 'tagged-devices',
+        ips: ['100.64.0.201'],
+        tags: ['tag:marine-leclerc-client'],
+      );
+      final oidcUntaggedNode = makeNode(
+        id: '202',
+        name: 'paul-laptop',
+        user: 'paul@example.com',
+        ips: ['100.64.0.202'],
+        tags: const [],
+      );
+
+      final grantsPolicy = GrantsV29GeneratorService().generatePolicy(
+        users: [oidcEmailUser, oidcUntaggedUser],
+        nodes: [oidcTaggedNode, oidcUntaggedNode],
+        serverVersion: '0.29.7',
+      );
+      final grants = grantsPolicy['grants'] as List;
+      expect(
+        grants.any((g) =>
+            ((g as Map)['src'] as List).contains('tag:marine-leclerc-client')),
+        isTrue,
+      );
+      expect(
+        grants.any(
+            (g) => ((g as Map)['src'] as List).contains('group:paul-oidc')),
+        isTrue,
+      );
+
+      final stdPolicy = StandardAclGeneratorService().generatePolicy(
+        users: [oidcEmailUser, oidcUntaggedUser],
+        nodes: [oidcTaggedNode, oidcUntaggedNode],
+        serverVersion: '0.29.7',
+      );
+      final acls = stdPolicy['acls'] as List;
+      expect(
+        acls.any((r) =>
+            ((r as Map)['src'] as List).contains('tag:marine-leclerc-client')),
+        isTrue,
+      );
+      expect(
+        acls.any(
+            (r) => ((r as Map)['src'] as List).contains('group:paul-oidc')),
+        isTrue,
+      );
     });
   });
 

@@ -786,6 +786,19 @@ class AclParserService {
               reasonFr: 'Cible introuvable dans "$field" : "$value"',
               reasonEn: 'Unknown target in "$field": "$value"',
             ));
+            continue;
+          }
+          final portError = _validateSingleTestPort(value);
+          if (portError != null) {
+            issues.add(PolicyTestIssue(
+              testIndex: i,
+              field: field,
+              value: value,
+              reasonFr:
+                  'Port invalide dans "$field" ("$value") : Headscale exige un port numérique unique (ex: :443), pas "*" ou de plage.',
+              reasonEn:
+                  'Invalid port in "$field" ("$value"): Headscale requires a single numeric port (e.g. :443), not "*" or ranges.',
+            ));
           }
         }
       }
@@ -1117,6 +1130,22 @@ class AclParserService {
       }
     }
     return _HostPortsPair(dest, defaultPorts);
+  }
+
+  static String? _validateSingleTestPort(String value) {
+    final lastColon = value.lastIndexOf(':');
+    if (lastColon == -1) return 'missing port';
+    final beforeColon = value.substring(0, lastColon);
+    if (beforeColon.contains(':') &&
+        !(beforeColon.startsWith('[') && beforeColon.endsWith(']'))) {
+      return 'missing port';
+    }
+    final portStr = value.substring(lastColon + 1).trim();
+    final portNum = int.tryParse(portStr);
+    if (portNum == null || portNum < 1 || portNum > 65535) {
+      return 'not a single numeric port';
+    }
+    return null;
   }
 
   static bool _portsMatch(List<String> allowedPorts, String requestedPort) {

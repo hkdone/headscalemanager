@@ -4,6 +4,52 @@ import 'package:headscalemanager/utils/string_utils.dart';
 
 /// Construit groups, tagOwners et autoApprovers (format Standard).
 class PolicyInfrastructureBuilder {
+  /// Tous les identifiants normalisés possibles pour un utilisateur (nom, email OIDC, displayName).
+  static Set<String> candidateNormalizedNames(User user) {
+    final names = <String>{normalizeUserName(user.name)};
+    if (user.email != null && user.email!.trim().isNotEmpty) {
+      names.add(normalizeUserName(user.email!.trim()));
+    }
+    if (user.displayName != null && user.displayName!.trim().isNotEmpty) {
+      names.add(normalizeUserName(user.displayName!.trim()));
+    }
+    return names;
+  }
+
+  /// Indique si [node] appartient à [user] (y compris comptes OIDC avec
+  /// nom/email/displayName distincts ou machines taguées sous `tagged-devices`).
+  static bool nodeBelongsToUser(Node node, User user) {
+    if (node.userId.isNotEmpty &&
+        user.id.isNotEmpty &&
+        node.userId == user.id) {
+      return true;
+    }
+    if (node.user == user.name) return true;
+    if (user.email != null &&
+        user.email!.isNotEmpty &&
+        node.user == user.email) {
+      return true;
+    }
+    if (user.displayName != null &&
+        user.displayName!.isNotEmpty &&
+        node.user == user.displayName) {
+      return true;
+    }
+    final candidates = candidateNormalizedNames(user);
+    if (candidates.contains(node.getNormalizedOwner())) return true;
+    for (final norm in candidates) {
+      for (final t in node.tags) {
+        if (t == 'tag:$norm-client' ||
+            t == 'tag:$norm-exit-node' ||
+            t == 'tag:$norm-lan-sharer' ||
+            t.startsWith('tag:$norm-client;')) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   static ({
     Map<String, List<String>> groups,
     Map<String, List<String>> tagOwners,

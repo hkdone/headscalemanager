@@ -30,15 +30,12 @@ class GrantsV29GeneratorService {
     for (var user in users) {
       final groupName = 'group:${normalizeUserName(user.name)}';
       final normalizedUser = normalizeUserName(user.name);
-
-      final stdClientTag = 'tag:$normalizedUser-client';
-      final stdExitTag = 'tag:$normalizedUser-exit-node';
-      final stdLanTag = 'tag:$normalizedUser-lan-sharer';
+      final candidateNorms =
+          PolicyInfrastructureBuilder.candidateNormalizedNames(user);
 
       final userNodes = nodes
           .where((node) =>
-              node.user == user.name ||
-              node.getNormalizedOwner() == normalizedUser)
+              PolicyInfrastructureBuilder.nodeBelongsToUser(node, user))
           .toList();
 
       final activeUserTags = <String>{};
@@ -47,53 +44,69 @@ class GrantsV29GeneratorService {
       String? activeLanTag;
 
       for (var n in userNodes) {
-        if (n.tags.contains(stdClientTag)) activeUserTags.add(stdClientTag);
-        if (n.tags.contains(stdExitTag)) {
-          activeUserTags.add(stdExitTag);
-          hasActiveExitNodes = true;
-          activeExitTag ??= stdExitTag;
-        } else if (n.isExitNode) {
-          hasActiveExitNodes = true;
-        }
-        if (n.tags.contains(stdLanTag)) {
-          activeUserTags.add(stdLanTag);
-          activeLanTag ??= stdLanTag;
-        }
+        for (final norm in candidateNorms) {
+          final stdClientTag = 'tag:$norm-client';
+          final stdExitTag = 'tag:$norm-exit-node';
+          final stdLanTag = 'tag:$norm-lan-sharer';
 
-        for (var t in n.tags) {
-          if (t.startsWith(stdClientTag)) {
-            activeUserTags.add(t);
-            PolicyInfrastructureBuilder.registerLegacyTagOwners(
-              tagOwners: tagOwners,
-              groupName: groupName,
-              tags: [t],
-              stdClientTag: stdClientTag,
-            );
-            if (t.contains(';exit-node')) {
+          if (n.tags.contains(stdClientTag)) activeUserTags.add(stdClientTag);
+          if (n.tags.contains(stdExitTag)) {
+            activeUserTags.add(stdExitTag);
+            hasActiveExitNodes = true;
+            activeExitTag ??= stdExitTag;
+          } else if (n.isExitNode) {
+            hasActiveExitNodes = true;
+          }
+          if (n.tags.contains(stdLanTag)) {
+            activeUserTags.add(stdLanTag);
+            activeLanTag ??= stdLanTag;
+          }
+
+          for (var t in n.tags) {
+            if (t.startsWith(stdClientTag)) {
+              activeUserTags.add(t);
+              PolicyInfrastructureBuilder.registerLegacyTagOwners(
+                tagOwners: tagOwners,
+                groupName: groupName,
+                tags: [t],
+                stdClientTag: stdClientTag,
+              );
+              if (t.contains(';exit-node')) {
+                hasActiveExitNodes = true;
+                activeExitTag ??= t;
+              }
+              if (t.contains(';lan-sharer')) {
+                activeLanTag ??= t;
+              }
+            } else if (t.contains(';exit-node')) {
+              activeUserTags.add(t);
+              PolicyInfrastructureBuilder.registerLegacyTagOwners(
+                tagOwners: tagOwners,
+                groupName: groupName,
+                tags: [t],
+                stdClientTag: stdClientTag,
+              );
               hasActiveExitNodes = true;
               activeExitTag ??= t;
-            }
-            if (t.contains(';lan-sharer')) {
+            } else if (t.contains(';lan-sharer')) {
+              activeUserTags.add(t);
               activeLanTag ??= t;
             }
-          } else if (t.contains(';exit-node')) {
-            activeUserTags.add(t);
-            PolicyInfrastructureBuilder.registerLegacyTagOwners(
-              tagOwners: tagOwners,
-              groupName: groupName,
-              tags: [t],
-              stdClientTag: stdClientTag,
-            );
-            hasActiveExitNodes = true;
-            activeExitTag ??= t;
-          } else if (t.contains(';lan-sharer')) {
-            activeUserTags.add(t);
-            activeLanTag ??= t;
           }
         }
       }
 
-      if (activeUserTags.isEmpty) continue;
+      if (activeUserTags.isEmpty) {
+        // Repli si l'utilisateur (ex: compte OIDC) possède des nœuds sans tags :
+        // préserver au minimum ses règles intra-utilisateur basées sur group:<user>.
+        if (userNodes.isEmpty) continue;
+        grants.add({
+          'src': [groupName],
+          'dst': [groupName],
+          'ip': ['*'],
+        });
+        continue;
+      }
 
       final sortedTags = activeUserTags.toList()..sort();
 
@@ -199,7 +212,10 @@ class GrantsV29GeneratorService {
       }
 
       if (dst.startsWith('tag:')) {
-        acls.add({...ruleMap, 'dst': ['$dst$dstPort']});
+        acls.add({
+          ...ruleMap,
+          'dst': ['$dst$dstPort']
+        });
         final reverseRuleMap = <String, dynamic>{
           'action': 'accept',
           'src': [dst],

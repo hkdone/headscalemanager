@@ -1560,9 +1560,9 @@ class _AclScreenState extends State<AclScreen> {
       final apiService = appProvider.apiService;
 
       final users = await apiService.getUsers();
-      final nodes =
-          _allNodes.isNotEmpty ? _allNodes : await apiService.getNodes();
-      if (_allNodes.isEmpty) _allNodes = nodes;
+      final nodes = await apiService.getNodes();
+      _allNodes = nodes;
+      _destinationNodes = List.from(nodes);
 
       // Clean up obsolete lan-sharer tags before ACL generation
       final cleanedNodes =
@@ -1593,10 +1593,18 @@ class _AclScreenState extends State<AclScreen> {
       _serverPolicySnapshot = PolicyPreserver.deepCopyMap(
         serverPolicy ?? const {},
       );
-      _currentAclPolicy = PolicyPreserver.merge(
+      var mergedPolicy = PolicyPreserver.merge(
         generatedPolicy,
         serverPolicy,
       );
+      if (serverPolicy != null) {
+        mergedPolicy = await _preserveCustomRulesOnRegenerate(
+          mergedPolicy: mergedPolicy,
+          serverPolicy: serverPolicy,
+          askUser: showSnackbar,
+        );
+      }
+      _currentAclPolicy = mergedPolicy;
       _users = users;
       _jsonParseError = null;
 
@@ -1666,6 +1674,88 @@ class _AclScreenState extends State<AclScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  /// Détecte et propose de conserver les règles `grants` et `acls`
+  /// personnalisées (ex: Composeur, Vue Puzzle, règles inter-utilisateurs OIDC)
+  /// présentes sur le serveur lors d'une régénération automatique.
+  Future<Map<String, dynamic>> _preserveCustomRulesOnRegenerate({
+    required Map<String, dynamic> mergedPolicy,
+    required Map<String, dynamic> serverPolicy,
+    required bool askUser,
+  }) async {
+    final generatedGrants = List<dynamic>.from(
+      (mergedPolicy['grants'] as List?) ?? const [],
+    );
+    final serverGrants = List<dynamic>.from(
+      (serverPolicy['grants'] as List?) ?? const [],
+    );
+    final generatedAcls = List<dynamic>.from(
+      (mergedPolicy['acls'] as List?) ?? const [],
+    );
+    final serverAcls = List<dynamic>.from(
+      (serverPolicy['acls'] as List?) ?? const [],
+    );
+
+    final genGrantJson = generatedGrants.map(jsonEncode).toSet();
+    final genAclJson = generatedAcls.map(jsonEncode).toSet();
+
+    final extraGrants = serverGrants.where((g) {
+      if (g is! Map) return false;
+      final encoded = jsonEncode(g);
+      return !genGrantJson.contains(encoded);
+    }).toList();
+
+    final extraAcls = serverAcls.where((a) {
+      if (a is! Map) return false;
+      final encoded = jsonEncode(a);
+      return !genAclJson.contains(encoded);
+    }).toList();
+
+    final totalExtra = extraGrants.length + extraAcls.length;
+    if (totalExtra == 0) return mergedPolicy;
+
+    bool shouldKeep = true;
+    if (askUser && mounted) {
+      final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
+      final choice = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(
+            isFr
+                ? 'Règles personnalisées détectées'
+                : 'Custom rules detected',
+          ),
+          content: Text(
+            isFr
+                ? '$totalExtra règle(s) personnalisée(s) (ex: Composeur, Vue Puzzle ou accès OIDC inter-utilisateurs) existent actuellement sur le serveur et ne font pas partie des règles par défaut.\n\nVoulez-vous les conserver lors de la régénération ?'
+                : '$totalExtra custom rule(s) (e.g. Composer, Puzzle View or cross-user OIDC rules) currently exist on the server and are not part of default rules.\n\nKeep them during regeneration?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(isFr ? 'Tout réinitialiser' : 'Reset all'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(isFr ? 'Conserver (Recommandé)' : 'Keep (Recommended)'),
+            ),
+          ],
+        ),
+      );
+      shouldKeep = choice ?? true;
+    }
+
+    if (!shouldKeep) return mergedPolicy;
+
+    final updated = PolicyPreserver.deepCopyMap(mergedPolicy);
+    if (extraGrants.isNotEmpty) {
+      updated['grants'] = [...generatedGrants, ...extraGrants];
+    }
+    if (extraAcls.isNotEmpty) {
+      updated['acls'] = [...generatedAcls, ...extraAcls];
+    }
+    return updated;
   }
 
   Future<void> _clearTemporaryRules() async {

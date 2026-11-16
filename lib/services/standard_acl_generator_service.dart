@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/models/user.dart';
+import 'package:headscalemanager/services/acl/policy_infrastructure_builder.dart';
 import 'package:headscalemanager/services/acl/taildrive_builder.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 
@@ -171,57 +172,69 @@ class StandardAclGeneratorService {
     for (var user in users) {
       final groupName = 'group:${normalizeUserName(user.name)}';
       final normalizedUser = normalizeUserName(user.name);
+      final candidateNorms =
+          PolicyInfrastructureBuilder.candidateNormalizedNames(user);
       debugPrint('DEBUG: Processing user $normalizedUser');
-
-      final stdClientTag = 'tag:$normalizedUser-client';
-      final stdExitTag = 'tag:$normalizedUser-exit-node';
-      final stdLanTag = 'tag:$normalizedUser-lan-sharer';
 
       final userNodes = nodes
           .where((node) =>
-              node.user == user.name ||
-              node.getNormalizedOwner() == normalizeUserName(user.name))
+              PolicyInfrastructureBuilder.nodeBelongsToUser(node, user))
           .toList();
 
       final activeUserTags = <String>{};
       bool hasActiveExitNodes = false;
 
-      // Collect ALL valid tags from user nodes
+      // Collect ALL valid tags from user nodes across OIDC candidate slugs
       for (var n in userNodes) {
-        // Standard Tags
-        if (n.tags.contains(stdClientTag)) activeUserTags.add(stdClientTag);
-        if (n.tags.contains(stdExitTag)) {
-          activeUserTags.add(stdExitTag);
-          hasActiveExitNodes = true;
-        } else if (n.isExitNode) {
-          // Fix: Also check explicit flag from Node object
-          hasActiveExitNodes = true;
-        }
+        for (final norm in candidateNorms) {
+          final stdClientTag = 'tag:$norm-client';
+          final stdExitTag = 'tag:$norm-exit-node';
+          final stdLanTag = 'tag:$norm-lan-sharer';
 
-        if (n.tags.contains(stdLanTag)) activeUserTags.add(stdLanTag);
-
-        // Legacy Tags
-        for (var t in n.tags) {
-          // If tag implies client identity (starts with client tag base)
-          if (t.startsWith(stdClientTag)) {
-            activeUserTags.add(t);
-            // VITAL: Register this legacy tag in tagOwners so Headscale accepts it
-            _addTagOwner(tagOwners, t, groupName);
-
-            if (t.contains(';exit-node')) hasActiveExitNodes = true;
-          }
-          // Also check for solo capabilities if they exist in legacy? unlikely but safe
-          else if (t.contains(';exit-node')) {
-            activeUserTags.add(t);
-            // VITAL: Register this legacy tag in tagOwners
-            _addTagOwner(tagOwners, t, groupName);
-
+          if (n.tags.contains(stdClientTag)) activeUserTags.add(stdClientTag);
+          if (n.tags.contains(stdExitTag)) {
+            activeUserTags.add(stdExitTag);
             hasActiveExitNodes = true;
+          } else if (n.isExitNode) {
+            hasActiveExitNodes = true;
+          }
+
+          if (n.tags.contains(stdLanTag)) activeUserTags.add(stdLanTag);
+
+          for (var t in n.tags) {
+            if (t.startsWith(stdClientTag)) {
+              activeUserTags.add(t);
+              _addTagOwner(tagOwners, t, groupName);
+
+              if (t.contains(';exit-node')) hasActiveExitNodes = true;
+            } else if (t.contains(';exit-node')) {
+              activeUserTags.add(t);
+              _addTagOwner(tagOwners, t, groupName);
+
+              hasActiveExitNodes = true;
+            }
           }
         }
       }
 
-      if (activeUserTags.isEmpty) continue;
+      if (activeUserTags.isEmpty) {
+        if (userNodes.isEmpty) continue;
+        final destinations = <String>{'$groupName:*'};
+        if (hasActiveExitNodes) destinations.add('autogroup:internet:*');
+        for (var node in userNodes) {
+          for (var route in node.sharedRoutes) {
+            if (route != '0.0.0.0/0' && route != '::/0') {
+              destinations.add('$route:*');
+            }
+          }
+        }
+        acls.add({
+          'action': 'accept',
+          'src': [groupName],
+          'dst': destinations.toList()..sort(),
+        });
+        continue;
+      }
 
       // Define Destinations
       final destinations = <String>{};
