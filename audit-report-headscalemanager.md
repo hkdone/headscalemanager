@@ -1,0 +1,3453 @@
+# Rapport d'Audit de Sécurité & Qualité de Code - AegisScan
+**Projet :** headscaleManager  
+**Date d'audit :** 12/11/2026 21:40:29  
+**Architecture détectée :** Application Front-End Statique (`client-only`)  
+**Stack :** Java/Kotlin  
+**Score de Sécurité Global (Code Actif) :** 97 / 100 (Note : A+ • Risque : Sécurisé)  
+**Périmètre analysé :** 213 fichiers prod • 7 outillage/dev • 3330 artefacts exclus (39055 lignes actives)  
+**Dette Technique Estimée :** 1 heures  
+
+---
+
+## Synthèse Exécutive & Frontières de Confiance
+- **Critique (Production) :** 0
+- **Élevé (Production) :** 0
+- **Moyen (Production) :** 0
+- **Faible / Info (Production) :** 3
+- **Outillage / Dev / Qualité (Non bloquant) :** 0
+- **Alertes écartées (Faux positifs / Doublons) :** 4
+
+### Frontières de Confiance Identifiées
+- **Navigateur Client (Zone Non Fiable)** (`client`) : Tout code et stockage exécuté dans le navigateur peut être inspecté ou altéré par l’utilisateur final. *(Entrées : Formulaires DOM, Paramètres URL / Hash, window.postMessage, localStorage / sessionStorage)*
+
+### Avis de l'Expert IA Cloud (Gemini 4 Hydrogen)
+Le triage des 5 alertes SAST aboutit au rejet de 2 alertes (QTY-001-1 et QTY-001-3) correspondant à des mécanismes de dégradation gracieuse lors du décodage JSON, à la rétrogradation de QTY-001-2 au niveau INFO (problème de qualité et de retour utilisateur sans impact de sécurité direct), ainsi qu'à la rétrogradation de QTY-001-4 et QTY-001-5 au niveau LOW car l'ignorance silencieuse d'erreurs sur le stockage sécurisé local constitue un défaut d'hygiène réel mais non exploitable à distance dans une architecture 100% client-side. Aucune nouvelle vulnérabilité sémantique n'a été détectée dans les fichiers actifs fournis dans le périmètre.
+
+#### Recommandations Architecturales :
+- Remplacer les blocs catch vides sur les opérations de stockage sécurisé par une journalisation maîtrisée sans exposition de secrets et par la propagation explicite de l'erreur vers la logique applicative.
+- Restreindre la capture d'exceptions lors du parsing JSON aux seules erreurs attendues (telles que FormatException) et afficher un état de validation clair à l'utilisateur avant toute sauvegarde de configuration.
+- Compléter .gitignore à la racine avec le motif *.keystore déjà présent dans android/.gitignore et exclure les artefacts de cache situés sous android/.gradle du suivi de version.
+- Inclure les fichiers sources applicatifs actifs dans le périmètre d'analyse afin de permettre une vérification sémantique complète des flux de données côté client et des appels API tiers.
+
+
+---
+
+## 1. Vulnérabilités confirmées sur le code actif (Production)
+
+#### 1. [INFO] Bloc catch vide sur une opération critique
+- **CWE :** CWE-390: Detection of Error Condition Without Action
+- **Score CVSS :** 0.0 / 10
+- **Catégorie :** Code Quality & Maintainability
+- **Contexte d'exécution :** Production / Runtime
+- **Emplacement(s) :** `lib/screens/acl_screen.dart` (Ligne 157)
+- **Décision de triage IA :** L'absence de gestion d'erreur lors d'un appel réseau de récupération d'utilisateurs relève principalement d'un défaut de fiabilité et d'observabilité UI dans une application cliente, sans vulnérabilité exploitable directe.
+- **Description :** Un bloc `catch` vide intercepte et étouffe silencieusement les exceptions.
+- **Impact :** Peut masquer une défaillance de sécurité, de base de données ou laisser l’application dans un état incohérent.
+- **Remédiation :** Journalisez l’erreur de manière structurée et gérez l’échec explicitement.
+
+```
+      try {
+        _users = await provider.apiService.getUsers();
+      } catch (_) {}
+    }
+
+```
+
+
+---
+
+#### 2. [LOW] Bloc catch vide sur une opération critique
+- **CWE :** CWE-390: Detection of Error Condition Without Action
+- **Score CVSS :** 3.1 / 10
+- **Catégorie :** Code Quality & Maintainability
+- **Contexte d'exécution :** Production / Runtime
+- **Emplacement(s) :** `lib/services/security_service.dart:L29`, `lib/services/storage_service.dart:L391`
+- **Décision de triage IA :** Avaler silencieusement les exceptions lors d'une suppression suivie d'une écriture dans le stockage sécurisé local peut masquer un échec de mise à jour ou de rotation de secret, mais l'impact reste limité au contexte local client sans exploitabilité distante directe.
+- **Description :** Un bloc `catch` vide intercepte et étouffe silencieusement les exceptions. (Bloc catch silencieux entourant une opération critique (authentification, base de données ou paiement).)
+- **Impact :** Peut masquer une défaillance de sécurité, de base de données ou laisser l’application dans un état incohérent.
+- **Remédiation :** Journalisez l’erreur de manière structurée et gérez l’échec explicitement.
+
+```
+        await _storage.delete(key: key);
+        await _storage.write(key: key, value: value);
+      } catch (_) {}
+    }
+  }
+```
+
+
+---
+
+#### 3. [LOW] Bloc catch vide sur une opération critique
+- **CWE :** CWE-390: Detection of Error Condition Without Action
+- **Score CVSS :** 3.1 / 10
+- **Catégorie :** Code Quality & Maintainability
+- **Contexte d'exécution :** Production / Runtime
+- **Emplacement(s) :** `lib/services/security_service.dart:L36`, `lib/services/storage_service.dart:L398`
+- **Décision de triage IA :** Ignorer silencieusement une erreur lors de la suppression d'une clé dans le stockage sécurisé local peut laisser un secret persister après déconnexion, ce qui constitue un risque d'hygiène locale surévalué en MEDIUM dans une architecture client-only.
+- **Description :** Un bloc `catch` vide intercepte et étouffe silencieusement les exceptions. (Bloc catch silencieux entourant une opération critique (authentification, base de données ou paiement).)
+- **Impact :** Peut masquer une défaillance de sécurité, de base de données ou laisser l’application dans un état incohérent.
+- **Remédiation :** Journalisez l’erreur de manière structurée et gérez l’échec explicitement.
+
+```
+    try {
+      await _storage.delete(key: key);
+    } catch (_) {}
+  }
+
+```
+
+
+---
+
+---
+
+## 2. Points d'attention outillage / dev / qualité (Non bloquants)
+
+_Aucun point d’attention outillage ou qualité détecté._
+
+
+---
+
+## 3. Périmètre exclu et alertes écartées
+
+### Fichiers et artefacts exclus de l'analyse SAST/IA (3330)
+- `headscaleManager/.git/` (**vendor_or_build**) : Répertoire de dépendances / VCS ignoré lors de l'extraction (.git/)
+- `.dart_tool/dartpad/web_plugin_registrant.dart` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/_composite.stamp` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/.filecache` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/android_aot_bundle_release_android-arm.stamp` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/android_aot_bundle_release_android-arm64.stamp` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/android_aot_bundle_release_android-x64.stamp` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/android_aot_release_android-arm.stamp` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/android_aot_release_android-arm64.stamp` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/android_aot_release_android-x64.stamp` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/aot_android_asset_bundle.stamp` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/app.dill` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/arm64-v8a/app.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/armeabi-v7a/app.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/dart_build_result.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/dart_build.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/dart_build.stamp` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/flutter_android_aot_bundle_release_android-arm.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/flutter_android_aot_bundle_release_android-arm64.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/flutter_android_aot_bundle_release_android-x64.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/flutter_android_aot_release_android-arm.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/flutter_android_aot_release_android-arm64.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/flutter_android_aot_release_android-x64.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/flutter_assets.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/gen_dart_plugin_registrant.stamp` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/gen_localizations.stamp` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/install_code_assets.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/install_code_assets.stamp` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/kernel_snapshot_program.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/kernel_snapshot_program.stamp` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/native_assets.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/outputs.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/flutter_build/b9cd1f5734b2a254dadcb6d20add7cc9/x86_64/app.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `.dart_tool/flutter_build/dart_plugin_registrant.dart` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/5c3ed2bf4e/.lock` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/5c3ed2bf4e/dependencies.dependencies_hash_file.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/5c3ed2bf4e/hook.dependencies_hash_file.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/5c3ed2bf4e/hook.dill` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/5c3ed2bf4e/hook.dill.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/5c3ed2bf4e/input.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/5c3ed2bf4e/output.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/5c3ed2bf4e/stderr.txt` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/5c3ed2bf4e/stdout.txt` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8ad9d573a7/.lock` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8ad9d573a7/dependencies.dependencies_hash_file.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8ad9d573a7/hook.dependencies_hash_file.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8ad9d573a7/hook.dill` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8ad9d573a7/hook.dill.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8ad9d573a7/input.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8ad9d573a7/output.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8ad9d573a7/stderr.txt` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8ad9d573a7/stdout.txt` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8e04c28b44/.lock` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8e04c28b44/dependencies.dependencies_hash_file.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8e04c28b44/hook.dependencies_hash_file.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8e04c28b44/hook.dill` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8e04c28b44/hook.dill.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8e04c28b44/input.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8e04c28b44/output.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8e04c28b44/stderr.txt` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/8e04c28b44/stdout.txt` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/e296de4dfd/.lock` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/e296de4dfd/dependencies.dependencies_hash_file.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/e296de4dfd/hook.dependencies_hash_file.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/e296de4dfd/hook.dill` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/e296de4dfd/hook.dill.d` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/e296de4dfd/input.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/e296de4dfd/output.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/e296de4dfd/stderr.txt` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/objective_c/e296de4dfd/stdout.txt` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/hooks_runner/shared/objective_c/.lock` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/package_config.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/package_graph.json` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.dart_tool/version` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.flutter-plugins-dependencies` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `.idea/.gitignore` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/caches/deviceStreaming.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/copilot.data.migration.agent.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/deviceManager.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/libraries/Dart_Packages.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/libraries/Dart_SDK.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/libraries/Flutter_Plugins.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/libraries/KotlinJavaRuntime.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/markdown.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/misc.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/modules.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/runConfigurations/main_dart.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/shelf/Uncommitted_changes_before_Checkout_at_27_11_2025_23_13__Changes_.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/shelf/Uncommitted_changes_before_Checkout_at_27_11_2025_23_13_[Changes]/shelved.patch` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/studiobot.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/vcs.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.idea/workspace.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.idea/)
+- `.vscode/settings.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (.vscode/)
+- `android/.gradle/8.14/checksums/md5-checksums.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/.gradle/8.14/checksums/sha1-checksums.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/.gradle/8.14/executionHistory/executionHistory.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/.gradle/8.14/fileChanges/last-build.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/.gradle/8.14/fileHashes/fileHashes.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/.gradle/8.14/fileHashes/resourceHashesCache.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/.gradle/buildOutputCleanup/outputFiles.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `android/app/src/main/res/drawable-hdpi/splash.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/drawable-mdpi/splash.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/drawable-v21/background.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/drawable-xhdpi/splash.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/drawable-xxhdpi/splash.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/drawable-xxxhdpi/splash.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/drawable/background.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/mipmap-hdpi/ic_launcher.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/mipmap-hdpi/launcher_icon.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/mipmap-mdpi/ic_launcher.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/mipmap-mdpi/launcher_icon.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/mipmap-xhdpi/ic_launcher.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/mipmap-xhdpi/launcher_icon.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/mipmap-xxhdpi/launcher_icon.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/main/res/mipmap-xxxhdpi/launcher_icon.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/app/src/profile/AndroidManifest.xml` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `android/gradle/wrapper/gradle-wrapper.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `android/headscalemanager_android.iml` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `android/key.jks` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `android/key.properties` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `assets/icon/Gemini_Generated_Image_de_presentation.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `assets/icon/icon recadre.PNG` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `assets/icon/icon.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `assets/icon/Screen1.jpg` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `assets/icon/Screen2.jpg` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `assets/icon/screen3.jpg` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `assets/icon/Screenshot_20250820_211008_2.jpg` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `assets/icon/Screenshot_20250820_211229_1.jpg` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `assets/icon/splash.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/.cxx/release/3r1v24q5/arm64-v8a/.cmake/api/v1/query/client-agp/cache-v2` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/.cmake/api/v1/query/client-agp/cmakeFiles-v1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/.cmake/api/v1/query/client-agp/codemodel-v2` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/.cmake/api/v1/reply/cache-v2-18a236f5d373da496cdc.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/.cmake/api/v1/reply/cmakeFiles-v1-466b03530d7ecf9396dd.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/.cmake/api/v1/reply/codemodel-v2-9196c693b4de96419010.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/.cmake/api/v1/reply/directory-.-release-d0094a50bb2071803777.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/.cmake/api/v1/reply/index-2026-08-25T05-42-41-0526.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/additional_project_files.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/android_gradle_build_mini.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/android_gradle_build.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/build_file_index.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/build.ninja` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/cmake_install.cmake` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeCache.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeFiles/3.22.1-g37088a8-dirty/CMakeCCompiler.cmake` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeFiles/3.22.1-g37088a8-dirty/CMakeCXXCompiler.cmake` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeFiles/3.22.1-g37088a8-dirty/CMakeDetermineCompilerABI_C.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeFiles/3.22.1-g37088a8-dirty/CMakeDetermineCompilerABI_CXX.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeFiles/3.22.1-g37088a8-dirty/CMakeSystem.cmake` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdC/CMakeCCompilerId.c` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdC/CMakeCCompilerId.o` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdCXX/CMakeCXXCompilerId.cpp` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdCXX/CMakeCXXCompilerId.o` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeFiles/cmake.check_cache` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeFiles/CMakeOutput.log` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeFiles/rules.ninja` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/CMakeFiles/TargetDirectories.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/configure_fingerprint.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/.cxx/release/3r1v24q5/arm64-v8a/metadata_generation_command.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/prefab_config.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/arm64-v8a/symbol_folder_index.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/.cmake/api/v1/query/client-agp/cache-v2` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/.cmake/api/v1/query/client-agp/cmakeFiles-v1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/.cmake/api/v1/query/client-agp/codemodel-v2` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/.cmake/api/v1/reply/cache-v2-18a4ab0e39a1a4cd9399.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/.cmake/api/v1/reply/cmakeFiles-v1-9c568b77ec374d4647c7.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/.cmake/api/v1/reply/codemodel-v2-c96564730419cc2784bf.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/.cmake/api/v1/reply/directory-.-release-d0094a50bb2071803777.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/.cmake/api/v1/reply/index-2026-08-25T05-42-55-0088.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/additional_project_files.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/android_gradle_build_mini.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/android_gradle_build.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/build_file_index.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/build.ninja` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/cmake_install.cmake` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeCache.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeFiles/3.22.1-g37088a8-dirty/CMakeCCompiler.cmake` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeFiles/3.22.1-g37088a8-dirty/CMakeCXXCompiler.cmake` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeFiles/3.22.1-g37088a8-dirty/CMakeDetermineCompilerABI_C.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeFiles/3.22.1-g37088a8-dirty/CMakeDetermineCompilerABI_CXX.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeFiles/3.22.1-g37088a8-dirty/CMakeSystem.cmake` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdC/CMakeCCompilerId.c` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdC/CMakeCCompilerId.o` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdCXX/CMakeCXXCompilerId.cpp` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdCXX/CMakeCXXCompilerId.o` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeFiles/cmake.check_cache` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeFiles/CMakeOutput.log` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeFiles/rules.ninja` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/CMakeFiles/TargetDirectories.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/configure_fingerprint.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/metadata_generation_command.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/prefab_config.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/armeabi-v7a/symbol_folder_index.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/hash_key.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/.cmake/api/v1/query/client-agp/cache-v2` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/.cmake/api/v1/query/client-agp/cmakeFiles-v1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/.cmake/api/v1/query/client-agp/codemodel-v2` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/.cmake/api/v1/reply/cache-v2-e889d253cadc5d8e3b72.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/.cmake/api/v1/reply/cmakeFiles-v1-7f8d2733da115ecc0c20.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/.cmake/api/v1/reply/codemodel-v2-35cc185a541c690b820a.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/.cmake/api/v1/reply/directory-.-release-d0094a50bb2071803777.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/.cmake/api/v1/reply/index-2026-08-25T05-43-01-0197.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/additional_project_files.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/android_gradle_build_mini.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/android_gradle_build.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/build_file_index.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/build.ninja` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/cmake_install.cmake` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeCache.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeFiles/3.22.1-g37088a8-dirty/CMakeCCompiler.cmake` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeFiles/3.22.1-g37088a8-dirty/CMakeCXXCompiler.cmake` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeFiles/3.22.1-g37088a8-dirty/CMakeDetermineCompilerABI_C.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeFiles/3.22.1-g37088a8-dirty/CMakeDetermineCompilerABI_CXX.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeFiles/3.22.1-g37088a8-dirty/CMakeSystem.cmake` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdC/CMakeCCompilerId.c` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdC/CMakeCCompilerId.o` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdCXX/CMakeCXXCompilerId.cpp` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeFiles/3.22.1-g37088a8-dirty/CompilerIdCXX/CMakeCXXCompilerId.o` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeFiles/cmake.check_cache` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeFiles/CMakeOutput.log` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeFiles/rules.ninja` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/CMakeFiles/TargetDirectories.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/configure_fingerprint.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/.cxx/release/3r1v24q5/x86_64/metadata_generation_command.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/prefab_config.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/.cxx/release/3r1v24q5/x86_64/symbol_folder_index.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/deeplink.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/app_metadata/release/writeReleaseAppMetadata/app-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/assets/release/mergeReleaseAssets/flutter_assets/AssetManifest.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/assets/release/mergeReleaseAssets/flutter_assets/FontManifest.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/assets/release/mergeReleaseAssets/flutter_assets/fonts/MaterialIcons-Regular.otf` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/assets/release/mergeReleaseAssets/flutter_assets/NativeAssetsManifest.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/assets/release/mergeReleaseAssets/flutter_assets/NOTICES.Z` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/assets/release/mergeReleaseAssets/flutter_assets/shaders/ink_sparkle.frag` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/assets/release/mergeReleaseAssets/flutter_assets/shaders/stretch_effect.frag` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/binary_art_profile_metadata/release/compileReleaseArtProfile/baseline.profm` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/binary_art_profile/release/compileReleaseArtProfile/baseline.prof` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/bundle_dependency_report/release/configureReleaseDependencies/dependencies.pb` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/bundle_ide_model/release/produceReleaseBundleIdeListingFile/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/bundle_ide_redirect_file/release/createReleaseBundleListingFileRedirect/redirect.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/bundle_manifest/release/processApplicationManifestReleaseForBundle/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/combined_art_profile/release/compileReleaseArtProfile/baseline-prof.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/compatible_screen_manifest/release/createReleaseCompatibleScreenManifests/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/compile_and_runtime_not_namespaced_r_class_jar/release/processReleaseResources/R.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/arm64-v8a/build_model.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/arm64-v8a/configure_command.bat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/arm64-v8a/configure_stderr.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/arm64-v8a/configure_stdout.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/arm64-v8a/generate_cxx_metadata_234_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/arm64-v8a/generate_cxx_metadata_242_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/arm64-v8a/generate_cxx_metadata_483_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/arm64-v8a/generate_cxx_metadata_724_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/arm64-v8a/generate_cxx_metadata_84_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/arm64-v8a/generate_cxx_metadata_85_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/arm64-v8a/generate_cxx_metadata_975_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/arm64-v8a/metadata_generation_record.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/armeabi-v7a/build_model.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/armeabi-v7a/configure_command.bat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/armeabi-v7a/configure_stderr.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/armeabi-v7a/configure_stdout.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/armeabi-v7a/generate_cxx_metadata_234_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/armeabi-v7a/generate_cxx_metadata_242_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/armeabi-v7a/generate_cxx_metadata_245_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/armeabi-v7a/generate_cxx_metadata_483_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/armeabi-v7a/generate_cxx_metadata_727_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/armeabi-v7a/generate_cxx_metadata_77_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/armeabi-v7a/generate_cxx_metadata_84_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/armeabi-v7a/generate_cxx_metadata_975_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/armeabi-v7a/metadata_generation_record.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/x86_64/build_model.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/x86_64/configure_command.bat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/x86_64/configure_stderr.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/x86_64/configure_stdout.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/x86_64/generate_cxx_metadata_237_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/x86_64/generate_cxx_metadata_245_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/x86_64/generate_cxx_metadata_484_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/x86_64/generate_cxx_metadata_727_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/x86_64/generate_cxx_metadata_77_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/x86_64/generate_cxx_metadata_84_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/x86_64/generate_cxx_metadata_975_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/cxx/release/3r1v24q5/logs/x86_64/metadata_generation_record.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/d8_metadata/release/mergeDexRelease/d8-metadata.dat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/default_proguard_files/global/proguard-android.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/default_proguard_files/global/proguard-defaults.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/desugar_graph/release/dexBuilderRelease/out/currentProject/dirs_bucket_0/graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/desugar_graph/release/dexBuilderRelease/out/currentProject/dirs_bucket_1/graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/desugar_graph/release/dexBuilderRelease/out/currentProject/dirs_bucket_2/graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/desugar_graph/release/dexBuilderRelease/out/currentProject/dirs_bucket_3/graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/desugar_graph/release/dexBuilderRelease/out/currentProject/dirs_bucket_4/graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/desugar_graph/release/dexBuilderRelease/out/currentProject/dirs_bucket_5/graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/desugar_graph/release/dexBuilderRelease/out/currentProject/jar_8fd1fb2c5d280ee37d56a225b18bad435e74a787694fbde42f4203eba077e975_bucket_0/graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/desugar_graph/release/dexBuilderRelease/out/currentProject/jar_8fd1fb2c5d280ee37d56a225b18bad435e74a787694fbde42f4203eba077e975_bucket_1/graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/desugar_graph/release/dexBuilderRelease/out/currentProject/jar_8fd1fb2c5d280ee37d56a225b18bad435e74a787694fbde42f4203eba077e975_bucket_2/graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/desugar_graph/release/dexBuilderRelease/out/currentProject/jar_8fd1fb2c5d280ee37d56a225b18bad435e74a787694fbde42f4203eba077e975_bucket_3/graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/desugar_graph/release/dexBuilderRelease/out/currentProject/jar_8fd1fb2c5d280ee37d56a225b18bad435e74a787694fbde42f4203eba077e975_bucket_4/graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/desugar_graph/release/dexBuilderRelease/out/currentProject/jar_8fd1fb2c5d280ee37d56a225b18bad435e74a787694fbde42f4203eba077e975_bucket_5/graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/desugar_lib_dex/release/l8DexDesugarLibRelease/classes1000.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/desugar_lib_keep_rules/release/l8DexDesugarLibRelease/keep_rules.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/dex_archive_input_jar_hashes/release/dexBuilderRelease/out` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/dex_metadata_directory/release/compileReleaseArtProfile/0/.dm` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/dex_metadata_directory/release/compileReleaseArtProfile/1/.dm` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/dex_metadata_directory/release/compileReleaseArtProfile/dex-metadata-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/dex_number_of_buckets_file/release/dexBuilderRelease/out` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/dex/release/mergeDexRelease/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/dex/release/mergeDexRelease/classes2.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/external_libs_dex/release/mergeExtDexRelease/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/external_libs_dex/release/mergeExtDexRelease/classes2.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/flutter/release/.last_build_id` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/flutter/release/arm64-v8a/app.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/flutter/release/armeabi-v7a/app.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/flutter/release/flutter_assets/AssetManifest.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/flutter/release/flutter_assets/FontManifest.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/flutter/release/flutter_assets/fonts/MaterialIcons-Regular.otf` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/flutter/release/flutter_assets/NativeAssetsManifest.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/flutter/release/flutter_assets/NOTICES.Z` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/flutter/release/flutter_assets/shaders/ink_sparkle.frag` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/flutter/release/flutter_assets/shaders/stretch_effect.frag` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/flutter/release/flutter_build.d` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/flutter/release/jniLibs/arm64-v8a/libapp.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/flutter/release/jniLibs/armeabi-v7a/libapp.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/flutter/release/jniLibs/x86_64/libapp.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/flutter/release/x86_64/app.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/global_synthetics_dex/release/mergeReleaseGlobalSynthetics/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/lintVitalAnalyzeRelease/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/lintVitalAnalyzeRelease/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/mergeReleaseAssets/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/mergeReleaseShaders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/merge-state` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/_IjLHA_V+GC7ZEcL+6xDHiPOLZk=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/_NZUykWiiJ2joCSmqqCdiQTFy8w=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/+Rmb5bnDsrx6p8oGjLuARxLTz+0=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/0pwhDmAZ4qrEmxejQD1BMorf1UI=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/1i2s9OzmGqWNJuqDPoQHDblfQ0I=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/2_O9NW_xW+U78x+luL+gCsSVNGE=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/29GS7TQIb+E4rEaKgPX5jhuV4u4=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/2QAqBSajxSid448hLmugxf04SpI=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/3UjXFQcQA7E_FEiwV_KidhmWwng=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/41UHWt_MVZPlGzzkCRaU0E1LqM0=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/5Tlay2HcOza19GBxOJnc7conQi4=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/6Hcw3JazC81DXXLyXnX1kUTNDlA=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/79Qus9EPZgmdnW82qSnR20Rz_6E=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/79zZbk3cqzJBZ0ZWlyC9mjHHKmg=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/7H_WfLRbWaXmwtxv6K60RULyZE0=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/9ldDODBIT6Ge_Pf_N1ux8Qmcmvw=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/aBw+whrNlNTjqGEqZaGlkLA8Zes=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/aSveckNxRLb6IeMLq1yybc_s3rU=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/bbHu355SZJcy_3kDQzKaWOesfLM=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/BC6Nq1Pn0Yc2Xyu1hCpM0YZ6RK8=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/bMcI6QEfFr372sLTaNOJY8OhEgc=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/BVrmqRRrhGl6PI5jZgkyRrqk18Y=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/c06ZadXV6wc171m7sVwHjNliBXM=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/C2koALeI0FBtCw5N5v+H7_TJxDE=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/d2IHx4A49EBd5OlnIoeNOWXCEkU=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/d3ExcEVWU_a3dnnSbfk1aatrZIM=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/DdCxzYC6VjpVIO6UPUz08pLKSos=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/DzorwvaBRXAc8iUkd9_OzR5bMYs=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/EGGgZloQfjHogthtvldVnRKT4xI=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/ejkB4lvhW7tj4+W6ZBoCUy6Aqq4=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/F4DWDegnUTO23MDoAkpXLvhTfr8=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/f8RzQnMMGroXhjJbgXLHPgYsw3g=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/FQmUFf+Zsv+cqnE0d6Syo__QWDk=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/FsGIn_s8sIF1AOuknEgVkf3ZfqY=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/G105wl8D_fHoApqMcnpeyFHoAmY=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/GPBizHA7wYJ2689kYOFFEYFzuqA=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/gy39csTJFNEJ1N8ZUhr0q77E4wA=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/H2NZmbiVPaiG_ui8B1VokPxpOdg=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/IfwJo59MNw2VyYgWp5e4PDpUQH0=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/Ivunrk4fa8u3G6ob9LtPpzsOICI=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/IWuw2c6HOjsC9R_bhl_jt4US8fM=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/IXCjn14E_nGQm0XrCfTkus++JjI=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/Jeq80tUkeV+tvcfGgRlv9w5gyX0=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/jlUdim4sEhZXlC9TmWVi09Qqa4k=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/juKcoWDZ47kP2hsJ3pFnwHXwTrY=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/JxbpQe4gonSenZRCBgFjGxN_iBU=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/k0qg15QiW8dQHTILoqwoZIAPIow=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/K14pRn5dif9rUMsFMqjbiE3ugZE=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/Kk72CZoUoMlExLMC_3vdDecCyco=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/lglmucqvbsLdYZv2ew9C9Po8QnE=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/Lhlgxaw0uWkauWXB6YssKaxhPqs=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/lnB8OjwGZvqly3EEMFc6C1g9Djo=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/lNHbQKXq9bpsOpukHOajlTMcfZM=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/LPhHQjt8pUgG5KUAioyK1Dp4R7Q=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/lQE2XaCaV3eT834TrOC9jXVNeoo=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/M+SZNI3vnjMCJXuX+3uBFpzP1Zs=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/MfMO2kt2qXXzvCzjGdlfxejt_r0=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/msk7RhSNnr1yztQNVdk_DKvz618=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/Muq_ibq6baDu6syVKdgTvHdHcZs=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/n6s1XYtubCnsBb7L4q5KGvePp3w=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/NjditjVhT9BSIUOlYTn1ge4ePCs=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/NngS0PtlTsidSiXTikyveTl218I=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/npmZJkiE6SBF6qsg2Ve+pul8Cjw=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/o3zRv5c32OXUjiFATOG5G+yTBtc=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/obPy+2PlMQiGjG+RINxvGdMCuRA=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/OLZQRMQgIQgeTC+n4M5riu5Csq0=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/oM7luJE1VYI_AaMgvJ8io9JYZpI=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/OMlVXW_ybhM_nXFd2YC3CipFTt8=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/p44ZonM+WlSGa0P3AZ87o7zhju8=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/Pb2s3KeSzP1K_NnmTBHb9sbyYUc=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/Pbt2j3vV6YQeSX72WIlVnlveny4=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/PkW73xoTSluR4_k+ZpnKWnk5xJw=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/r9YamsBXI4mijUBRWqWvaMaRMvM=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/rb2oUhHvn5yDLPQZjkqL+viqZiU=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/RHWP0VXYr8U60e1Dj+o2ZF82L_U=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/sFuAgZIZH8To6_dFJR4xhrkJKyY=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/sfUCDHkoQf0SkRWOOoWF_uK8C2M=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/Sl1LdHdJvaMzktF0I9LN_JqS9HM=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/taZjV4v2i9dfLxuX_ge6gc_124o=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/tE2SR_pZlHZnI7jOVoKvXFMcxZs=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/TEiIZ+keUhUZ0uHfcrClt5ySDr0=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/Tl4uJvtqrOY2JfxU2kZWP53CCgU=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/tmgSHxZ0UO4x6HcDIrF7CTVE6P0=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/TpV6VPGTgYCfCu+eFavGiZ_4jHk=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/tTNp3XBAx62LvKWDjO9HDVTBRTI=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/uaOtMpHwU71CQG4wBtg+W24_SpE=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/uKC9h6GbRDIOvJs3C_CK5s3dEEQ=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/va0dPA0J0XgbMdkEyJUo3MA7tLs=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/VWqmE8Ko55Bi2qFwDkPbe2H1Row=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/wFrak7P2P3cU8rawDK+qHRLD17Q=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/WG3mdE9k1ZjwYJiH_Z_GyTTEFek=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/woZvemdOoO16bUGnaENHon+p5ZQ=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/WXtVyWEK8GvP76amGFndzs5OZaE=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/XEAspOR11BBfSty15mygLrZbxQo=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/xhXfLaODNuZ7BRwMduwP1ehsYZY=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/Xrj1FIxYRKfzKaDIzz6z3vYsUmk=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/XtRqMT2Bi+3AOwcQ66BdNoohbz0=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/XUabTMDakNwohV+WH5kxvLtV8vg=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/y+pQ5EZBB8rz+r90Whe7gV4uyxw=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/y82kXk1e4Ffce7oOHUi4yXHKpN8=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/YLININcKIviyY3R1XSQyVdjikLk=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/ze_J7zZI_SkWx9FuBpW+lOGijGg=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release-mergeJavaRes/zip-cache/ZLTE6ZllYDNOYivACr16+3aZzsw=` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-af/values-af.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-am/values-am.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ar/values-ar.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-as/values-as.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-az/values-az.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-b+sr+Latn/values-b+sr+Latn.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-be/values-be.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-bg/values-bg.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-bn/values-bn.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-bs/values-bs.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ca/values-ca.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-cs/values-cs.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-da/values-da.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-de/values-de.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-el/values-el.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-en-rAU/values-en-rAU.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-en-rCA/values-en-rCA.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-en-rGB/values-en-rGB.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-en-rIN/values-en-rIN.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-en-rXC/values-en-rXC.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-es-rUS/values-es-rUS.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-es/values-es.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-et/values-et.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-eu/values-eu.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-fa/values-fa.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-fi/values-fi.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-fr-rCA/values-fr-rCA.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-fr/values-fr.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-gl/values-gl.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-gu/values-gu.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-h720dp-v13/values-h720dp-v13.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-hdpi-v4/values-hdpi-v4.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-hi/values-hi.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-hr/values-hr.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-hu/values-hu.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-hy/values-hy.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-in/values-in.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-is/values-is.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-it/values-it.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-iw/values-iw.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ja/values-ja.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ka/values-ka.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-kk/values-kk.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-km/values-km.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-kn/values-kn.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ko/values-ko.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ky/values-ky.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-land/values-land.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-large-v4/values-large-v4.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ldltr-v21/values-ldltr-v21.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-lo/values-lo.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-lt/values-lt.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-lv/values-lv.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-mk/values-mk.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ml/values-ml.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-mn/values-mn.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-mr/values-mr.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ms/values-ms.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-my/values-my.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-nb/values-nb.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ne/values-ne.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-night-v31/values-night-v31.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-night-v8/values-night-v8.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-nl/values-nl.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-or/values-or.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-pa/values-pa.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-pl/values-pl.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-port/values-port.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-pt-rBR/values-pt-rBR.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-pt-rPT/values-pt-rPT.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-pt/values-pt.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ro/values-ro.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ru/values-ru.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-si/values-si.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sk/values-sk.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sl/values-sl.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sq/values-sq.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sr/values-sr.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sv/values-sv.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sw/values-sw.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sw360dp-v13/values-sw360dp-v13.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-sw600dp-v13/values-sw600dp-v13.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ta/values-ta.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-te/values-te.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-th/values-th.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-tl/values-tl.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-tr/values-tr.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-uk/values-uk.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-ur/values-ur.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-uz/values-uz.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v16/values-v16.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v17/values-v17.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v18/values-v18.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v21/values-v21.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v22/values-v22.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v23/values-v23.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v24/values-v24.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v25/values-v25.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v26/values-v26.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v28/values-v28.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-v31/values-v31.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-vi/values-vi.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-watch-v20/values-watch-v20.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-watch-v21/values-watch-v21.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-xlarge-v4/values-xlarge-v4.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-zh-rCN/values-zh-rCN.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-zh-rHK/values-zh-rHK.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-zh-rTW/values-zh-rTW.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values-zu/values-zu.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merged.dir/values/values.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/mergeReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/packageReleaseResources/merged.dir/values-night-v31/values-night-v31.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/packageReleaseResources/merged.dir/values-night-v8/values-night-v8.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/packageReleaseResources/merged.dir/values-v31/values-v31.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/packageReleaseResources/merged.dir/values/values.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/incremental/release/packageReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/intermediary_bundle/release/packageReleaseBundle/intermediary-bundle.aab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/java_res/release/processReleaseJavaRes/out/kotlin-tooling-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/java_res/release/processReleaseJavaRes/out/META-INF/app_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/GeneratedPluginRegistrant.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/l8_art_profile/release/expandReleaseL8ArtProfileWildcards/baseline-prof.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/l8_art_profile/release/l8DexDesugarLibRelease/baseline-prof.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/linked_resources_binary_format/release/processReleaseResources/linked-resources-binary-format-release.ap_` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/linked_resources_binary_format/release/processReleaseResources/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/linked_resources_for_bundle_proto_format/release/bundleReleaseResources/linked-resources-for-bundle-proto-format.ap_` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/lint_vital_intermediate_text_report/release/lintVitalReportRelease/lint-results-release.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/lint_vital_output/release/lintVitalRelease/lint-vital-output.dat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/lint_vital_report_lint_model/release/generateReleaseLintVitalReportModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/lint_vital_report_lint_model/release/generateReleaseLintVitalReportModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/lint_vital_report_lint_model/release/generateReleaseLintVitalReportModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/lint_vital_report_lint_model/release/generateReleaseLintVitalReportModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/lint_vital_return_value/release/lintVitalReportRelease/return-value-release.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/lint-cache/lintVitalAnalyzeRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/activity/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/com/android/tools/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/master-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/lint-cache/lintVitalAnalyzeRelease/migrated-jars/androidx.lifecycle.lint.LiveDataCoreIssueRegistry-32b654e6cacc2c23..jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/lint-cache/lintVitalAnalyzeRelease/sdk_index/snapshot.gz` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/lint-cache/lintVitalReportRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/manifest_merge_blame_file/release/processReleaseMainManifest/manifest-merger-blame-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_art_profile/release/mergeReleaseArtProfile/baseline-prof.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_java_res/release/mergeReleaseJavaResource/base.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_jni_libs/release/mergeReleaseJniLibFolders/out/arm64-v8a/libapp.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_jni_libs/release/mergeReleaseJniLibFolders/out/armeabi-v7a/libapp.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_jni_libs/release/mergeReleaseJniLibFolders/out/x86_64/libapp.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_manifest/release/outputReleaseAppLinkSettings/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_manifests/release/processReleaseManifest/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/arm64-v8a/libapp.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/arm64-v8a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/arm64-v8a/libdatastore_shared_counter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/arm64-v8a/libflutter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/armeabi-v7a/libapp.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/armeabi-v7a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/armeabi-v7a/libdatastore_shared_counter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/armeabi-v7a/libflutter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/x86_64/libapp.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/x86_64/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/x86_64/libdatastore_shared_counter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/x86_64/libflutter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/x86/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/x86/libdatastore_shared_counter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/mergeReleaseResources.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-af.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-am.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ar.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-as.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-az.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-b+sr+Latn.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-be.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-bg.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-bn.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-bs.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ca.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-cs.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-da.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-de.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-el.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-en-rAU.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-en-rCA.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-en-rGB.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-en-rIN.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-en-rXC.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-es-rUS.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-es.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-et.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-eu.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-fa.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-fi.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-fr-rCA.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-fr.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-gl.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-gu.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-h720dp-v13.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-hdpi-v4.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-hi.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-hr.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-hu.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-hy.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-in.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-is.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-it.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-iw.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ja.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ka.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-kk.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-km.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-kn.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ko.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ky.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-land.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-large-v4.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ldltr-v21.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-lo.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-lt.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-lv.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-mk.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ml.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-mn.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-mr.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ms.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-my.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-nb.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ne.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-night-v31.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-night-v8.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-nl.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-or.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-pa.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-pl.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-port.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-pt-rBR.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-pt-rPT.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-pt.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ro.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ru.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-si.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sk.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sl.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sq.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sr.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sv.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sw.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sw360dp-v13.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-sw600dp-v13.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ta.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-te.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-th.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-tl.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-tr.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-uk.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-ur.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-uz.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v16.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v17.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v18.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v21.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v22.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v23.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v24.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v25.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v26.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v28.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-v31.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-vi.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-watch-v20.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-watch-v21.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-xlarge-v4.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-zh-rCN.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-zh-rHK.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-zh-rTW.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values-zu.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/multi-v2/values.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res_blame_folder/release/mergeReleaseResources/out/single/mergeReleaseResources.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/drawable-hdpi_splash.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/drawable-mdpi_splash.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/drawable-v21_background.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/drawable-v21_launch_background.xml.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/drawable-xhdpi_splash.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/drawable-xxhdpi_splash.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/drawable-xxxhdpi_splash.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/mipmap-hdpi_ic_launcher.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/mipmap-hdpi_launcher_icon.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/mipmap-mdpi_ic_launcher.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/mipmap-mdpi_launcher_icon.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/mipmap-xhdpi_ic_launcher.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/mipmap-xhdpi_launcher_icon.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/mipmap-xxhdpi_ic_launcher.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/mipmap-xxhdpi_launcher_icon.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/mipmap-xxxhdpi_ic_launcher.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/mipmap-xxxhdpi_launcher_icon.png.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values_values.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-af_values-af.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-am_values-am.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ar_values-ar.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-as_values-as.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-az_values-az.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-b+sr+Latn_values-b+sr+Latn.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-be_values-be.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-bg_values-bg.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-bn_values-bn.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-bs_values-bs.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ca_values-ca.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-cs_values-cs.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-da_values-da.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-de_values-de.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-el_values-el.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-en-rAU_values-en-rAU.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-en-rCA_values-en-rCA.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-en-rGB_values-en-rGB.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-en-rIN_values-en-rIN.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-en-rXC_values-en-rXC.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-es_values-es.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-es-rUS_values-es-rUS.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-et_values-et.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-eu_values-eu.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-fa_values-fa.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-fi_values-fi.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-fr_values-fr.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-fr-rCA_values-fr-rCA.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-gl_values-gl.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-gu_values-gu.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-h720dp-v13_values-h720dp-v13.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-hdpi-v4_values-hdpi-v4.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-hi_values-hi.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-hr_values-hr.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-hu_values-hu.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-hy_values-hy.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-in_values-in.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-is_values-is.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-it_values-it.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-iw_values-iw.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ja_values-ja.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ka_values-ka.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-kk_values-kk.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-km_values-km.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-kn_values-kn.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ko_values-ko.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ky_values-ky.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-land_values-land.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-large-v4_values-large-v4.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ldltr-v21_values-ldltr-v21.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-lo_values-lo.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-lt_values-lt.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-lv_values-lv.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-mk_values-mk.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ml_values-ml.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-mn_values-mn.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-mr_values-mr.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ms_values-ms.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-my_values-my.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-nb_values-nb.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ne_values-ne.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-night-v31_values-night-v31.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-night-v8_values-night-v8.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-nl_values-nl.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-or_values-or.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-pa_values-pa.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-pl_values-pl.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-port_values-port.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-pt_values-pt.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-pt-rBR_values-pt-rBR.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-pt-rPT_values-pt-rPT.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ro_values-ro.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ru_values-ru.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-si_values-si.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-sk_values-sk.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-sl_values-sl.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-sq_values-sq.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-sr_values-sr.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-sv_values-sv.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-sw_values-sw.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-sw360dp-v13_values-sw360dp-v13.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-sw600dp-v13_values-sw600dp-v13.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ta_values-ta.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-te_values-te.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-th_values-th.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-tl_values-tl.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-tr_values-tr.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-uk_values-uk.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-ur_values-ur.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-uz_values-uz.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-v16_values-v16.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-v17_values-v17.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-v18_values-v18.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-v21_values-v21.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-v22_values-v22.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-v23_values-v23.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-v24_values-v24.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-v25_values-v25.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-v26_values-v26.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-v28_values-v28.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-v31_values-v31.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-vi_values-vi.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-watch-v20_values-watch-v20.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-watch-v21_values-watch-v21.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-xlarge-v4_values-xlarge-v4.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-zh-rCN_values-zh-rCN.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-zh-rHK_values-zh-rHK.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-zh-rTW_values-zh-rTW.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/merged_res/release/mergeReleaseResources/values-zu_values-zu.arsc.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/metadata_library_dependencies_report/release/collectReleaseDependencies/dependencies.pb` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/module_bundle/release/buildReleasePreBundle/base.zip` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/native_symbol_tables/release/extractReleaseNativeSymbolTables/out/arm64-v8a/libapp.so.sym` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/native_symbol_tables/release/extractReleaseNativeSymbolTables/out/arm64-v8a/libdartjni.so.sym` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/native_symbol_tables/release/extractReleaseNativeSymbolTables/out/arm64-v8a/libflutter.so.sym` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/native_symbol_tables/release/extractReleaseNativeSymbolTables/out/armeabi-v7a/libapp.so.sym` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/native_symbol_tables/release/extractReleaseNativeSymbolTables/out/armeabi-v7a/libdartjni.so.sym` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/native_symbol_tables/release/extractReleaseNativeSymbolTables/out/armeabi-v7a/libflutter.so.sym` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/native_symbol_tables/release/extractReleaseNativeSymbolTables/out/x86_64/libapp.so.sym` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/native_symbol_tables/release/extractReleaseNativeSymbolTables/out/x86_64/libdartjni.so.sym` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/native_symbol_tables/release/extractReleaseNativeSymbolTables/out/x86_64/libflutter.so.sym` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/native_symbol_tables/release/extractReleaseNativeSymbolTables/out/x86/libdartjni.so.sym` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/packaged_manifests/release/processReleaseManifestForPackage/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/packaged_manifests/release/processReleaseManifestForPackage/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/drawable-hdpi-v4/splash.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/drawable-mdpi-v4/splash.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/drawable-v21/background.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/drawable-v21/launch_background.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/drawable-xhdpi-v4/splash.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/drawable-xxhdpi-v4/splash.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/drawable-xxxhdpi-v4/splash.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/mipmap-hdpi-v4/ic_launcher.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/mipmap-hdpi-v4/launcher_icon.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/mipmap-mdpi-v4/ic_launcher.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/mipmap-mdpi-v4/launcher_icon.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/mipmap-xhdpi-v4/ic_launcher.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/mipmap-xhdpi-v4/launcher_icon.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/mipmap-xxhdpi-v4/ic_launcher.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/mipmap-xxhdpi-v4/launcher_icon.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/mipmap-xxxhdpi-v4/ic_launcher.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/mipmap-xxxhdpi-v4/launcher_icon.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/values-night-v31/values-night-v31.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/values-night-v8/values-night-v8.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/values-v31/values-v31.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/packaged_res/release/packageReleaseResources/values/values.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/project_dex_archive/release/dexBuilderRelease/out/b0f94a44822021c328bea219fadc97b709abd429b44415bb681d343f70c94eef_0.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/project_dex_archive/release/dexBuilderRelease/out/b0f94a44822021c328bea219fadc97b709abd429b44415bb681d343f70c94eef_1.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/project_dex_archive/release/dexBuilderRelease/out/b0f94a44822021c328bea219fadc97b709abd429b44415bb681d343f70c94eef_2.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/project_dex_archive/release/dexBuilderRelease/out/b0f94a44822021c328bea219fadc97b709abd429b44415bb681d343f70c94eef_3.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/project_dex_archive/release/dexBuilderRelease/out/b0f94a44822021c328bea219fadc97b709abd429b44415bb681d343f70c94eef_4.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/project_dex_archive/release/dexBuilderRelease/out/b0f94a44822021c328bea219fadc97b709abd429b44415bb681d343f70c94eef_5.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/project_dex_archive/release/dexBuilderRelease/out/com/dkstudio/headscalemanager/MainActivity.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/project_dex_archive/release/dexBuilderRelease/out/io/flutter/plugins/GeneratedPluginRegistrant.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/runtime_symbol_list/release/processReleaseResources/R.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/source_set_path_map/release/mapReleaseSourceSetPaths/file-map.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/stable_resource_ids_file/release/processReleaseResources/stableIds.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/arm64-v8a/libapp.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/arm64-v8a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/arm64-v8a/libdatastore_shared_counter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/arm64-v8a/libflutter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/armeabi-v7a/libapp.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/armeabi-v7a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/armeabi-v7a/libdatastore_shared_counter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/armeabi-v7a/libflutter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/x86_64/libapp.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/x86_64/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/x86_64/libdatastore_shared_counter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/x86_64/libflutter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/x86/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/x86/libdatastore_shared_counter.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/intermediates/symbol_list_with_package_name/release/processReleaseResources/package-aware-r.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/intermediates/version_control_info_file/release/extractReleaseVersionControlInfo/version-control-info.textproto` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/counters.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/kotlin/compileReleaseKotlin/cacheable/last-build.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/kotlin/compileReleaseKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/kotlinToolingMetadata/kotlin-tooling-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/outputs/bundle/release/app-release.aab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/outputs/logs/manifest-merger-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/app/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/tmp/kotlin-classes/release/com/dkstudio/headscalemanager/MainActivity.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/app/tmp/kotlin-classes/release/META-INF/app_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/138127b01cb8ff7af9db19d1d9a7cd2a/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/.transforms/138127b01cb8ff7af9db19d1d9a7cd2a/transformed/classes/classes_dex/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/mr/flutter/plugin/filepicker/FileInfo.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/mr/flutter/plugin/filepicker/FileInfo$Builder.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/mr/flutter/plugin/filepicker/FilePickerDelegate.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/mr/flutter/plugin/filepicker/FilePickerDelegate$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/mr/flutter/plugin/filepicker/FilePickerPlugin.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/mr/flutter/plugin/filepicker/FilePickerPlugin$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/mr/flutter/plugin/filepicker/FilePickerPlugin$LifeCycleObserver.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/mr/flutter/plugin/filepicker/FilePickerPlugin$setup$1$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/mr/flutter/plugin/filepicker/FileUtils.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/mr/flutter/plugin/filepicker/FileUtils$processFiles$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/mr/flutter/plugin/filepicker/FileUtils$WhenMappings.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/mr/flutter/plugin/filepicker/MethodResultWrapper.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/.transforms/28903e4248c397810f1d427f301e89b0/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/aar_main_jar/release/syncReleaseLibJars/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/annotations_typedef_file/release/extractReleaseAnnotations/typedefs.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/default_proguard_files/global/proguard-android.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/default_proguard_files/global/proguard-defaults.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/full_jar/release/createFullJarRelease/full.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/incremental/lintVitalAnalyzeRelease/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/incremental/lintVitalAnalyzeRelease/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/incremental/mergeReleaseAssets/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/incremental/mergeReleaseShaders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/incremental/release-mergeJavaRes/merge-state` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/incremental/release/packageReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/java_res/release/processReleaseJavaRes/out/META-INF/file_picker_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint_model_metadata/release/writeReleaseLintModelMetadata/lint-model-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint_model/release/generateReleaseLintModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint_model/release/generateReleaseLintModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-issues.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint-cache/lintVitalAnalyzeRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/annotation/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/core/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/lifecycle/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/com/android/tools/build/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/master-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/lint-cache/lintVitalAnalyzeRelease/migrated-jars/androidx.lifecycle.lint.LiveDataCoreIssueRegistry-32b654e6cacc2c23..jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/lint-cache/lintVitalAnalyzeRelease/sdk_index/snapshot.gz` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/local_aar_for_lint/release/out.aar` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/merged_consumer_proguard_file/release/mergeReleaseConsumerProguardFiles/proguard.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/merged_java_res/release/mergeReleaseJavaResource/feature-file_picker.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/mr/flutter/plugin/filepicker/FileInfo.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/mr/flutter/plugin/filepicker/FileInfo$Builder.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/mr/flutter/plugin/filepicker/FilePickerDelegate.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/mr/flutter/plugin/filepicker/FilePickerDelegate$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/mr/flutter/plugin/filepicker/FilePickerPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/mr/flutter/plugin/filepicker/FilePickerPlugin$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/mr/flutter/plugin/filepicker/FilePickerPlugin$LifeCycleObserver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/mr/flutter/plugin/filepicker/FilePickerPlugin$setup$1$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/mr/flutter/plugin/filepicker/FileUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/mr/flutter/plugin/filepicker/FileUtils$processFiles$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/mr/flutter/plugin/filepicker/FileUtils$WhenMappings.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/mr/flutter/plugin/filepicker/MethodResultWrapper.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/META-INF/file_picker_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/counters.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/kotlin/compileReleaseKotlin/cacheable/last-build.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/kotlin/compileReleaseKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/outputs/logs/manifest-merger-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/file_picker/tmp/kotlin-classes/release/com/mr/flutter/plugin/filepicker/FileInfo.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/tmp/kotlin-classes/release/com/mr/flutter/plugin/filepicker/FileInfo$Builder.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/tmp/kotlin-classes/release/com/mr/flutter/plugin/filepicker/FilePickerDelegate.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/tmp/kotlin-classes/release/com/mr/flutter/plugin/filepicker/FilePickerDelegate$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/tmp/kotlin-classes/release/com/mr/flutter/plugin/filepicker/FilePickerPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/tmp/kotlin-classes/release/com/mr/flutter/plugin/filepicker/FilePickerPlugin$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/tmp/kotlin-classes/release/com/mr/flutter/plugin/filepicker/FilePickerPlugin$LifeCycleObserver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/tmp/kotlin-classes/release/com/mr/flutter/plugin/filepicker/FilePickerPlugin$setup$1$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/tmp/kotlin-classes/release/com/mr/flutter/plugin/filepicker/FileUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/tmp/kotlin-classes/release/com/mr/flutter/plugin/filepicker/FileUtils$processFiles$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/tmp/kotlin-classes/release/com/mr/flutter/plugin/filepicker/FileUtils$WhenMappings.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/tmp/kotlin-classes/release/com/mr/flutter/plugin/filepicker/MethodResultWrapper.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/file_picker/tmp/kotlin-classes/release/META-INF/file_picker_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/ActionBroadcastReceiver.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/ActionBroadcastReceiver$ActionEventSink.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$2.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$3.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$4.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$5.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$6.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$ExactAlarmPermissionException.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$PermissionRequestProgress.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$PluginException.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/ForegroundService.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/ForegroundServiceStartParameter.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/isolate/IsolatePreferences.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/BitmapSource.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/DateTimeComponents.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/IconSource.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/MessageDetails.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/NotificationAction.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/NotificationAction$NotificationActionInput.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/NotificationChannelAction.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/NotificationChannelDetails.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/NotificationChannelGroupDetails.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/NotificationDetails.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/NotificationStyle.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/PersonDetails.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/RepeatInterval.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/ScheduledNotificationRepeatFrequency.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/ScheduleMode.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/ScheduleMode$Deserializer.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/SoundSource.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/styles/BigPictureStyleInformation.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/styles/BigTextStyleInformation.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/styles/DefaultStyleInformation.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/styles/InboxStyleInformation.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/styles/MessagingStyleInformation.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/styles/StyleInformation.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/models/Time.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/PermissionRequestListener.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/RuntimeTypeAdapterFactory.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/RuntimeTypeAdapterFactory$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/ScheduledNotificationBootReceiver.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/ScheduledNotificationReceiver.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/ScheduledNotificationReceiver$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/utils/BooleanUtils.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/utils/LongUtils.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/dexterous/flutterlocalnotifications/utils/StringUtils.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/.transforms/21e62ec62c07801b035169c1d07b965e/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/.transforms/93e30c803f849dcedddd1a2f408c83a9/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/.transforms/93e30c803f849dcedddd1a2f408c83a9/transformed/classes/classes_dex/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/aar_main_jar/release/syncReleaseLibJars/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/annotations_typedef_file/release/extractReleaseAnnotations/typedefs.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/default_proguard_files/global/proguard-android.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/default_proguard_files/global/proguard-defaults.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/full_jar/release/createFullJarRelease/full.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/incremental/lintVitalAnalyzeRelease/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/incremental/lintVitalAnalyzeRelease/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/incremental/mergeReleaseAssets/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/incremental/mergeReleaseShaders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/incremental/release-mergeJavaRes/merge-state` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/incremental/release/packageReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/ActionBroadcastReceiver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/ActionBroadcastReceiver$ActionEventSink.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$3.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$4.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$5.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$6.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$ExactAlarmPermissionException.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$PermissionRequestProgress.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$PluginException.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/ForegroundService.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/ForegroundServiceStartParameter.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/isolate/IsolatePreferences.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/BitmapSource.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/DateTimeComponents.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/IconSource.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/MessageDetails.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/NotificationAction.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/NotificationAction$NotificationActionInput.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/NotificationChannelAction.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/NotificationChannelDetails.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/NotificationChannelGroupDetails.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/NotificationDetails.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/NotificationStyle.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/PersonDetails.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/RepeatInterval.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/ScheduledNotificationRepeatFrequency.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/ScheduleMode.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/ScheduleMode$Deserializer.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/SoundSource.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/styles/BigPictureStyleInformation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/styles/BigTextStyleInformation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/styles/DefaultStyleInformation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/styles/InboxStyleInformation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/styles/MessagingStyleInformation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/styles/StyleInformation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/models/Time.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/PermissionRequestListener.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/RuntimeTypeAdapterFactory.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/RuntimeTypeAdapterFactory$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/ScheduledNotificationBootReceiver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/ScheduledNotificationReceiver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/ScheduledNotificationReceiver$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/utils/BooleanUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/utils/LongUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/dexterous/flutterlocalnotifications/utils/StringUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/lint_model_metadata/release/writeReleaseLintModelMetadata/lint-model-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint_model/release/generateReleaseLintModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint_model/release/generateReleaseLintModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-issues.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint-cache/lintVitalAnalyzeRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/core/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/media/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/test/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/com/android/tools/build/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/com/android/tools/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/master-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/lint-cache/lintVitalAnalyzeRelease/sdk_index/snapshot.gz` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/local_aar_for_lint/release/out.aar` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/merged_java_res/release/mergeReleaseJavaResource/feature-flutter_local_notifications.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/ActionBroadcastReceiver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/ActionBroadcastReceiver$ActionEventSink.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$3.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$4.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$5.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$6.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$ExactAlarmPermissionException.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$PermissionRequestProgress.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/FlutterLocalNotificationsPlugin$PluginException.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/ForegroundService.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/ForegroundServiceStartParameter.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/isolate/IsolatePreferences.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/BitmapSource.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/DateTimeComponents.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/IconSource.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/MessageDetails.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/NotificationAction.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/NotificationAction$NotificationActionInput.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/NotificationChannelAction.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/NotificationChannelDetails.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/NotificationChannelGroupDetails.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/NotificationDetails.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/NotificationStyle.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/PersonDetails.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/RepeatInterval.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/ScheduledNotificationRepeatFrequency.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/ScheduleMode.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/ScheduleMode$Deserializer.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/SoundSource.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/styles/BigPictureStyleInformation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/styles/BigTextStyleInformation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/styles/DefaultStyleInformation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/styles/InboxStyleInformation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/styles/MessagingStyleInformation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/styles/StyleInformation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/models/Time.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/PermissionRequestListener.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/RuntimeTypeAdapterFactory.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/RuntimeTypeAdapterFactory$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/ScheduledNotificationBootReceiver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/ScheduledNotificationReceiver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/ScheduledNotificationReceiver$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/utils/BooleanUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/utils/LongUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/dexterous/flutterlocalnotifications/utils/StringUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_local_notifications/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/outputs/logs/manifest-merger-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_local_notifications/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/.transforms/38c1abbf2eac5cdc83dd0858aacdf608/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/.transforms/38c1abbf2eac5cdc83dd0858aacdf608/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/embedding/engine/plugins/lifecycle/FlutterLifecycleAdapter.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/.transforms/38c1abbf2eac5cdc83dd0858aacdf608/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/flutter_plugin_android_lifecycle/FlutterAndroidLifecyclePlugin.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/.transforms/38c1abbf2eac5cdc83dd0858aacdf608/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/.transforms/b90727da17a353dc53320cc88140533e/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/.transforms/b90727da17a353dc53320cc88140533e/transformed/classes/classes_dex/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/aar_main_jar/release/syncReleaseLibJars/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/annotations_typedef_file/release/extractReleaseAnnotations/typedefs.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/default_proguard_files/global/proguard-android.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/default_proguard_files/global/proguard-defaults.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/full_jar/release/createFullJarRelease/full.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/intermediates/incremental/lintVitalAnalyzeRelease/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/incremental/lintVitalAnalyzeRelease/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/incremental/mergeReleaseAssets/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/incremental/mergeReleaseShaders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/incremental/release-mergeJavaRes/merge-state` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/incremental/release/packageReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/embedding/engine/plugins/lifecycle/FlutterLifecycleAdapter.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/flutter_plugin_android_lifecycle/FlutterAndroidLifecyclePlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/intermediates/lint_model_metadata/release/writeReleaseLintModelMetadata/lint-model-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint_model/release/generateReleaseLintModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint_model/release/generateReleaseLintModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-issues.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint-cache/lintVitalAnalyzeRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/annotation/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/com/android/tools/build/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/master-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/lint-cache/lintVitalAnalyzeRelease/sdk_index/snapshot.gz` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/intermediates/local_aar_for_lint/release/out.aar` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/merged_consumer_proguard_file/release/mergeReleaseConsumerProguardFiles/proguard.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/merged_java_res/release/mergeReleaseJavaResource/feature-flutter_plugin_android_lifecycle.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/embedding/engine/plugins/lifecycle/FlutterLifecycleAdapter.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/flutter_plugin_android_lifecycle/FlutterAndroidLifecyclePlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_plugin_android_lifecycle/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/outputs/logs/manifest-merger-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_plugin_android_lifecycle/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/.transforms/1550f300612cedfe8c5f54a4ac015817/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/.transforms/1550f300612cedfe8c5f54a4ac015817/transformed/classes/classes_dex/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/BuildConfig.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/ciphers/KeyCipher.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/ciphers/KeyCipherAlgorithm.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/ciphers/KeyCipherFunction.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/ciphers/RSACipher18Implementation.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/ciphers/RSACipherOAEPImplementation.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/ciphers/StorageCipher.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/ciphers/StorageCipher18Implementation.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/ciphers/StorageCipherAlgorithm.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/ciphers/StorageCipherFactory.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/ciphers/StorageCipherFunction.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/ciphers/StorageCipherGCMImplementation.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/FlutterSecureStorage.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/FlutterSecureStoragePlugin.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/FlutterSecureStoragePlugin$MethodResultWrapper.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/it_nomads/fluttersecurestorage/FlutterSecureStoragePlugin$MethodRunner.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/.transforms/89a9bed5599a01a645861c2e896f7ab8/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/generated/source/buildConfig/release/com/it_nomads/fluttersecurestorage/BuildConfig.java` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/aar_main_jar/release/syncReleaseLibJars/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/annotations_typedef_file/release/extractReleaseAnnotations/typedefs.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/default_proguard_files/global/proguard-android.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/default_proguard_files/global/proguard-defaults.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/full_jar/release/createFullJarRelease/full.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/incremental/lintVitalAnalyzeRelease/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/incremental/lintVitalAnalyzeRelease/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/incremental/mergeReleaseAssets/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/incremental/mergeReleaseShaders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/incremental/release-mergeJavaRes/merge-state` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/incremental/release/packageReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/BuildConfig.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/ciphers/KeyCipher.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/ciphers/KeyCipherAlgorithm.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/ciphers/KeyCipherFunction.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/ciphers/RSACipher18Implementation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/ciphers/RSACipherOAEPImplementation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/ciphers/StorageCipher.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/ciphers/StorageCipher18Implementation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/ciphers/StorageCipherAlgorithm.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/ciphers/StorageCipherFactory.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/ciphers/StorageCipherFunction.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/ciphers/StorageCipherGCMImplementation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/FlutterSecureStorage.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/FlutterSecureStoragePlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/FlutterSecureStoragePlugin$MethodResultWrapper.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/it_nomads/fluttersecurestorage/FlutterSecureStoragePlugin$MethodRunner.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/lint_model_metadata/release/writeReleaseLintModelMetadata/lint-model-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint_model/release/generateReleaseLintModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint_model/release/generateReleaseLintModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint-cache/lintVitalAnalyzeRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/security/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/com/android/tools/build/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/master-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/lint-cache/lintVitalAnalyzeRelease/sdk_index/snapshot.gz` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/local_aar_for_lint/release/out.aar` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/merged_java_res/release/mergeReleaseJavaResource/feature-flutter_secure_storage.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/BuildConfig.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/ciphers/KeyCipher.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/ciphers/KeyCipherAlgorithm.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/ciphers/KeyCipherFunction.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/ciphers/RSACipher18Implementation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/ciphers/RSACipherOAEPImplementation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/ciphers/StorageCipher.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/ciphers/StorageCipher18Implementation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/ciphers/StorageCipherAlgorithm.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/ciphers/StorageCipherFactory.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/ciphers/StorageCipherFunction.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/ciphers/StorageCipherGCMImplementation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/FlutterSecureStorage.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/FlutterSecureStoragePlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/FlutterSecureStoragePlugin$MethodResultWrapper.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/it_nomads/fluttersecurestorage/FlutterSecureStoragePlugin$MethodRunner.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/flutter_secure_storage/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/outputs/logs/manifest-merger-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/flutter_secure_storage/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/CacheRetrievalError.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/CacheRetrievalError$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/CacheRetrievalResult.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/CacheRetrievalResult$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/CacheRetrievalType.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/CacheRetrievalType$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ExifDataCopier.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/FileUtils.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/FlutterError.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/GeneralOptions.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/GeneralOptions$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerApi.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerApi$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerCache.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerCache$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerCache$CacheType.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerDelegate.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerDelegate$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerDelegate$2.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerDelegate$CameraDevice.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerDelegate$FileUriResolver.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerDelegate$MediaPath.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerDelegate$OnPathReadyListener.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerDelegate$PendingCallState.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerDelegate$PermissionManager.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerFileProvider.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerPlugin.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerPlugin$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerPlugin$ActivityState.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerPlugin$LifeCycleObserver.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImagePickerUtils.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImageResizer.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImageSelectionOptions.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ImageSelectionOptions$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/MediaSelectionOptions.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/MediaSelectionOptions$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/MessagesPigeonCodec.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/MessagesPigeonUtils.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/ResultUtilsKt.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/SourceCamera.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/SourceCamera$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/SourceSpecification.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/SourceSpecification$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/SourceType.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/SourceType$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/VideoSelectionOptions.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/imagepicker/VideoSelectionOptions$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/.transforms/1716952ef17e26d760db4d4209897b0c/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/.transforms/19efd955c42d1e9ebae6a3e50a63b294/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/.transforms/19efd955c42d1e9ebae6a3e50a63b294/transformed/classes/classes_dex/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/aar_main_jar/release/syncReleaseLibJars/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/annotations_typedef_file/release/extractReleaseAnnotations/typedefs.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/compiled_local_resources/release/compileReleaseLibraryResources/out/xml_flutter_image_picker_file_paths.xml.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/default_proguard_files/global/proguard-android.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/default_proguard_files/global/proguard-defaults.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/full_jar/release/createFullJarRelease/full.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/incremental/lintVitalAnalyzeRelease/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/incremental/lintVitalAnalyzeRelease/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/incremental/mergeReleaseAssets/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/incremental/mergeReleaseShaders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/incremental/release-mergeJavaRes/merge-state` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/incremental/release/packageReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/java_res/release/processReleaseJavaRes/out/META-INF/image_picker_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ExifDataCopier.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/FileUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerCache.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerCache$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerCache$CacheType.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerDelegate.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerDelegate$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerDelegate$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerDelegate$CameraDevice.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerDelegate$FileUriResolver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerDelegate$MediaPath.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerDelegate$OnPathReadyListener.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerDelegate$PendingCallState.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerDelegate$PermissionManager.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerFileProvider.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerPlugin$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerPlugin$ActivityState.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerPlugin$LifeCycleObserver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImagePickerUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/imagepicker/ImageResizer.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/lint_model_metadata/release/writeReleaseLintModelMetadata/lint-model-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint_model/release/generateReleaseLintModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint_model/release/generateReleaseLintModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-issues.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint-cache/lintVitalAnalyzeRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/activity/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/annotation/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/core/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/exifinterface/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/test/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/com/android/tools/build/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/master-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/lint-cache/lintVitalAnalyzeRelease/sdk_index/snapshot.gz` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/local_aar_for_lint/release/out.aar` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/merged_java_res/release/mergeReleaseJavaResource/feature-image_picker_android.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/packaged_res/release/packageReleaseResources/xml/flutter_image_picker_file_paths.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/CacheRetrievalError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/CacheRetrievalError$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/CacheRetrievalResult.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/CacheRetrievalResult$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/CacheRetrievalType.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/CacheRetrievalType$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ExifDataCopier.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/FileUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/FlutterError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/GeneralOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/GeneralOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerCache.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerCache$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerCache$CacheType.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerDelegate.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerDelegate$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerDelegate$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerDelegate$CameraDevice.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerDelegate$FileUriResolver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerDelegate$MediaPath.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerDelegate$OnPathReadyListener.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerDelegate$PendingCallState.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerDelegate$PermissionManager.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerFileProvider.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerPlugin$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerPlugin$ActivityState.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerPlugin$LifeCycleObserver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImagePickerUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImageResizer.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImageSelectionOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ImageSelectionOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/MediaSelectionOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/MediaSelectionOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/MessagesPigeonCodec.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/MessagesPigeonUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/ResultUtilsKt.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/SourceCamera.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/SourceCamera$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/SourceSpecification.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/SourceSpecification$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/SourceType.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/SourceType$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/VideoSelectionOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/imagepicker/VideoSelectionOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/META-INF/image_picker_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/counters.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/kotlin/compileReleaseKotlin/cacheable/last-build.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/kotlin/compileReleaseKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/outputs/logs/manifest-merger-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/image_picker_android/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/CacheRetrievalError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/CacheRetrievalError$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/CacheRetrievalResult.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/CacheRetrievalResult$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/CacheRetrievalType.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/CacheRetrievalType$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/FlutterError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/GeneralOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/GeneralOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/ImagePickerApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/ImagePickerApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/ImageSelectionOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/ImageSelectionOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/MediaSelectionOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/MediaSelectionOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/MessagesPigeonCodec.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/MessagesPigeonUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/ResultUtilsKt.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/SourceCamera.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/SourceCamera$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/SourceSpecification.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/SourceSpecification$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/SourceType.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/SourceType$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/VideoSelectionOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/io/flutter/plugins/imagepicker/VideoSelectionOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/image_picker_android/tmp/kotlin-classes/release/META-INF/image_picker_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/.transforms/613d8ad62aa1b7ebe1158d8b51b372f8/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni_flutter/.transforms/613d8ad62aa1b7ebe1158d8b51b372f8/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/github/dart_lang/jni_flutter/JniFlutterPlugin.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/.transforms/613d8ad62aa1b7ebe1158d8b51b372f8/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni_flutter/.transforms/88a4812fe11aa1d8289ccd69564fcfda/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni_flutter/.transforms/88a4812fe11aa1d8289ccd69564fcfda/transformed/classes/classes_dex/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/aar_main_jar/release/syncReleaseLibJars/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni_flutter/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/annotations_typedef_file/release/extractReleaseAnnotations/typedefs.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni_flutter/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni_flutter/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/default_proguard_files/global/proguard-android.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/default_proguard_files/global/proguard-defaults.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/full_jar/release/createFullJarRelease/full.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni_flutter/intermediates/incremental/lintVitalAnalyzeRelease/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/incremental/lintVitalAnalyzeRelease/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/incremental/mergeReleaseAssets/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/incremental/mergeReleaseShaders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/incremental/release-mergeJavaRes/merge-state` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/incremental/release/packageReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/github/dart_lang/jni_flutter/JniFlutterPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni_flutter/intermediates/lint_model_metadata/release/writeReleaseLintModelMetadata/lint-model-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/lint_model/release/generateReleaseLintModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/lint_model/release/generateReleaseLintModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/lint-cache/lintVitalAnalyzeRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/local_aar_for_lint/release/out.aar` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/merged_consumer_proguard_file/release/mergeReleaseConsumerProguardFiles/proguard.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/merged_java_res/release/mergeReleaseJavaResource/feature-jni_flutter.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni_flutter/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/github/dart_lang/jni_flutter/JniFlutterPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni_flutter/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni_flutter/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/outputs/logs/manifest-merger-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni_flutter/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/.transforms/1765dfbf271ee8bfadfec3080e5a458f/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/.transforms/1765dfbf271ee8bfadfec3080e5a458f/transformed/classes/classes_dex/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/.transforms/c86efbd82b6fd1eac7bce2dd1ce890fc/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/.transforms/c86efbd82b6fd1eac7bce2dd1ce890fc/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/github/dart_lang/jni/JniPlugin.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/.transforms/c86efbd82b6fd1eac7bce2dd1ce890fc/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/github/dart_lang/jni/JniUtils.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/.transforms/c86efbd82b6fd1eac7bce2dd1ce890fc/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/github/dart_lang/jni/PortCleaner.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/.transforms/c86efbd82b6fd1eac7bce2dd1ce890fc/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/github/dart_lang/jni/PortCleaner$PortPhantom.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/.transforms/c86efbd82b6fd1eac7bce2dd1ce890fc/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/github/dart_lang/jni/PortContinuation.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/.transforms/c86efbd82b6fd1eac7bce2dd1ce890fc/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/github/dart_lang/jni/PortProxyBuilder.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/.transforms/c86efbd82b6fd1eac7bce2dd1ce890fc/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/github/dart_lang/jni/PortProxyBuilder$DartException.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/.transforms/c86efbd82b6fd1eac7bce2dd1ce890fc/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/com/github/dart_lang/jni/PortProxyBuilder$DartImplementation.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/.transforms/c86efbd82b6fd1eac7bce2dd1ce890fc/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/aar_main_jar/release/syncReleaseLibJars/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/annotations_typedef_file/release/extractReleaseAnnotations/typedefs.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/build_command_jni.bat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/build_model.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/build_stderr_jni.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/build_stdout_jni.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/configure_command.bat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/configure_stderr.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/configure_stdout.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/generate_cxx_metadata_237_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/generate_cxx_metadata_238_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/generate_cxx_metadata_242_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/generate_cxx_metadata_493_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/generate_cxx_metadata_725_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/generate_cxx_metadata_78_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/generate_cxx_metadata_81_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/generate_cxx_metadata_977_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/arm64-v8a/metadata_generation_record.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/build_command_jni.bat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/build_model.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/build_stderr_jni.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/build_stdout_jni.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/configure_command.bat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/configure_stderr.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/configure_stdout.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/generate_cxx_metadata_237_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/generate_cxx_metadata_242_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/generate_cxx_metadata_244_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/generate_cxx_metadata_493_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/generate_cxx_metadata_725_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/generate_cxx_metadata_78_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/generate_cxx_metadata_81_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/generate_cxx_metadata_977_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/armeabi-v7a/metadata_generation_record.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/build_command_jni.bat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/build_model.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/build_stderr_jni.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/build_stdout_jni.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/configure_command.bat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/configure_stderr.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/configure_stdout.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/generate_cxx_metadata_237_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/generate_cxx_metadata_242_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/generate_cxx_metadata_244_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/generate_cxx_metadata_484_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/generate_cxx_metadata_725_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/generate_cxx_metadata_78_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/generate_cxx_metadata_81_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/generate_cxx_metadata_973_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86_64/metadata_generation_record.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/build_command_jni.bat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/build_model.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/build_stderr_jni.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/build_stdout_jni.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/configure_command.bat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/configure_stderr.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/configure_stdout.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/generate_cxx_metadata_237_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/generate_cxx_metadata_242_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/generate_cxx_metadata_244_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/generate_cxx_metadata_493_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/generate_cxx_metadata_725_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/generate_cxx_metadata_78_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/generate_cxx_metadata_81_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/generate_cxx_metadata_977_timing.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/logs/x86/metadata_generation_record.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/obj/arm64-v8a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/obj/armeabi-v7a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/obj/x86_64/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/cxx/RelWithDebInfo/501u4p6x/obj/x86/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/default_proguard_files/global/proguard-android.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/default_proguard_files/global/proguard-defaults.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/full_jar/release/createFullJarRelease/full.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/incremental/lintVitalAnalyzeRelease/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/incremental/lintVitalAnalyzeRelease/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/incremental/mergeReleaseAssets/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/incremental/mergeReleaseShaders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/incremental/release-mergeJavaRes/merge-state` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/incremental/release/packageReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/github/dart_lang/jni/JniPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/github/dart_lang/jni/JniUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/github/dart_lang/jni/PortCleaner.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/github/dart_lang/jni/PortCleaner$PortPhantom.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/github/dart_lang/jni/PortContinuation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/github/dart_lang/jni/PortProxyBuilder.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/github/dart_lang/jni/PortProxyBuilder$DartException.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/github/dart_lang/jni/PortProxyBuilder$DartImplementation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/library_and_local_jars_jni/release/copyReleaseJniLibsProjectAndLocalJars/jni/arm64-v8a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/library_and_local_jars_jni/release/copyReleaseJniLibsProjectAndLocalJars/jni/armeabi-v7a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/library_and_local_jars_jni/release/copyReleaseJniLibsProjectAndLocalJars/jni/x86_64/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/library_and_local_jars_jni/release/copyReleaseJniLibsProjectAndLocalJars/jni/x86/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/library_jni/release/copyReleaseJniLibsProjectOnly/jni/arm64-v8a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/library_jni/release/copyReleaseJniLibsProjectOnly/jni/armeabi-v7a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/library_jni/release/copyReleaseJniLibsProjectOnly/jni/x86_64/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/library_jni/release/copyReleaseJniLibsProjectOnly/jni/x86/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/lint_model_metadata/release/writeReleaseLintModelMetadata/lint-model-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/lint_model/release/generateReleaseLintModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/lint_model/release/generateReleaseLintModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/lint-cache/lintVitalAnalyzeRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/lint-cache/lintVitalAnalyzeRelease/private-apis-18-7541949.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/local_aar_for_lint/release/out.aar` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/merged_consumer_proguard_file/release/mergeReleaseConsumerProguardFiles/proguard.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/merged_java_res/release/mergeReleaseJavaResource/feature-jni.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/arm64-v8a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/armeabi-v7a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/x86_64/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/x86/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/github/dart_lang/jni/JniPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/github/dart_lang/jni/JniUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/github/dart_lang/jni/PortCleaner.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/github/dart_lang/jni/PortCleaner$PortPhantom.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/github/dart_lang/jni/PortContinuation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/github/dart_lang/jni/PortProxyBuilder.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/github/dart_lang/jni/PortProxyBuilder$DartException.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/com/github/dart_lang/jni/PortProxyBuilder$DartImplementation.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/arm64-v8a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/armeabi-v7a/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/x86_64/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/stripped_native_libs/release/stripReleaseDebugSymbols/out/lib/x86/libdartjni.so` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/jni/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/outputs/logs/manifest-merger-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/jni/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/.transforms/6f21c51aa196d58ed8e7e1044b1e6083/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/.transforms/6f21c51aa196d58ed8e7e1044b1e6083/transformed/classes/classes_dex/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/AuthClassification.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/AuthClassification$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/AuthenticationHelper.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/AuthenticationHelper$AuthCompletionHandler.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/AuthenticationHelper$UiThreadExecutor.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/AuthOptions.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/AuthOptions$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/AuthResult.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/AuthResult$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/AuthResultCode.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/AuthResultCode$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/AuthStrings.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/AuthStrings$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/FlutterError.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/LocalAuthApi.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/LocalAuthApi$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/LocalAuthPlugin.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/MessagesPigeonCodec.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/MessagesPigeonUtils.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/localauth/ResultUtilsKt.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/.transforms/9e069be3eecec743cc84fa409de5c681/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/aar_main_jar/release/syncReleaseLibJars/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/annotations_typedef_file/release/extractReleaseAnnotations/typedefs.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/default_proguard_files/global/proguard-android.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/default_proguard_files/global/proguard-defaults.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/full_jar/release/createFullJarRelease/full.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/incremental/lintVitalAnalyzeRelease/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/incremental/lintVitalAnalyzeRelease/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/incremental/mergeReleaseAssets/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/incremental/mergeReleaseShaders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/incremental/release-mergeJavaRes/merge-state` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/incremental/release/packageReleaseResources/merged.dir/values/values.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/incremental/release/packageReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/java_res/release/processReleaseJavaRes/out/META-INF/local_auth_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/localauth/AuthenticationHelper.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/localauth/AuthenticationHelper$AuthCompletionHandler.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/localauth/AuthenticationHelper$UiThreadExecutor.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/localauth/LocalAuthPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/lint_model_metadata/release/writeReleaseLintModelMetadata/lint-model-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint_model/release/generateReleaseLintModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint_model/release/generateReleaseLintModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-issues.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint-cache/lintVitalAnalyzeRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/biometric/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/core/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/fragment/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/test/espresso/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/test/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/com/android/tools/build/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/master-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/lint-cache/lintVitalAnalyzeRelease/sdk_index/snapshot.gz` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/local_aar_for_lint/release/out.aar` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/merged_java_res/release/mergeReleaseJavaResource/feature-local_auth_android.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/packaged_res/release/packageReleaseResources/values/values.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/AuthClassification.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/AuthClassification$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/AuthenticationHelper.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/AuthenticationHelper$AuthCompletionHandler.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/AuthenticationHelper$UiThreadExecutor.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/AuthOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/AuthOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/AuthResult.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/AuthResult$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/AuthResultCode.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/AuthResultCode$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/AuthStrings.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/AuthStrings$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/FlutterError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/LocalAuthApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/LocalAuthApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/LocalAuthPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/MessagesPigeonCodec.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/MessagesPigeonUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/localauth/ResultUtilsKt.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/META-INF/local_auth_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/counters.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/kotlin/compileReleaseKotlin/cacheable/last-build.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/kotlin/compileReleaseKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/outputs/logs/manifest-merger-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/local_auth_android/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/AuthClassification.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/AuthClassification$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/AuthOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/AuthOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/AuthResult.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/AuthResult$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/AuthResultCode.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/AuthResultCode$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/AuthStrings.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/AuthStrings$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/FlutterError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/LocalAuthApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/LocalAuthApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/MessagesPigeonCodec.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/MessagesPigeonUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/io/flutter/plugins/localauth/ResultUtilsKt.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/local_auth_android/tmp/kotlin-classes/release/META-INF/local_auth_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/native_assets/windows/native_assets.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/reports/problems/problems-report.html` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/.transforms/0fdd2ec4ad720f038d0b2189734d040f/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/.transforms/0fdd2ec4ad720f038d0b2189734d040f/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/plus/share/MethodCallHandler.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/.transforms/0fdd2ec4ad720f038d0b2189734d040f/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/plus/share/Share.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/.transforms/0fdd2ec4ad720f038d0b2189734d040f/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/plus/share/ShareFileProvider.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/.transforms/0fdd2ec4ad720f038d0b2189734d040f/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/plus/share/SharePlusPendingIntent.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/.transforms/0fdd2ec4ad720f038d0b2189734d040f/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/plus/share/SharePlusPendingIntent$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/.transforms/0fdd2ec4ad720f038d0b2189734d040f/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/plus/share/SharePlusPlugin.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/.transforms/0fdd2ec4ad720f038d0b2189734d040f/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/plus/share/SharePlusPlugin$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/.transforms/0fdd2ec4ad720f038d0b2189734d040f/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/plus/share/ShareSuccessManager.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/.transforms/0fdd2ec4ad720f038d0b2189734d040f/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/plus/share/ShareSuccessManager$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/.transforms/0fdd2ec4ad720f038d0b2189734d040f/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/.transforms/e96b2b543b997f18af7513c735db02d6/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/.transforms/e96b2b543b997f18af7513c735db02d6/transformed/classes/classes_dex/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/aar_main_jar/release/syncReleaseLibJars/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/annotations_typedef_file/release/extractReleaseAnnotations/typedefs.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/compiled_local_resources/release/compileReleaseLibraryResources/out/xml_flutter_share_file_paths.xml.flat` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/default_proguard_files/global/proguard-android.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/default_proguard_files/global/proguard-defaults.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/full_jar/release/createFullJarRelease/full.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/incremental/lintVitalAnalyzeRelease/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/incremental/lintVitalAnalyzeRelease/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/incremental/mergeReleaseAssets/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/incremental/mergeReleaseShaders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/incremental/release-mergeJavaRes/merge-state` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/incremental/release/packageReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/java_res/release/processReleaseJavaRes/out/META-INF/share_plus_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint_model_metadata/release/writeReleaseLintModelMetadata/lint-model-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint_model/release/generateReleaseLintModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint_model/release/generateReleaseLintModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-issues.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint-cache/lintVitalAnalyzeRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/annotation/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/core/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/com/android/tools/build/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/master-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/org/jetbrains/kotlin/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/lint-cache/lintVitalAnalyzeRelease/sdk_index/snapshot.gz` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/local_aar_for_lint/release/out.aar` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/merged_java_res/release/mergeReleaseJavaResource/feature-share_plus.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/packaged_res/release/packageReleaseResources/xml/flutter_share_file_paths.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/plus/share/MethodCallHandler.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/plus/share/Share.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/plus/share/ShareFileProvider.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/plus/share/SharePlusPendingIntent.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/plus/share/SharePlusPendingIntent$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/plus/share/SharePlusPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/plus/share/SharePlusPlugin$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/plus/share/ShareSuccessManager.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/plus/share/ShareSuccessManager$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/META-INF/share_plus_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/counters.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/kotlin/compileReleaseKotlin/cacheable/last-build.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/kotlin/compileReleaseKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/outputs/logs/manifest-merger-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/share_plus/tmp/kotlin-classes/release/dev/fluttercommunity/plus/share/MethodCallHandler.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/tmp/kotlin-classes/release/dev/fluttercommunity/plus/share/Share.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/tmp/kotlin-classes/release/dev/fluttercommunity/plus/share/ShareFileProvider.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/tmp/kotlin-classes/release/dev/fluttercommunity/plus/share/SharePlusPendingIntent.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/tmp/kotlin-classes/release/dev/fluttercommunity/plus/share/SharePlusPendingIntent$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/tmp/kotlin-classes/release/dev/fluttercommunity/plus/share/SharePlusPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/tmp/kotlin-classes/release/dev/fluttercommunity/plus/share/SharePlusPlugin$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/tmp/kotlin-classes/release/dev/fluttercommunity/plus/share/ShareSuccessManager.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/tmp/kotlin-classes/release/dev/fluttercommunity/plus/share/ShareSuccessManager$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/share_plus/tmp/kotlin-classes/release/META-INF/share_plus_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/de10e1209ce3595e71b26cba0ccb58e5/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/.transforms/de10e1209ce3595e71b26cba0ccb58e5/transformed/classes/classes_dex/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/FlutterError.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/LegacySharedPreferencesPlugin.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/LegacySharedPreferencesPlugin$ListEncoder.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/ListEncoder.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/MessagesAsyncPigeonCodec.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/MessagesAsyncPigeonUtils.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/MessagesPigeonCodec.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/MessagesPigeonUtils.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesApi.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesApi$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesAsyncApi.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesAsyncApi$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesBackend.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesError.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesListEncoder.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPigeonOptions.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPigeonOptions$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$clear$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$clear$1$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$dataStoreSetString$2.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getAll$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getBool$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getBool$1$invokeSuspend$$inlined$map$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getBool$1$invokeSuspend$$inlined$map$1$2.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getBool$1$invokeSuspend$$inlined$map$1$2$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getDouble$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getDouble$1$invokeSuspend$$inlined$map$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getDouble$1$invokeSuspend$$inlined$map$1$2.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getDouble$1$invokeSuspend$$inlined$map$1$2$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getInt$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getInt$1$invokeSuspend$$inlined$map$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getInt$1$invokeSuspend$$inlined$map$1$2.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getInt$1$invokeSuspend$$inlined$map$1$2$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getKeys$prefs$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getPrefs$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getString$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getString$1$invokeSuspend$$inlined$map$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getString$1$invokeSuspend$$inlined$map$1$2.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getString$1$invokeSuspend$$inlined$map$1$2$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getValueByKey$$inlined$map$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getValueByKey$$inlined$map$1$2.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getValueByKey$$inlined$map$1$2$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$readAllKeys$$inlined$map$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$readAllKeys$$inlined$map$1$2.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$readAllKeys$$inlined$map$1$2$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setBool$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setBool$1$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setDeprecatedStringList$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setDouble$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setDouble$1$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setEncodedStringList$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setInt$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setInt$1$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setString$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/SharedPreferencesPluginKt.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/StringListLookupResultType.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/StringListLookupResultType$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/StringListObjectInputStream.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/StringListResult.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/sharedpreferences/StringListResult$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/.transforms/ea5aa104b7a30cfa828cee99403854fa/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/aar_main_jar/release/syncReleaseLibJars/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/annotations_typedef_file/release/extractReleaseAnnotations/typedefs.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/default_proguard_files/global/proguard-android.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/default_proguard_files/global/proguard-defaults.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/full_jar/release/createFullJarRelease/full.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/incremental/lintVitalAnalyzeRelease/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/incremental/lintVitalAnalyzeRelease/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/incremental/mergeReleaseAssets/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/incremental/mergeReleaseShaders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/incremental/release-mergeJavaRes/merge-state` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/incremental/release/packageReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/java_res/release/processReleaseJavaRes/out/META-INF/shared_preferences_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/sharedpreferences/LegacySharedPreferencesPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/sharedpreferences/LegacySharedPreferencesPlugin$ListEncoder.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/sharedpreferences/SharedPreferencesListEncoder.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/lint_model_metadata/release/writeReleaseLintModelMetadata/lint-model-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint_model/release/generateReleaseLintModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint_model/release/generateReleaseLintModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-issues.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint-cache/lintVitalAnalyzeRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/datastore/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/preference/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/test/ext/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/test/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/com/android/tools/build/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/master-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/lint-cache/lintVitalAnalyzeRelease/sdk_index/snapshot.gz` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/local_aar_for_lint/release/out.aar` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/merged_java_res/release/mergeReleaseJavaResource/feature-shared_preferences_android.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/FlutterError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/LegacySharedPreferencesPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/LegacySharedPreferencesPlugin$ListEncoder.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/ListEncoder.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/MessagesAsyncPigeonCodec.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/MessagesAsyncPigeonUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/MessagesPigeonCodec.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/MessagesPigeonUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesAsyncApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesAsyncApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesBackend.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesListEncoder.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPigeonOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPigeonOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$clear$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$clear$1$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$dataStoreSetString$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getAll$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getBool$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getBool$1$invokeSuspend$$inlined$map$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getBool$1$invokeSuspend$$inlined$map$1$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getBool$1$invokeSuspend$$inlined$map$1$2$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getDouble$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getDouble$1$invokeSuspend$$inlined$map$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getDouble$1$invokeSuspend$$inlined$map$1$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getDouble$1$invokeSuspend$$inlined$map$1$2$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getInt$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getInt$1$invokeSuspend$$inlined$map$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getInt$1$invokeSuspend$$inlined$map$1$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getInt$1$invokeSuspend$$inlined$map$1$2$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getKeys$prefs$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getPrefs$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getString$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getString$1$invokeSuspend$$inlined$map$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getString$1$invokeSuspend$$inlined$map$1$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getString$1$invokeSuspend$$inlined$map$1$2$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getValueByKey$$inlined$map$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getValueByKey$$inlined$map$1$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getValueByKey$$inlined$map$1$2$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$readAllKeys$$inlined$map$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$readAllKeys$$inlined$map$1$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$readAllKeys$$inlined$map$1$2$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setBool$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setBool$1$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setDeprecatedStringList$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setDouble$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setDouble$1$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setEncodedStringList$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setInt$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setInt$1$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setString$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/SharedPreferencesPluginKt.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/StringListLookupResultType.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/StringListLookupResultType$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/StringListObjectInputStream.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/StringListResult.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/sharedpreferences/StringListResult$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/META-INF/shared_preferences_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/counters.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/cacheable/last-build.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/kotlin/compileReleaseKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/outputs/logs/manifest-merger-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/shared_preferences_android/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/FlutterError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/ListEncoder.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/MessagesAsyncPigeonCodec.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/MessagesAsyncPigeonUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/MessagesPigeonCodec.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/MessagesPigeonUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesAsyncApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesAsyncApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesBackend.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPigeonOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPigeonOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$clear$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$clear$1$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$dataStoreSetString$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getAll$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getBool$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getBool$1$invokeSuspend$$inlined$map$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getBool$1$invokeSuspend$$inlined$map$1$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getBool$1$invokeSuspend$$inlined$map$1$2$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getDouble$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getDouble$1$invokeSuspend$$inlined$map$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getDouble$1$invokeSuspend$$inlined$map$1$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getDouble$1$invokeSuspend$$inlined$map$1$2$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getInt$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getInt$1$invokeSuspend$$inlined$map$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getInt$1$invokeSuspend$$inlined$map$1$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getInt$1$invokeSuspend$$inlined$map$1$2$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getKeys$prefs$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getPrefs$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getString$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getString$1$invokeSuspend$$inlined$map$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getString$1$invokeSuspend$$inlined$map$1$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getString$1$invokeSuspend$$inlined$map$1$2$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getValueByKey$$inlined$map$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getValueByKey$$inlined$map$1$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$getValueByKey$$inlined$map$1$2$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$readAllKeys$$inlined$map$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$readAllKeys$$inlined$map$1$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$readAllKeys$$inlined$map$1$2$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setBool$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setBool$1$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setDeprecatedStringList$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setDouble$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setDouble$1$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setEncodedStringList$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setInt$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setInt$1$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPlugin$setString$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/SharedPreferencesPluginKt.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/StringListLookupResultType.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/StringListLookupResultType$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/StringListObjectInputStream.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/StringListResult.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/io/flutter/plugins/sharedpreferences/StringListResult$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/shared_preferences_android/tmp/kotlin-classes/release/META-INF/shared_preferences_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/test_cache/build/1e57b4283dd269ba75191ea2755bf355.cache.dill.track.dill` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/unit_test_assets/AssetManifest.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/unit_test_assets/FontManifest.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/unit_test_assets/fonts/MaterialIcons-Regular.otf` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/unit_test_assets/NativeAssetsManifest.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/unit_test_assets/NOTICES.Z` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/unit_test_assets/shaders/ink_sparkle.frag` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/unit_test_assets/shaders/stretch_effect.frag` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/9f3015985d46681392a6e62e8af2d239/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/.transforms/9f3015985d46681392a6e62e8af2d239/transformed/classes/classes_dex/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/BrowserOptions.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/BrowserOptions$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/BuildConfig.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/FlutterError.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/MessagesPigeonCodec.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/MessagesPigeonUtils.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/UrlLauncher.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/UrlLauncher$IntentResolver.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/UrlLauncherApi.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/UrlLauncherApi$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/UrlLauncherPlugin.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/WebViewActivity.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/WebViewActivity$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/WebViewActivity$2.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/WebViewActivity$FlutterWebChromeClient.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/WebViewActivity$FlutterWebChromeClient$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/WebViewOptions.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/io/flutter/plugins/urllauncher/WebViewOptions$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/.transforms/b7a20da3fd4b109579ba89119643072a/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/generated/source/buildConfig/release/io/flutter/plugins/urllauncher/BuildConfig.java` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/aar_main_jar/release/syncReleaseLibJars/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/annotations_typedef_file/release/extractReleaseAnnotations/typedefs.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/default_proguard_files/global/proguard-android.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/default_proguard_files/global/proguard-defaults.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/full_jar/release/createFullJarRelease/full.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/incremental/lintVitalAnalyzeRelease/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/incremental/lintVitalAnalyzeRelease/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/incremental/mergeReleaseAssets/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/incremental/mergeReleaseShaders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/incremental/release-mergeJavaRes/merge-state` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/incremental/release/packageReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/java_res/release/processReleaseJavaRes/out/META-INF/url_launcher_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/urllauncher/BuildConfig.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/urllauncher/UrlLauncher.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/urllauncher/UrlLauncher$IntentResolver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/urllauncher/UrlLauncherPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/urllauncher/WebViewActivity.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/urllauncher/WebViewActivity$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/urllauncher/WebViewActivity$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/urllauncher/WebViewActivity$FlutterWebChromeClient.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/javac/release/compileReleaseJavaWithJavac/classes/io/flutter/plugins/urllauncher/WebViewActivity$FlutterWebChromeClient$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/lint_model_metadata/release/writeReleaseLintModelMetadata/lint-model-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint_model/release/generateReleaseLintModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint_model/release/generateReleaseLintModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-issues.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint-cache/lintVitalAnalyzeRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/annotation/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/browser/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/core/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/test/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/com/android/tools/build/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/master-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/lint-cache/lintVitalAnalyzeRelease/sdk_index/snapshot.gz` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/local_aar_for_lint/release/out.aar` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/merged_java_res/release/mergeReleaseJavaResource/feature-url_launcher_android.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/BrowserOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/BrowserOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/BuildConfig.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/FlutterError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/MessagesPigeonCodec.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/MessagesPigeonUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/UrlLauncher.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/UrlLauncher$IntentResolver.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/UrlLauncherApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/UrlLauncherApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/UrlLauncherPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/WebViewActivity.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/WebViewActivity$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/WebViewActivity$2.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/WebViewActivity$FlutterWebChromeClient.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/WebViewActivity$FlutterWebChromeClient$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/WebViewOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/io/flutter/plugins/urllauncher/WebViewOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/META-INF/url_launcher_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/counters.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/cacheable/last-build.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/kotlin/compileReleaseKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/outputs/logs/manifest-merger-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/url_launcher_android/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/tmp/kotlin-classes/release/io/flutter/plugins/urllauncher/BrowserOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/tmp/kotlin-classes/release/io/flutter/plugins/urllauncher/BrowserOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/tmp/kotlin-classes/release/io/flutter/plugins/urllauncher/FlutterError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/tmp/kotlin-classes/release/io/flutter/plugins/urllauncher/MessagesPigeonCodec.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/tmp/kotlin-classes/release/io/flutter/plugins/urllauncher/MessagesPigeonUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/tmp/kotlin-classes/release/io/flutter/plugins/urllauncher/UrlLauncherApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/tmp/kotlin-classes/release/io/flutter/plugins/urllauncher/UrlLauncherApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/tmp/kotlin-classes/release/io/flutter/plugins/urllauncher/WebViewOptions.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/tmp/kotlin-classes/release/io/flutter/plugins/urllauncher/WebViewOptions$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/url_launcher_android/tmp/kotlin-classes/release/META-INF/url_launcher_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/BackgroundWorker.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/BackgroundWorker$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/LoggingDebugHandler.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/LoggingDebugHandler$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/LoggingDebugHandler$WhenMappings.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/NotificationDebugHandler.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/NotificationDebugHandler$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/NotificationDebugHandler$WhenMappings.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/BackoffPolicy.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/BackoffPolicy$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/BackoffPolicyConfig.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/BackoffPolicyConfig$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/Constraints.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/Constraints$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/ExistingPeriodicWorkPolicy.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/ExistingPeriodicWorkPolicy$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/ExistingWorkPolicy.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/ExistingWorkPolicy$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/FlutterError.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/InitializeRequest.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/InitializeRequest$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/NetworkType.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/NetworkType$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/OneOffTaskRequest.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/OneOffTaskRequest$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/OutOfQuotaPolicy.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/OutOfQuotaPolicy$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/PeriodicTaskRequest.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/PeriodicTaskRequest$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/ProcessingTaskRequest.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/ProcessingTaskRequest$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/TaskStatus.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/TaskStatus$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/WorkmanagerApiPigeonCodec.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/WorkmanagerApiPigeonUtils.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/WorkmanagerFlutterApi.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/WorkmanagerFlutterApi$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/WorkmanagerHostApi.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/pigeon/WorkmanagerHostApi$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/SharedPreferenceHelper.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/SharedPreferenceHelper$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/SharedPreferenceHelper$DispatcherHandleListener.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/TaskDebugInfo.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/TaskResult.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/WorkmanagerDebug.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/WorkmanagerDebug$Companion.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/WorkmanagerDebug$Companion$current$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/WorkmanagerPlugin.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/WorkmanagerPlugin$onAttachedToEngine$1.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/WorkmanagerPluginKt.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/WorkManagerUtilsKt.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/WorkManagerUtilsKt$WhenMappings.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/bundleLibRuntimeToDirRelease_dex/dev/fluttercommunity/workmanager/WorkManagerWrapper.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/.transforms/042c3c952682c4b155743dcd2e8ac7de/transformed/bundleLibRuntimeToDirRelease/desugar_graph.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/.transforms/da39f474b06da30d250166e5a9137d9e/results.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/.transforms/da39f474b06da30d250166e5a9137d9e/transformed/classes/classes_dex/classes.dex` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/aar_main_jar/release/syncReleaseLibJars/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/annotations_typedef_file/release/extractReleaseAnnotations/typedefs.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/default_proguard_files/global/proguard-android.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/default_proguard_files/global/proguard-defaults.txt-8.11.1` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/full_jar/release/createFullJarRelease/full.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/incremental/lintVitalAnalyzeRelease/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/incremental/lintVitalAnalyzeRelease/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/incremental/lintVitalAnalyzeRelease/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/incremental/mergeReleaseAssets/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/incremental/mergeReleaseShaders/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/incremental/release-mergeJavaRes/merge-state` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/incremental/release/packageReleaseResources/merger.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/java_res/release/processReleaseJavaRes/out/META-INF/workmanager_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint_model_metadata/release/writeReleaseLintModelMetadata/lint-model-metadata.properties` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint_model/release/generateReleaseLintModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint_model/release/generateReleaseLintModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint_model/release/generateReleaseLintModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/module.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-dependencies.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release-artifact-libraries.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint_vital_lint_model/release/generateReleaseLintVitalModel/release.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-issues.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out/lint-resources.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint-cache/lintVitalAnalyzeRelease/lint-cache-version.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/concurrent/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/androidx/work/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/com/android/application/group-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint-cache/lintVitalAnalyzeRelease/maven.google/master-index.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/lint-cache/lintVitalAnalyzeRelease/sdk_index/snapshot.gz` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/local_aar_for_lint/release/out.aar` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/merged_java_res/release/mergeReleaseJavaResource/feature-workmanager_android.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/BackgroundWorker.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/BackgroundWorker$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/LoggingDebugHandler.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/LoggingDebugHandler$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/LoggingDebugHandler$WhenMappings.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/NotificationDebugHandler.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/NotificationDebugHandler$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/NotificationDebugHandler$WhenMappings.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/BackoffPolicy.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/BackoffPolicy$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/BackoffPolicyConfig.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/BackoffPolicyConfig$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/Constraints.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/Constraints$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/ExistingPeriodicWorkPolicy.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/ExistingPeriodicWorkPolicy$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/ExistingWorkPolicy.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/ExistingWorkPolicy$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/FlutterError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/InitializeRequest.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/InitializeRequest$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/NetworkType.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/NetworkType$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/OneOffTaskRequest.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/OneOffTaskRequest$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/OutOfQuotaPolicy.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/OutOfQuotaPolicy$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/PeriodicTaskRequest.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/PeriodicTaskRequest$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/ProcessingTaskRequest.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/ProcessingTaskRequest$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/TaskStatus.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/TaskStatus$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/WorkmanagerApiPigeonCodec.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/WorkmanagerApiPigeonUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/WorkmanagerFlutterApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/WorkmanagerFlutterApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/WorkmanagerHostApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/pigeon/WorkmanagerHostApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/SharedPreferenceHelper.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/SharedPreferenceHelper$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/SharedPreferenceHelper$DispatcherHandleListener.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/TaskDebugInfo.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/TaskResult.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/WorkmanagerDebug.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/WorkmanagerDebug$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/WorkmanagerDebug$Companion$current$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/WorkmanagerPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/WorkmanagerPlugin$onAttachedToEngine$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/WorkmanagerPluginKt.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/WorkManagerUtilsKt.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/WorkManagerUtilsKt$WhenMappings.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/dev/fluttercommunity/workmanager/WorkManagerWrapper.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/runtime_library_classes_dir/release/bundleLibRuntimeToDirRelease/META-INF/workmanager_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/inputs/source-to-output.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-attributes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/class-fq-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/constants.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/internal-name-to-source.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/package-parts.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/proto.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/source-to-classes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/subtypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/jvm/kotlin/supertypes.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/counters.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/file-to-id.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/id-to-file.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab_i.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.keystream.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.len` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/caches-jvm/lookups/lookups.tab.values.at` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/kotlin/compileReleaseKotlin/cacheable/last-build.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/kotlin/compileReleaseKotlin/classpath-snapshot/shrunk-classpath-snapshot.bin` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/outputs/logs/manifest-merger-release-report.txt` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/BackgroundWorker.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/BackgroundWorker$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/LoggingDebugHandler.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/LoggingDebugHandler$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/LoggingDebugHandler$WhenMappings.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/NotificationDebugHandler.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/NotificationDebugHandler$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/NotificationDebugHandler$WhenMappings.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/BackoffPolicy.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/BackoffPolicy$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/BackoffPolicyConfig.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/BackoffPolicyConfig$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/Constraints.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/Constraints$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/ExistingPeriodicWorkPolicy.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/ExistingPeriodicWorkPolicy$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/ExistingWorkPolicy.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/ExistingWorkPolicy$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/FlutterError.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/InitializeRequest.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/InitializeRequest$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/NetworkType.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/NetworkType$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/OneOffTaskRequest.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/OneOffTaskRequest$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/OutOfQuotaPolicy.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/OutOfQuotaPolicy$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/PeriodicTaskRequest.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/PeriodicTaskRequest$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/ProcessingTaskRequest.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/ProcessingTaskRequest$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/TaskStatus.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/TaskStatus$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/WorkmanagerApiPigeonCodec.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/WorkmanagerApiPigeonUtils.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/WorkmanagerFlutterApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/WorkmanagerFlutterApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/WorkmanagerHostApi.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/pigeon/WorkmanagerHostApi$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/SharedPreferenceHelper.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/SharedPreferenceHelper$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/SharedPreferenceHelper$DispatcherHandleListener.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/TaskDebugInfo.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/TaskResult.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/WorkmanagerDebug.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/WorkmanagerDebug$Companion.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/WorkmanagerDebug$Companion$current$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/WorkmanagerPlugin.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/WorkmanagerPlugin$onAttachedToEngine$1.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/WorkmanagerPluginKt.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/WorkManagerUtilsKt.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/WorkManagerUtilsKt$WhenMappings.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/dev/fluttercommunity/workmanager/WorkManagerWrapper.class` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `build/workmanager_android/tmp/kotlin-classes/release/META-INF/workmanager_android_release.kotlin_module` (**vendor_or_build**) : Artefact de build, dépendance ou archive exclue (build/)
+- `GEMINI.md` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `headscalemanager.iml` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `ios/Flutter/ephemeral/flutter_lldb_helper.py` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `ios/Flutter/ephemeral/flutter_lldbinit` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `ios/Flutter/ephemeral/flutter_native_integration.env` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `ios/Flutter/flutter_export_environment.sh` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `ios/Flutter/Generated.xcconfig` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@1x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@2x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@3x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@1x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@2x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@3x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@1x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@2x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@3x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-50x50@1x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-50x50@2x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-57x57@1x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-57x57@2x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@3x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-72x72@1x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-72x72@2x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@1x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-83.5x83.5@2x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/LaunchBackground.imageset/background.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@2x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@3x.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `ios/Runner/GeneratedPluginRegistrant.h` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `ios/Runner/GeneratedPluginRegistrant.m` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `macos/Flutter/ephemeral/flutter_export_environment.sh` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `macos/Flutter/ephemeral/flutter_native_integration.env` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `macos/Flutter/ephemeral/Flutter-Generated.xcconfig` (**gitignore**) : Exclu conformément aux règles du fichier .gitignore du projet
+- `macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_256.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_32.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_64.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `web/favicon.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `web/icons/Icon-192.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `web/icons/Icon-512.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `web/icons/Icon-maskable-192.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `web/icons/Icon-maskable-512.png` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+- `windows/runner/resources/app_icon.ico` (**binary**) : Fichier binaire ou média non auditable en analyse statique
+
+### Alertes écartées ou fusionnées par filtrage contextuel / triage IA (4)
+- **Bloc catch vide sur une opération critique** (`lib/services/storage_service.dart:L391`, sévérité initiale `MEDIUM`, source `DEDUPLICATION`) : Doublon fusionné avec l'occurrence principale dans lib/services/security_service.dart:L29
+- **Bloc catch vide sur une opération critique** (`lib/services/storage_service.dart:L398`, sévérité initiale `MEDIUM`, source `DEDUPLICATION`) : Doublon fusionné avec l'occurrence principale dans lib/services/security_service.dart:L36
+- **Bloc catch vide sur une opération critique** (`lib/providers/app_provider.dart:L342`, sévérité initiale `LOW`, source `AI_TRIAGE`) : Dégradation gracieuse intentionnelle lors du décodage JSON de préférences d'icônes non critiques côté client ; un échec de parsing n'entraîne aucun impact de sécurité ni compromission de données sensibles.
+- **Bloc catch vide sur une opération critique** (`lib/screens/acl_screen.dart:L351`, sévérité initiale `LOW`, source `AI_TRIAGE`) : Bloc catch utilisé comme dégradation gracieuse attendue lors du décodage JSON d'un brouillon en cours de saisie par l'utilisateur afin d'éviter un plantage sur une syntaxe temporairement invalide.
+
+---
+*Généré automatiquement par AegisScan - Plateforme d'audit SAST/DAST contextuelle*
