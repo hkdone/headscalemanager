@@ -26,7 +26,7 @@ class PolicyPreserver {
     Map<String, dynamic> generatedPolicy,
     Map<String, dynamic>? serverPolicy,
   ) {
-    final result = _deepCopyMap(generatedPolicy);
+    final result = deepCopyMap(generatedPolicy);
     if (serverPolicy == null || serverPolicy.isEmpty) {
       return result;
     }
@@ -77,7 +77,7 @@ class PolicyPreserver {
     if (trimmed.isEmpty) return null;
     final decoded = JsonUtils.decodeHuJson(trimmed);
     if (decoded is Map) {
-      return _deepCopyMap(Map<String, dynamic>.from(decoded));
+      return deepCopyMap(Map<String, dynamic>.from(decoded));
     }
     return null;
   }
@@ -179,7 +179,8 @@ class PolicyPreserver {
     );
   }
 
-  static Map<String, dynamic> _deepCopyMap(Map<String, dynamic> source) {
+  /// Crée une copie profonde d'une politique ACL afin d'éviter les mutations partagées.
+  static Map<String, dynamic> deepCopyMap(Map<String, dynamic> source) {
     return source.map(
       (key, value) => MapEntry(key, _deepCopyValue(value)),
     );

@@ -68,7 +68,7 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 - [x] **08.4** `JsonUtils` : parseur lexical HuJSON complet (`//`, `/* */`, trailing commas) + application dans `AclScreen._fetchAclPolicyFromServer`
 - [x] **08.5** API `PreAuthKey` v0.28+ (`serverVersion` + `keyId`) + encodage `Uri.encodeComponent`
 - [x] **08.6** Isolation `aclEngineMode` par `serverId` dans `StorageService` / `AppProvider` (avec fallback sur la clé globale existante)
-- [ ] **Gate 2 (Validation avant merge)** : `flutter analyze` (0 erreur/info) ✅ • 51/51 tests unitaires ✅ • Versionning `2.3.0+158` ✅ • Test interne conservation `ssh`/`hosts`, approbation route 0.29, et bascule multi-serveurs ⬜
+- [ ] **Gate 2 (Validation avant merge)** : `flutter analyze` (0 erreur/info) ✅ • 52/52 tests unitaires ✅ • Versionning `2.3.0+158` ✅ • Test interne conservation `ssh`/`hosts`, approbation route 0.29, synchro éditeur JSON/orphelins et bascule multi-serveurs ⬜
 
 ### Étape 3 — Plan 11 (`feat/acl-simulator-diff-ssh-api` → `2.4.0+159`)
 - [ ] **11.1** `JsonDiffUtils` + `PolicyDiffDialog` v2 (comparateur coloré `+`/`-` face à la policy serveur réelle)
@@ -92,4 +92,4 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 |---|---|---|---|
 | 2026-11-16 | Initialisation & Audit | `master` | Création et audit croisé des plans 08 à 11 ; mise en place de l'ordre graduel 10 $\rightarrow$ 08 $\rightarrow$ 11 $\rightarrow$ 09. |
 | 2026-11-16 | Étape 1 — Plan 10 | `sec/hardening-pin-network-sast` | Implémentation PBKDF2 + migration PIN, lockout, auto-lock arrière-plan, timeouts HTTP 20s, alerte HTTP, diagnostic opt-in, remédiation SAST. `flutter analyze` (0 issue), 36/36 tests passés, test manuel interne validé. Mergé dans `master`. |
-| 2026-11-16 | Étape 2 — Plan 08 | `fix/compat-non-destructive-acl` | Implémentation `PolicyPreserver`, `TagCapabilityHelper`, `RouteConflictService` (via 0.29+ & garde-fou rollback), parseur lexical HuJSON (`JsonUtils`), API PreAuthKey v0.28+ & `Uri.encodeComponent`, isolation `aclEngineMode` par `serverId`. `flutter analyze` (0 issue) & 51/51 tests passés (`2.3.0+158`). En attente de validation manuelle interne avant merge. |
+| 2026-11-16 | Étape 2 — Plan 08 | `fix/compat-non-destructive-acl` | Implémentation `PolicyPreserver`, `TagCapabilityHelper`, `RouteConflictService` (via 0.29+ & garde-fou rollback), parseur lexical HuJSON (`JsonUtils`), API PreAuthKey v0.28+ & `Uri.encodeComponent`, isolation `aclEngineMode` par `serverId`, synchro éditeur JSON/serveur + `PolicyOrphanCleaner`. `flutter analyze` (0 issue) & 52/52 tests passés (`2.3.0+158`). En attente de validation manuelle interne avant merge. |
