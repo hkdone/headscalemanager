@@ -13,6 +13,14 @@ class IpUtils {
     }
   }
 
+  /// Retourne true si [ip] est une adresse IPv4 valide.
+  static bool isIPv4(String ip) =>
+      InternetAddress.tryParse(ip)?.type == InternetAddressType.IPv4;
+
+  /// Retourne true si [ip] est une adresse IPv6 valide.
+  static bool isIPv6(String ip) =>
+      InternetAddress.tryParse(ip)?.type == InternetAddressType.IPv6;
+
   /// Checks if a given IP address is within a specific subnet in CIDR notation.
   static bool isIpInSubnet(String ip, String subnet) {
     try {

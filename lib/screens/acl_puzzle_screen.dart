@@ -11,6 +11,7 @@ import 'package:headscalemanager/services/acl_puzzle_service.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
 import 'package:headscalemanager/services/acl/hujson_comment_service.dart';
 import 'package:headscalemanager/services/acl/policy_preserver.dart';
+import 'package:headscalemanager/widgets/acl/policy_diff_dialog.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
@@ -18,7 +19,8 @@ import 'package:headscalemanager/utils/string_utils.dart'; // For normalizeUserN
 import 'package:headscalemanager/utils/tag_capability_helper.dart';
 import 'package:headscalemanager/services/security_service.dart';
 
-void _showEntityRenameDialog(BuildContext context, PuzzleEntity entity, VoidCallback onSaved) {
+void _showEntityRenameDialog(
+    BuildContext context, PuzzleEntity entity, VoidCallback onSaved) {
   final appProvider = context.read<AppProvider>();
   final isFr = appProvider.locale.languageCode == 'fr';
   final currentAlias = appProvider.getEntityAlias(entity.value) ?? '';
@@ -40,7 +42,8 @@ void _showEntityRenameDialog(BuildContext context, PuzzleEntity entity, VoidCall
           TextField(
             controller: controller,
             decoration: InputDecoration(
-              labelText: isFr ? 'Nom personnalisé (Alias)' : 'Custom Name (Alias)',
+              labelText:
+                  isFr ? 'Nom personnalisé (Alias)' : 'Custom Name (Alias)',
               hintText: entity.displayLabel,
               border: const OutlineInputBorder(),
             ),
@@ -224,9 +227,8 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
 
     // Nœuds routeurs (picker via par machine)
     for (var node in _nodes) {
-      final norm = normalizeUserName(node.user.isNotEmpty
-          ? node.getNormalizedOwner()
-          : node.user);
+      final norm = normalizeUserName(
+          node.user.isNotEmpty ? node.getNormalizedOwner() : node.user);
       final stdLan = 'tag:$norm-lan-sharer';
       final stdExit = 'tag:$norm-exit-node';
       String? viaTag;
@@ -326,8 +328,7 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
     final appProvider = context.read<AppProvider>();
 
     // Clean up obsolete lan-sharer tags before ACL generation
-    final cleanedNodes =
-        await TagCapabilityHelper.cleanupObsoleteLanSharerTags(
+    final cleanedNodes = await TagCapabilityHelper.cleanupObsoleteLanSharerTags(
       appProvider.apiService,
       _nodes,
     );
@@ -363,10 +364,42 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
       }
     }
 
-    // 4. Export to Server (non-destructive merge + préservation/écriture commentaires)
+    // 4. Prévisualisation Diff + Export non-destructif vers le serveur
     try {
       if (!mounted) return;
-      final appProvider = context.read<AppProvider>();
+      final serverBundle = await PolicyPreserver.fetchServerPolicyBundleSafely(
+        appProvider.apiService,
+      );
+      if (!mounted) return;
+
+      final mergedPreview = PolicyPreserver.merge(
+        finalPolicy,
+        serverBundle.policy,
+      );
+      final mergedComments = Map<String, String>.from(
+        serverBundle.ruleComments,
+      );
+      for (final sig in removedCommentSigs) {
+        mergedComments.remove(sig);
+      }
+      mergedComments.addAll(puzzleComments);
+
+      final rawNewText = HuJsonCommentService.formatPolicyWithComments(
+        mergedPreview,
+        ruleComments: mergedComments,
+        leadingComments: serverBundle.leadingComments,
+      );
+
+      final confirmed = await PolicyDiffDialog.show(
+        context,
+        currentPolicy: serverBundle.policy ?? const {},
+        newPolicy: mergedPreview,
+        rawCurrentText: serverBundle.rawText,
+        rawNewText: rawNewText,
+        isFr: isFr,
+      );
+      if (confirmed != true || !mounted) return;
+
       await PolicyPreserver.applyPreservingPolicy(
         apiService: appProvider.apiService,
         generatedPolicy: finalPolicy,
@@ -520,7 +553,10 @@ class _PuzzleBlockCard extends StatefulWidget {
   final AclPuzzleService service;
 
   const _PuzzleBlockCard(
-      {super.key, required this.rule, required this.onDelete, required this.service});
+      {super.key,
+      required this.rule,
+      required this.onDelete,
+      required this.service});
 
   @override
   State<_PuzzleBlockCard> createState() => _PuzzleBlockCardState();
@@ -572,291 +608,327 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
         child: StatefulBuilder(
           builder: (stCtx, setModalState) {
             return Container(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(stCtx).viewInsets.bottom + MediaQuery.of(stCtx).padding.bottom + 16,
-              top: 16,
-              left: 16,
-              right: 16,
-            ),
-            height: MediaQuery.of(stCtx).size.height * 0.85,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(10),
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(stCtx).viewInsets.bottom +
+                    MediaQuery.of(stCtx).padding.bottom +
+                    16,
+                top: 16,
+                left: 16,
+                right: 16,
+              ),
+              height: MediaQuery.of(stCtx).size.height * 0.85,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    isFr ? 'Personnaliser le bloc de règle' : 'Customize Rule Block',
-                    style: Theme.of(stCtx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: nameController,
-                    decoration: InputDecoration(
-                      labelText: isFr ? 'Nom du bloc' : 'Block Name',
-                      hintText: isFr ? 'Ex: Accès Web Invités' : 'Ex: Guest Web Access',
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.title),
+                    const SizedBox(height: 12),
+                    Text(
+                      isFr
+                          ? 'Personnaliser le bloc de règle'
+                          : 'Customize Rule Block',
+                      style: Theme.of(stCtx)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // --- SECTION PHOTO ---
-                  Text(
-                    isFr ? 'Illustration (Photo)' : 'Illustration (Photo)',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 35,
-                        backgroundColor: Colors.grey[200],
-                        backgroundImage: selectedImagePath != null && selectedImagePath!.isNotEmpty && File(selectedImagePath!).existsSync()
-                            ? FileImage(File(selectedImagePath!))
-                            : null,
-                        child: selectedImagePath == null || selectedImagePath!.isEmpty || !File(selectedImagePath!).existsSync()
-                            ? const Icon(Icons.image, size: 30, color: Colors.grey)
-                            : null,
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        labelText: isFr ? 'Nom du bloc' : 'Block Name',
+                        hintText: isFr
+                            ? 'Ex: Accès Web Invités'
+                            : 'Ex: Guest Web Access',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.title),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: () async {
-                                SecurityService.suppressNextResumeLock = true;
-                                try {
-                                  final picker = ImagePicker();
-                                  final image = await picker.pickImage(
-                                      source: ImageSource.gallery);
-                                  if (image != null) {
-                                    final appDir =
-                                        await getApplicationDocumentsDirectory();
-                                    final fileName =
-                                        'puzzle_${DateTime.now().millisecondsSinceEpoch}.png';
-                                    final savedFile = await File(image.path)
-                                        .copy('${appDir.path}/$fileName');
+                    ),
+                    const SizedBox(height: 20),
 
-                                    setModalState(() {
-                                      selectedImagePath = savedFile.path;
+                    // --- SECTION PHOTO ---
+                    Text(
+                      isFr ? 'Illustration (Photo)' : 'Illustration (Photo)',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 35,
+                          backgroundColor: Colors.grey[200],
+                          backgroundImage: selectedImagePath != null &&
+                                  selectedImagePath!.isNotEmpty &&
+                                  File(selectedImagePath!).existsSync()
+                              ? FileImage(File(selectedImagePath!))
+                              : null,
+                          child: selectedImagePath == null ||
+                                  selectedImagePath!.isEmpty ||
+                                  !File(selectedImagePath!).existsSync()
+                              ? const Icon(Icons.image,
+                                  size: 30, color: Colors.grey)
+                              : null,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  SecurityService.suppressNextResumeLock = true;
+                                  try {
+                                    final picker = ImagePicker();
+                                    final image = await picker.pickImage(
+                                        source: ImageSource.gallery);
+                                    if (image != null) {
+                                      final appDir =
+                                          await getApplicationDocumentsDirectory();
+                                      final fileName =
+                                          'puzzle_${DateTime.now().millisecondsSinceEpoch}.png';
+                                      final savedFile = await File(image.path)
+                                          .copy('${appDir.path}/$fileName');
+
+                                      setModalState(() {
+                                        selectedImagePath = savedFile.path;
+                                      });
+                                    }
+                                  } finally {
+                                    Future.delayed(
+                                        const Duration(milliseconds: 500), () {
+                                      SecurityService.suppressNextResumeLock =
+                                          false;
                                     });
                                   }
-                                } finally {
-                                  Future.delayed(
-                                      const Duration(milliseconds: 500), () {
-                                    SecurityService.suppressNextResumeLock =
-                                        false;
-                                  });
-                                }
-                              },
-                              icon: const Icon(Icons.photo_library),
-                              label: Text(isFr ? 'Choisir une photo' : 'Choose Photo'),
+                                },
+                                icon: const Icon(Icons.photo_library),
+                                label: Text(isFr
+                                    ? 'Choisir une photo'
+                                    : 'Choose Photo'),
+                              ),
+                              if (selectedImagePath != null &&
+                                  selectedImagePath!.isNotEmpty)
+                                TextButton.icon(
+                                  onPressed: () {
+                                    setModalState(() {
+                                      selectedImagePath = null;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.red),
+                                  label: Text(
+                                    isFr
+                                        ? 'Supprimer la photo'
+                                        : 'Remove Photo',
+                                    style: const TextStyle(color: Colors.red),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        )
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // --- SECTION COULEUR DE L'EN-TÊTE ---
+                    Text(
+                      isFr ? 'Couleur de l\'en-tête' : 'Header Color',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: availableColors.map((colorMap) {
+                        final hex = colorMap['hex']!;
+                        final name = colorMap['name']!;
+                        final color =
+                            Color(int.parse(hex.replaceFirst('#', '0xFF')));
+                        final isSelected = selectedColorHex == hex;
+
+                        return Tooltip(
+                          message: name,
+                          child: GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                selectedColorHex = isSelected ? null : hex;
+                              });
+                            },
+                            child: Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Theme.of(stCtx).colorScheme.primary
+                                      : Colors.grey[300]!,
+                                  width: isSelected ? 3 : 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: color.withAlpha(77),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: isSelected
+                                  ? Icon(
+                                      Icons.check,
+                                      color: color.computeLuminance() > 0.5
+                                          ? Colors.black
+                                          : Colors.white,
+                                      size: 18,
+                                    )
+                                  : null,
                             ),
-                            if (selectedImagePath != null && selectedImagePath!.isNotEmpty)
-                              TextButton.icon(
-                                onPressed: () {
+                          ),
+                        );
+                      }).toList(),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // --- SECTION PALETTE D'ICÔNES ---
+                    Text(
+                      isFr
+                          ? 'Sélectionner une icône (Palette riche)'
+                          : 'Select an Icon (Rich Palette)',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Grille classée par catégories
+                    ...puzzleIconsPalette.entries.map((category) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6.0),
+                            child: Text(
+                              category.key,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(stCtx).colorScheme.primary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 6,
+                              mainAxisSpacing: 8,
+                              crossAxisSpacing: 8,
+                            ),
+                            itemCount: category.value.length,
+                            itemBuilder: (context, index) {
+                              final key = category.value.keys.elementAt(index);
+                              final icon = category.value[key]!;
+                              final isIconSelected = selectedIcon == key;
+
+                              return InkWell(
+                                onTap: () {
                                   setModalState(() {
-                                    selectedImagePath = null;
+                                    selectedIcon = isIconSelected ? null : key;
                                   });
                                 },
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                label: Text(
-                                  isFr ? 'Supprimer la photo' : 'Remove Photo',
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              ),
-                          ],
-                        ),
-                      )
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 20),
-
-                  // --- SECTION COULEUR DE L'EN-TÊTE ---
-                  Text(
-                    isFr ? 'Couleur de l\'en-tête' : 'Header Color',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: availableColors.map((colorMap) {
-                      final hex = colorMap['hex']!;
-                      final name = colorMap['name']!;
-                      final color = Color(int.parse(hex.replaceFirst('#', '0xFF')));
-                      final isSelected = selectedColorHex == hex;
-                      
-                      return Tooltip(
-                        message: name,
-                        child: GestureDetector(
-                          onTap: () {
-                            setModalState(() {
-                              selectedColorHex = isSelected ? null : hex;
-                            });
-                          },
-                          child: Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected ? Theme.of(stCtx).colorScheme.primary : Colors.grey[300]!,
-                                width: isSelected ? 3 : 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: color.withAlpha(77),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: isSelected
-                                ? Icon(
-                                    Icons.check,
-                                    color: color.computeLuminance() > 0.5 ? Colors.black : Colors.white,
-                                    size: 18,
-                                  )
-                                : null,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // --- SECTION PALETTE D'ICÔNES ---
-                  Text(
-                    isFr ? 'Sélectionner une icône (Palette riche)' : 'Select an Icon (Rich Palette)',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 10),
-                  
-                  // Grille classée par catégories
-                  ...puzzleIconsPalette.entries.map((category) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6.0),
-                          child: Text(
-                            category.key,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(stCtx).colorScheme.primary,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 6,
-                            mainAxisSpacing: 8,
-                            crossAxisSpacing: 8,
-                          ),
-                          itemCount: category.value.length,
-                          itemBuilder: (context, index) {
-                            final key = category.value.keys.elementAt(index);
-                            final icon = category.value[key]!;
-                            final isIconSelected = selectedIcon == key;
-                            
-                            return InkWell(
-                              onTap: () {
-                                setModalState(() {
-                                  selectedIcon = isIconSelected ? null : key;
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: isIconSelected
-                                      ? Theme.of(stCtx).colorScheme.primary.withAlpha(51)
-                                      : Colors.transparent,
-                                  border: Border.all(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: isIconSelected
+                                        ? Theme.of(stCtx)
+                                            .colorScheme
+                                            .primary
+                                            .withAlpha(51)
+                                        : Colors.transparent,
+                                    border: Border.all(
+                                      color: isIconSelected
+                                          ? Theme.of(stCtx).colorScheme.primary
+                                          : Colors.grey[300]!,
+                                      width: isIconSelected ? 2 : 1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    icon,
                                     color: isIconSelected
                                         ? Theme.of(stCtx).colorScheme.primary
-                                        : Colors.grey[300]!,
-                                    width: isIconSelected ? 2 : 1,
+                                        : Colors.grey[700],
                                   ),
-                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Icon(
-                                  icon,
-                                  color: isIconSelected
-                                      ? Theme.of(stCtx).colorScheme.primary
-                                      : Colors.grey[700],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                    );
-                  }),
-                  
-                  const SizedBox(height: 24),
-                  
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            appProvider.deleteBlockMeta(signature);
-                            Navigator.pop(ctx);
-                            setState(() {});
-                          },
-                          child: Text(isFr ? 'Réinitialiser' : 'Reset'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            await appProvider.setBlockMeta(
-                              signature,
-                              name: nameController.text.trim().isNotEmpty ? nameController.text.trim() : '',
-                              iconKey: selectedIcon ?? '',
-                              imagePath: selectedImagePath ?? '',
-                              colorHex: selectedColorHex ?? '',
-                            );
-                            if (ctx.mounted) {
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      );
+                    }),
+
+                    const SizedBox(height: 24),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              appProvider.deleteBlockMeta(signature);
                               Navigator.pop(ctx);
                               setState(() {});
-                            }
-                          },
-                          child: Text(isFr ? 'Enregistrer' : 'Save'),
+                            },
+                            child: Text(isFr ? 'Réinitialiser' : 'Reset'),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              await appProvider.setBlockMeta(
+                                signature,
+                                name: nameController.text.trim().isNotEmpty
+                                    ? nameController.text.trim()
+                                    : '',
+                                iconKey: selectedIcon ?? '',
+                                imagePath: selectedImagePath ?? '',
+                                colorHex: selectedColorHex ?? '',
+                              );
+                              if (ctx.mounted) {
+                                Navigator.pop(ctx);
+                                setState(() {});
+                              }
+                            },
+                            child: Text(isFr ? 'Enregistrer' : 'Save'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -876,7 +948,8 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
     Color? customHeaderColor;
     if (colorHex != null && colorHex.isNotEmpty) {
       try {
-        customHeaderColor = Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+        customHeaderColor =
+            Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
       } catch (e) {
         debugPrint('Error parsing colorHex: $e');
       }
@@ -892,7 +965,8 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
         : (isFr ? 'Règle non nommée' : 'Unnamed Rule');
 
     final isCustomColor = customHeaderColor != null;
-    final isLight = isCustomColor ? customHeaderColor.computeLuminance() > 0.5 : true;
+    final isLight =
+        isCustomColor ? customHeaderColor.computeLuminance() > 0.5 : true;
 
     final Color headerTextColor = isCustomColor
         ? (isLight ? Colors.black87 : Colors.white)
@@ -919,7 +993,9 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
             color: customHeaderColor,
             border: Border(
               bottom: BorderSide(
-                color: isLight ? Colors.black.withAlpha(26) : Colors.white.withAlpha(26),
+                color: isLight
+                    ? Colors.black.withAlpha(26)
+                    : Colors.white.withAlpha(26),
               ),
             ),
           )
@@ -971,11 +1047,14 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
             GestureDetector(
               onTap: () => _showBlockCustomizerDialog(context, sig),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: headerDecoration,
                 child: Row(
                   children: [
-                    if (imagePath != null && imagePath.isNotEmpty && File(imagePath).existsSync())
+                    if (imagePath != null &&
+                        imagePath.isNotEmpty &&
+                        File(imagePath).existsSync())
                       CircleAvatar(
                         radius: 20,
                         backgroundImage: FileImage(File(imagePath)),
@@ -984,13 +1063,15 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                       CircleAvatar(
                         radius: 20,
                         backgroundColor: avatarBgColor,
-                        child: Icon(customIcon, color: avatarIconColor, size: 20),
+                        child:
+                            Icon(customIcon, color: avatarIconColor, size: 20),
                       )
                     else
                       CircleAvatar(
                         radius: 20,
                         backgroundColor: avatarBgColor,
-                        child: Icon(Icons.extension, color: avatarIconColor, size: 20),
+                        child: Icon(Icons.extension,
+                            color: avatarIconColor, size: 20),
                       ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1004,8 +1085,10 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.tune, size: 20, color: headerActionIconColor),
-                      tooltip: isFr ? 'Personnaliser le bloc' : 'Customize block',
+                      icon: Icon(Icons.tune,
+                          size: 20, color: headerActionIconColor),
+                      tooltip:
+                          isFr ? 'Personnaliser le bloc' : 'Customize block',
                       onPressed: () => _showBlockCustomizerDialog(context, sig),
                     ),
                   ],
@@ -1032,8 +1115,11 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.tune, size: 18, color: Colors.grey),
-                      tooltip: isFr ? 'Nommer ou illustrer le bloc' : 'Name or illustrate block',
+                      icon:
+                          const Icon(Icons.tune, size: 18, color: Colors.grey),
+                      tooltip: isFr
+                          ? 'Nommer ou illustrer le bloc'
+                          : 'Name or illustrate block',
                       onPressed: () => _showBlockCustomizerDialog(context, sig),
                     ),
                   ],
@@ -1055,10 +1141,11 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: widget.rule.sources
                           .map((e) => Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 4.0),
                                 child: Tooltip(
-                                  message: isFr 
-                                      ? 'Valeur: ${e.value}\n(Cliquer pour renommer)' 
+                                  message: isFr
+                                      ? 'Valeur: ${e.value}\n(Cliquer pour renommer)'
                                       : 'Value: ${e.value}\n(Click to rename)',
                                   child: InkWell(
                                     onTap: () {
@@ -1068,12 +1155,16 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                                     },
                                     borderRadius: BorderRadius.circular(12),
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 8),
                                       decoration: BoxDecoration(
-                                        color: theme.colorScheme.primaryContainer.withAlpha(60),
+                                        color: theme
+                                            .colorScheme.primaryContainer
+                                            .withAlpha(60),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: theme.colorScheme.primary.withAlpha(40),
+                                          color: theme.colorScheme.primary
+                                              .withAlpha(40),
                                           width: 1,
                                         ),
                                       ),
@@ -1091,7 +1182,8 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                                               style: TextStyle(
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w600,
-                                                color: theme.colorScheme.onPrimaryContainer,
+                                                color: theme.colorScheme
+                                                    .onPrimaryContainer,
                                               ),
                                               softWrap: true,
                                             ),
@@ -1135,33 +1227,34 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                                       },
                                       borderRadius: BorderRadius.circular(12),
                                       child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.purple.withAlpha(40),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: Colors.purple.withAlpha(80),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.purple.withAlpha(40),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: Colors.purple.withAlpha(80),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.alt_route,
+                                                size: 14, color: Colors.purple),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                _getEntityLabel(context, e),
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                                softWrap: true,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(Icons.alt_route,
-                                              size: 14, color: Colors.purple),
-                                          const SizedBox(width: 6),
-                                          Expanded(
-                                            child: Text(
-                                              _getEntityLabel(context, e),
-                                              style: const TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                              softWrap: true,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
                                     ),
                                   ))
                               .toList(),
@@ -1194,10 +1287,11 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: widget.rule.destinations
                           .map((e) => Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 4.0),
                                 child: Tooltip(
-                                  message: isFr 
-                                      ? 'Valeur: ${e.value}\n(Cliquer pour renommer)' 
+                                  message: isFr
+                                      ? 'Valeur: ${e.value}\n(Cliquer pour renommer)'
                                       : 'Value: ${e.value}\n(Click to rename)',
                                   child: InkWell(
                                     onTap: () {
@@ -1207,12 +1301,16 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                                     },
                                     borderRadius: BorderRadius.circular(12),
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 8),
                                       decoration: BoxDecoration(
-                                        color: theme.colorScheme.secondaryContainer.withAlpha(60),
+                                        color: theme
+                                            .colorScheme.secondaryContainer
+                                            .withAlpha(60),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: theme.colorScheme.secondary.withAlpha(40),
+                                          color: theme.colorScheme.secondary
+                                              .withAlpha(40),
                                           width: 1,
                                         ),
                                       ),
@@ -1230,7 +1328,8 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                                               style: TextStyle(
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w600,
-                                                color: theme.colorScheme.onSecondaryContainer,
+                                                color: theme.colorScheme
+                                                    .onSecondaryContainer,
                                               ),
                                               softWrap: true,
                                             ),
@@ -1245,7 +1344,8 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                    icon: const Icon(Icons.delete_outline,
+                        color: Colors.redAccent),
                     onPressed: widget.onDelete,
                   )
                 ],
@@ -1341,11 +1441,8 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                 ),
               ),
               const Divider(),
-              _buildDetailSection(
-                  ctx,
-                  isFr ? 'VIA (routage)' : 'VIA (routing)',
-                  widget.rule.via,
-                  Colors.purple),
+              _buildDetailSection(ctx, isFr ? 'VIA (routage)' : 'VIA (routing)',
+                  widget.rule.via, Colors.purple),
               const Divider(),
               _buildDetailSection(ctx, isFr ? 'DESTINATIONS' : 'DESTINATIONS',
                   widget.rule.destinations, Colors.orange),
@@ -1464,7 +1561,8 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
               ),
             const SizedBox(height: 16),
             Expanded(
-              child: _buildEntityList(_currentSelection(useGrants), isFr, useGrants),
+              child: _buildEntityList(
+                  _currentSelection(useGrants), isFr, useGrants),
             ),
             const SizedBox(height: 16),
             Row(
@@ -1564,7 +1662,8 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
         if (!isViaTag && !isViaRouter) continue;
       }
 
-      if (_currentStep == (useGrants ? 2 : 1) && excludedIds.contains(e.value)) {
+      if (_currentStep == (useGrants ? 2 : 1) &&
+          excludedIds.contains(e.value)) {
         continue;
       }
 
@@ -1585,9 +1684,10 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
           title: Text(_getLocalizedEntityType(entry.key, isFr)),
           children: entry.value.map((entity) {
             final isSelected = selectedList.any((e) => e.id == entity.id);
-            final alias = context.watch<AppProvider>().getEntityAlias(entity.value);
+            final alias =
+                context.watch<AppProvider>().getEntityAlias(entity.value);
             final hasAlias = alias != null && alias.isNotEmpty;
-            
+
             return ListTile(
               leading: Checkbox(
                 value: isSelected,
@@ -1603,14 +1703,19 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
               ),
               title: Row(
                 children: [
-                  Icon(_getIconForType(entity.type), size: 18, color: Colors.grey[600]),
+                  Icon(_getIconForType(entity.type),
+                      size: 18, color: Colors.grey[600]),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _wrapTextForWrapping(hasAlias ? alias : entity.displayLabel),
+                      _wrapTextForWrapping(
+                          hasAlias ? alias : entity.displayLabel),
                       style: TextStyle(
-                        fontWeight: hasAlias ? FontWeight.bold : FontWeight.normal,
-                        color: hasAlias ? Theme.of(context).colorScheme.primary : null,
+                        fontWeight:
+                            hasAlias ? FontWeight.bold : FontWeight.normal,
+                        color: hasAlias
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
                       ),
                       softWrap: true,
                     ),
@@ -1618,9 +1723,11 @@ class _RuleEditorDialogState extends State<_RuleEditorDialog> {
                 ],
               ),
               subtitle: Text(
-                hasAlias 
+                hasAlias
                     ? '${entity.value} • ${isFr ? "Cliquer sur le crayon pour modifier" : "Click pencil to edit"}'
-                    : (isFr ? "Cliquer sur le crayon pour donner un nom" : "Click pencil to name"),
+                    : (isFr
+                        ? "Cliquer sur le crayon pour donner un nom"
+                        : "Click pencil to name"),
                 style: TextStyle(fontSize: 10, color: Colors.grey[600]),
               ),
               trailing: IconButton(

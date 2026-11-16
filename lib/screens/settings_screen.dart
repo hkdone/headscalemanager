@@ -15,6 +15,7 @@ import 'package:headscalemanager/services/tag_migration_service.dart';
 import 'package:headscalemanager/widgets/server_list_tile.dart';
 import 'package:headscalemanager/widgets/grants_migration_dialog.dart';
 import 'package:headscalemanager/screens/api_keys_screen.dart';
+import 'package:headscalemanager/utils/snack_bar_utils.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -212,6 +213,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     color: Colors.blue,
                                   ),
                                 ),
+                              ),
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(Icons.alt_route,
+                                    color: Colors.teal),
+                                title: Text(
+                                  isFr
+                                      ? 'Attribuer les IPs manquantes (Backfill IPs)'
+                                      : 'Assign Missing IPs (Backfill IPs)',
+                                  style: theme.textTheme.bodyLarge,
+                                ),
+                                subtitle: Text(
+                                  isFr
+                                      ? 'Prévisualise puis attribue les IPs manquantes aux nœuds.'
+                                      : 'Previews and assigns missing IPs to existing nodes.',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => _handleBackfillNodeIps(
+                                    context, appProvider, isFr),
                               ),
                               const SizedBox(height: 8),
                               // Danger Zone Header inside Card
@@ -534,6 +555,127 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _handleBackfillNodeIps(
+    BuildContext context,
+    AppProvider appProvider,
+    bool isFr,
+  ) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    List<String> previewChanges;
+    try {
+      previewChanges =
+          await appProvider.apiService.backfillNodeIps(confirmed: false);
+    } catch (e) {
+      if (context.mounted) Navigator.of(context).pop();
+      if (context.mounted) {
+        showSafeSnackBar(
+          context,
+          isFr
+              ? 'Erreur lors de la prévisualisation Backfill IPs : $e'
+              : 'Backfill IPs preview error: $e',
+        );
+      }
+      return;
+    }
+
+    if (!context.mounted) return;
+    Navigator.of(context).pop(); // Ferme le loader
+
+    final shouldApply = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: Text(
+          isFr ? 'Prévisualisation Backfill IPs' : 'Backfill IPs Preview',
+        ),
+        content: SizedBox(
+          width: 460,
+          child: SingleChildScrollView(
+            child: previewChanges.isEmpty
+                ? Text(
+                    isFr
+                        ? 'Aucune IP manquante détectée : tous les nœuds possèdent déjà leurs adresses.'
+                        : 'No missing IP detected: all nodes already have assigned addresses.',
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        isFr
+                            ? 'Modifications proposées (${previewChanges.length}) :'
+                            : 'Proposed changes (${previewChanges.length}):',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      ...previewChanges.map(
+                        (c) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: SelectableText(
+                            '• $c',
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: Text(isFr ? 'Fermer' : 'Close'),
+          ),
+          if (previewChanges.isNotEmpty)
+            FilledButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(true),
+              child: Text(
+                  isFr ? 'Confirmer l\'attribution' : 'Confirm assignment'),
+            ),
+        ],
+      ),
+    );
+
+    if (shouldApply != true || !context.mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final appliedChanges =
+          await appProvider.apiService.backfillNodeIps(confirmed: true);
+      if (context.mounted) Navigator.of(context).pop();
+      if (context.mounted) {
+        showSafeSnackBar(
+          context,
+          isFr
+              ? 'Attribution terminée (${appliedChanges.length} modification(s)).'
+              : 'Assignment completed (${appliedChanges.length} change(s)).',
+        );
+      }
+    } catch (e) {
+      if (context.mounted) Navigator.of(context).pop();
+      if (context.mounted) {
+        showSafeSnackBar(
+          context,
+          isFr
+              ? 'Erreur lors de l\'attribution Backfill IPs : $e'
+              : 'Backfill IPs assignment error: $e',
+        );
+      }
+    }
+  }
+
   void _showMigrationHelpDialog(BuildContext context, bool isFr) {
     showDialog(
       context: context,
@@ -600,7 +742,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       if (duplicates.isNotEmpty) {
         final details = duplicates.entries.map((entry) {
-          final users = entry.value.map((n) => '${n.name} (${n.user})').join(', ');
+          final users =
+              entry.value.map((n) => '${n.name} (${n.user})').join(', ');
           return '• ${entry.key} → $users';
         }).join('\n');
 
@@ -664,9 +807,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (forceConfirm && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(isFr
-              ? 'Moteur Standard activé.'
-              : 'Standard engine enabled.'),
+          content: Text(
+              isFr ? 'Moteur Standard activé.' : 'Standard engine enabled.'),
         ),
       );
     }
@@ -717,7 +859,8 @@ class _AclEngineModeTile extends StatelessWidget {
       title: Text(title),
       subtitle: Text(subtitle),
       trailing: selected
-          ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary)
+          ? Icon(Icons.check_circle,
+              color: Theme.of(context).colorScheme.primary)
           : Icon(Icons.circle_outlined,
               color: Theme.of(context).colorScheme.outline),
       onTap: enabled ? () => onChanged(mode) : null,

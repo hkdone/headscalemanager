@@ -638,6 +638,47 @@ class _NodeCard extends StatelessWidget {
           case 'edit_tags':
             _showEditTagsDialog(context);
             break;
+          case 'expire_session':
+            showDialog(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                title: Text(
+                  isFr
+                      ? 'Expirer la session de ${node.name} ?'
+                      : 'Expire session for ${node.name}?',
+                  style: theme.textTheme.titleLarge,
+                ),
+                content: Text(
+                  isFr
+                      ? 'Déconnecte le nœud sans le supprimer. Ses tags, IPs et routes sont conservés.'
+                      : 'Disconnects the node without deleting it. Its tags, IPs, and routes are preserved.',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    child: Text(isFr ? 'Annuler' : 'Cancel',
+                        style: theme.textTheme.labelLarge),
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                  ),
+                  TextButton(
+                    child: Text(isFr ? 'Expirer' : 'Expire',
+                        style: theme.textTheme.labelLarge
+                            ?.copyWith(color: Colors.orange)),
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      _runAction(
+                        context,
+                        () => provider.apiService.expireNode(node.id),
+                        isFr
+                            ? 'Session expirée pour ${node.name}.'
+                            : 'Session expired for ${node.name}.',
+                      );
+                    },
+                  ),
+                ],
+              ),
+            );
+            break;
           case 'delete_device':
             showDialog(
               context: context,
@@ -689,6 +730,14 @@ class _NodeCard extends StatelessWidget {
             child: Text(isFr ? 'Modifier les tags' : 'Edit tags',
                 style: theme.textTheme.bodyMedium
                     ?.copyWith(color: theme.colorScheme.onSurface))),
+        PopupMenuItem<String>(
+            value: 'expire_session',
+            child: Text(
+                isFr
+                    ? 'Expirer la session (Déconnecter)'
+                    : 'Expire session (Disconnect)',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: Colors.orange))),
         const PopupMenuDivider(),
         PopupMenuItem<String>(
             value: 'delete_device',

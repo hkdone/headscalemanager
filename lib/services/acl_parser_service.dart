@@ -536,4 +536,709 @@ class AclParserService {
         (int.parse(parts[2]) << 8) |
         int.parse(parts[3]);
   }
+
+  /// Simule une connexion entre [sourceNode] et [destination] selon les
+  /// règles `grants` puis `acls` de la politique locale.
+  SimulationResult simulateConnection({
+    required Node sourceNode,
+    required String destination,
+    String? port,
+    String protocol = 'tcp',
+  }) {
+    final normalizedDest = destination.trim();
+    final normalizedPort =
+        (port == null || port.trim().isEmpty) ? '*' : port.trim();
+    final normalizedProto =
+        protocol.trim().isEmpty ? 'tcp' : protocol.trim().toLowerCase();
+
+    final targetNode = _findTargetNode(normalizedDest);
+    final hostsMap = _extractHostsMap();
+    final destIps = _resolveDestinationIps(
+      normalizedDest,
+      targetNode: targetNode,
+      hostsMap: hostsMap,
+    );
+
+    // 1. Évaluation des Grants réseau (Headscale 0.29+)
+    final grants = aclPolicy['grants'];
+    if (grants is List) {
+      for (final rawGrant in grants) {
+        if (rawGrant is! Map) continue;
+        final grantMap = Map<String, dynamic>.from(rawGrant);
+        if (!grantMap.containsKey('ip')) continue;
+
+        final sources = _coerceStringList(grantMap['src']);
+        if (sources.isEmpty ||
+            !_selectorListMatchesNode(sources, sourceNode, sourceNode)) {
+          continue;
+        }
+
+        final destinations = _coerceStringList(grantMap['dst']);
+        if (destinations.isEmpty) continue;
+
+        final ipSpecs = _coerceStringList(grantMap['ip']);
+        if (!_grantIpListMatches(
+          ipSpecs.isEmpty ? const ['*'] : ipSpecs,
+          port: normalizedPort,
+          protocol: normalizedProto,
+        )) {
+          continue;
+        }
+
+        for (final dstExpr in destinations) {
+          if (_destinationMatches(
+            dstExpr: dstExpr,
+            targetExpr: normalizedDest,
+            targetNode: targetNode,
+            targetIps: destIps,
+            sourceNode: sourceNode,
+            hostsMap: hostsMap,
+          )) {
+            final viaList = _coerceStringList(grantMap['via']);
+            final viaTag = viaList.isNotEmpty ? viaList.first : null;
+            final viaNode = viaTag != null
+                ? _findNodeByTag(viaTag)
+                : _inferViaNode(normalizedDest, destIps);
+
+            return SimulationResult(
+              allowed: true,
+              matchedRuleType: 'grant',
+              matchedRule: grantMap,
+              viaTag: viaTag,
+              viaNode: viaNode,
+              normalizedDestination: normalizedDest,
+              requestedPort: normalizedPort,
+              requestedProtocol: normalizedProto,
+              matchedRuleSummary:
+                  'grant: ${sources.join(', ')} -> $dstExpr [ip: ${ipSpecs.join(', ')}]'
+                  '${viaTag != null ? ' via $viaTag' : ''}',
+            );
+          }
+        }
+      }
+    }
+
+    // 2. Évaluation des ACL classiques
+    final acls = aclPolicy['acls'];
+    if (acls is List) {
+      for (final rawRule in acls) {
+        if (rawRule is! Map) continue;
+        final ruleMap = Map<String, dynamic>.from(rawRule);
+        if (ruleMap['action'] != 'accept') continue;
+
+        final ruleProto = ruleMap['proto']?.toString().trim().toLowerCase();
+        if (ruleProto != null &&
+            ruleProto.isNotEmpty &&
+            ruleProto != '*' &&
+            ruleProto != 'all' &&
+            normalizedProto != '*' &&
+            ruleProto != normalizedProto) {
+          continue;
+        }
+
+        final sources = _coerceStringList(ruleMap['src']);
+        if (sources.isEmpty ||
+            !_selectorListMatchesNode(sources, sourceNode, sourceNode)) {
+          continue;
+        }
+
+        final destinations = _coerceStringList(ruleMap['dst']);
+        final defaultPorts = ruleMap['ports'] is List
+            ? _coerceStringList(ruleMap['ports'])
+            : const ['*'];
+
+        for (final destSpec in destinations) {
+          final parsed = _splitHostAndPorts(
+            destSpec,
+            defaultPorts: defaultPorts,
+          );
+          if (!_portsMatch(parsed.ports, normalizedPort)) continue;
+
+          if (_destinationMatches(
+            dstExpr: parsed.host,
+            targetExpr: normalizedDest,
+            targetNode: targetNode,
+            targetIps: destIps,
+            sourceNode: sourceNode,
+            hostsMap: hostsMap,
+          )) {
+            final viaNode = _inferViaNode(normalizedDest, destIps);
+            return SimulationResult(
+              allowed: true,
+              matchedRuleType: 'acl',
+              matchedRule: ruleMap,
+              viaNode: viaNode,
+              normalizedDestination: normalizedDest,
+              requestedPort: normalizedPort,
+              requestedProtocol: normalizedProto,
+              matchedRuleSummary:
+                  'acl: ${sources.join(', ')} -> $destSpec'
+                  '${viaNode != null ? ' (via ${viaNode.name})' : ''}',
+            );
+          }
+        }
+      }
+    }
+
+    return SimulationResult(
+      allowed: false,
+      normalizedDestination: normalizedDest,
+      requestedPort: normalizedPort,
+      requestedProtocol: normalizedProto,
+    );
+  }
+
+  /// Valide les entrées `policy['tests']` (Headscale >= 0.29) afin d'éviter un
+  /// rejet serveur lorsqu'une machine ou un tag référencé n'existe plus.
+  static AclTestValidationResult validatePolicyTests(
+    Map<String, dynamic> policy, {
+    required List<Node> allNodes,
+    required List<User> allUsers,
+  }) {
+    final testsRaw = policy['tests'];
+    if (testsRaw is! List || testsRaw.isEmpty) {
+      return const AclTestValidationResult(issues: []);
+    }
+
+    final validNodeIps = <String>{
+      for (final node in allNodes) ...node.ipAddresses.map((ip) => ip.trim()),
+    };
+    final validTags = <String>{
+      for (final node in allNodes) ...node.tags,
+      if (policy['tagOwners'] is Map)
+        ...(policy['tagOwners'] as Map).keys.map((k) => k.toString()),
+    };
+    final validGroups = <String>{
+      if (policy['groups'] is Map)
+        ...(policy['groups'] as Map).keys.map((k) => k.toString()),
+    };
+    final validHosts = <String>{
+      if (policy['hosts'] is Map)
+        ...(policy['hosts'] as Map).keys.map((k) => k.toString()),
+    };
+    final validUsers = <String>{
+      for (final user in allUsers) ...[
+        user.name,
+        normalizeUserName(user.name),
+      ],
+    };
+
+    bool isValidEndpoint(String rawToken, {required bool stripPort}) {
+      var token = rawToken.trim();
+      if (token.isEmpty || token == '*' || token.startsWith('autogroup:')) {
+        return true;
+      }
+      if (stripPort) {
+        token = _splitHostAndPorts(token, defaultPorts: const ['*']).host;
+      }
+      if (token == '*' || token.startsWith('autogroup:')) return true;
+      if (token.startsWith('tag:')) {
+        return token
+            .split(';')
+            .where((t) => t.isNotEmpty)
+            .map((t) => t.startsWith('tag:') ? t : 'tag:$t')
+            .every(validTags.contains);
+      }
+      if (token.startsWith('group:')) {
+        return validGroups.contains(token);
+      }
+      if (validHosts.contains(token) || validUsers.contains(token)) {
+        return true;
+      }
+      if (IpUtils.isCIDR(token)) return true;
+      if (_isTailscaleMeshIp(token)) {
+        return validNodeIps.contains(token);
+      }
+      if (IpUtils.isIPv4(token) || IpUtils.isIPv6(token)) {
+        return true;
+      }
+      // Nom de machine direct ou alias inconnu
+      return allNodes.any((n) => n.name == token) ||
+          validNodeIps.contains(token);
+    }
+
+    final issues = <PolicyTestIssue>[];
+    for (var i = 0; i < testsRaw.length; i++) {
+      final entry = testsRaw[i];
+      if (entry is! Map) continue;
+
+      final src = entry['src']?.toString().trim() ?? '';
+      if (src.isEmpty || !isValidEndpoint(src, stripPort: false)) {
+        issues.add(PolicyTestIssue(
+          testIndex: i,
+          field: 'src',
+          value: src,
+          reasonFr: 'Source introuvable ou nœud supprimé : "$src"',
+          reasonEn: 'Unknown source or deleted node: "$src"',
+        ));
+      }
+
+      for (final field in const ['accept', 'deny']) {
+        final targets = entry[field];
+        if (targets is! List) continue;
+        for (final t in targets) {
+          final value = t.toString().trim();
+          if (!isValidEndpoint(value, stripPort: true)) {
+            issues.add(PolicyTestIssue(
+              testIndex: i,
+              field: field,
+              value: value,
+              reasonFr: 'Cible introuvable dans "$field" : "$value"',
+              reasonEn: 'Unknown target in "$field": "$value"',
+            ));
+            continue;
+          }
+          final portError = _validateSingleTestPort(value);
+          if (portError != null) {
+            issues.add(PolicyTestIssue(
+              testIndex: i,
+              field: field,
+              value: value,
+              reasonFr:
+                  'Port invalide dans "$field" ("$value") : Headscale exige un port numérique unique (ex: :443), pas "*" ou de plage.',
+              reasonEn:
+                  'Invalid port in "$field" ("$value"): Headscale requires a single numeric port (e.g. :443), not "*" or ranges.',
+            ));
+          }
+        }
+      }
+    }
+
+    return AclTestValidationResult(issues: issues);
+  }
+
+  /// Retourne une copie de [policy] dont les références invalides dans `tests`
+  /// ont été nettoyées.
+  static Map<String, dynamic> pruneObsoletePolicyTests(
+    Map<String, dynamic> policy, {
+    required List<Node> allNodes,
+    required List<User> allUsers,
+  }) {
+    final copy = Map<String, dynamic>.from(policy);
+    final testsRaw = copy['tests'];
+    if (testsRaw is! List || testsRaw.isEmpty) return copy;
+
+    final validation = validatePolicyTests(
+      copy,
+      allNodes: allNodes,
+      allUsers: allUsers,
+    );
+    if (validation.isValid) return copy;
+
+    final deadIndices = <int>{};
+    final deadTargetsByTest = <int, Set<String>>{};
+    for (final issue in validation.issues) {
+      if (issue.field == 'src') {
+        deadIndices.add(issue.testIndex);
+      } else {
+        deadTargetsByTest
+            .putIfAbsent(issue.testIndex, () => <String>{})
+            .add('${issue.field}:${issue.value}');
+      }
+    }
+
+    final cleanedTests = <Map<String, dynamic>>[];
+    for (var i = 0; i < testsRaw.length; i++) {
+      if (deadIndices.contains(i)) continue;
+      final raw = testsRaw[i];
+      if (raw is! Map) continue;
+      final testMap = Map<String, dynamic>.from(raw);
+      final deadTargets = deadTargetsByTest[i] ?? const <String>{};
+
+      for (final field in const ['accept', 'deny']) {
+        if (testMap[field] is List) {
+          final filtered = (testMap[field] as List)
+              .map((e) => e.toString())
+              .where((v) => !deadTargets.contains('$field:${v.trim()}'))
+              .toList();
+          if (filtered.isEmpty) {
+            testMap.remove(field);
+          } else {
+            testMap[field] = filtered;
+          }
+        }
+      }
+
+      final hasAccept =
+          testMap['accept'] is List && (testMap['accept'] as List).isNotEmpty;
+      final hasDeny =
+          testMap['deny'] is List && (testMap['deny'] as List).isNotEmpty;
+      if (hasAccept || hasDeny) {
+        cleanedTests.add(testMap);
+      }
+    }
+
+    if (cleanedTests.isEmpty) {
+      copy.remove('tests');
+    } else {
+      copy['tests'] = cleanedTests;
+    }
+    return copy;
+  }
+
+  Map<String, String> _extractHostsMap() {
+    final hostsRaw = aclPolicy['hosts'];
+    if (hostsRaw is! Map) return const {};
+    return {
+      for (final entry in hostsRaw.entries)
+        entry.key.toString().trim(): entry.value.toString().trim(),
+    };
+  }
+
+  Node? _findTargetNode(String destination) {
+    final clean = destination.trim();
+    for (final node in allNodes) {
+      if (node.name == clean ||
+          node.id == clean ||
+          node.ipAddresses.contains(clean)) {
+        return node;
+      }
+    }
+    final hostIp = _extractHostsMap()[clean];
+    if (hostIp != null && _nodeIpMap.containsKey(hostIp)) {
+      return _nodeIpMap[hostIp];
+    }
+    return null;
+  }
+
+  List<String> _resolveDestinationIps(
+    String destination, {
+    Node? targetNode,
+    required Map<String, String> hostsMap,
+  }) {
+    if (targetNode != null && targetNode.ipAddresses.isNotEmpty) {
+      return targetNode.ipAddresses;
+    }
+    if (hostsMap.containsKey(destination)) {
+      return [hostsMap[destination]!];
+    }
+    if (IpUtils.isIPv4(destination) ||
+        IpUtils.isIPv6(destination) ||
+        IpUtils.isCIDR(destination)) {
+      return [destination];
+    }
+    return const [];
+  }
+
+  bool _selectorListMatchesNode(
+    List<String> selectors,
+    Node candidateNode,
+    Node sourceContextNode, [
+    Set<String>? visited,
+  ]) {
+    visited ??= <String>{};
+    for (final raw in selectors) {
+      final expr = raw.trim();
+      if (expr.isEmpty) continue;
+      if (_selectorMatchesNode(expr, candidateNode, sourceContextNode, visited)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _selectorMatchesNode(
+    String expr,
+    Node candidateNode,
+    Node sourceContextNode,
+    Set<String> visited,
+  ) {
+    if (expr == '*') return true;
+    if (expr == 'autogroup:member') {
+      return candidateNode.user.isNotEmpty || candidateNode.tags.isEmpty;
+    }
+    if (expr == 'autogroup:tagged') {
+      return candidateNode.tags.isNotEmpty;
+    }
+    if (expr == 'autogroup:self') {
+      return _isSameUser(candidateNode, sourceContextNode);
+    }
+
+    if (expr.startsWith('group:')) {
+      if (!visited.add(expr)) return false;
+      final groups = aclPolicy['groups'];
+      if (groups is Map && groups[expr] != null) {
+        final members = _coerceStringList(groups[expr]);
+        return _selectorListMatchesNode(
+            members, candidateNode, sourceContextNode, visited);
+      }
+      return false;
+    }
+
+    if (expr.startsWith('tag:')) {
+      final requiredTags = expr
+          .split(';')
+          .where((t) => t.isNotEmpty)
+          .map((t) => t.startsWith('tag:') ? t : 'tag:$t')
+          .toSet();
+      return requiredTags.isNotEmpty &&
+          requiredTags.every(candidateNode.tags.contains);
+    }
+
+    final hostsMap = _extractHostsMap();
+    if (hostsMap.containsKey(expr)) {
+      return candidateNode.ipAddresses.contains(hostsMap[expr]);
+    }
+
+    if (candidateNode.ipAddresses.contains(expr) ||
+        candidateNode.name == expr) {
+      return true;
+    }
+
+    if (IpUtils.isCIDR(expr)) {
+      return candidateNode.ipAddresses.any((ip) => _isIpInSubnet(ip, expr));
+    }
+
+    return candidateNode.user == expr ||
+        candidateNode.getNormalizedOwner() == normalizeUserName(expr);
+  }
+
+  bool _destinationMatches({
+    required String dstExpr,
+    required String targetExpr,
+    required Node? targetNode,
+    required List<String> targetIps,
+    required Node sourceNode,
+    required Map<String, String> hostsMap,
+    Set<String>? visited,
+  }) {
+    visited ??= <String>{};
+    final expr = dstExpr.trim();
+    if (expr.isEmpty) return false;
+    if (expr == '*') return true;
+
+    final targetIsInternet = targetExpr == 'autogroup:internet' ||
+        targetExpr == '0.0.0.0/0' ||
+        targetExpr == '::/0';
+    if (targetIsInternet) {
+      return expr == 'autogroup:internet' ||
+          expr == '0.0.0.0/0' ||
+          expr == '::/0';
+    }
+    if (expr == 'autogroup:internet') return false;
+
+    if (targetNode != null) {
+      return _selectorMatchesNode(expr, targetNode, sourceNode, visited);
+    }
+
+    // Cible IP / CIDR / alias hosts (sans nœud Tailscale correspondant)
+    if (expr == targetExpr) return true;
+    if (hostsMap.containsKey(expr) &&
+        (targetIps.contains(hostsMap[expr]) || hostsMap[expr] == targetExpr)) {
+      return true;
+    }
+    if (expr.startsWith('group:') && visited.add(expr)) {
+      final groups = aclPolicy['groups'];
+      if (groups is Map && groups[expr] != null) {
+        final members = _coerceStringList(groups[expr]);
+        return members.any((m) => _destinationMatches(
+              dstExpr: m,
+              targetExpr: targetExpr,
+              targetNode: targetNode,
+              targetIps: targetIps,
+              sourceNode: sourceNode,
+              hostsMap: hostsMap,
+              visited: visited,
+            ));
+      }
+    }
+
+    for (final ip in targetIps) {
+      if (ip == expr) return true;
+      if (IpUtils.isCIDR(expr) && _isIpInSubnet(ip, expr)) {
+        return true;
+      }
+      if (IpUtils.isCIDR(targetExpr) &&
+          IpUtils.isCIDR(expr) &&
+          expr == targetExpr) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  Node? _inferViaNode(String destination, List<String> destIps) {
+    if (destination == 'autogroup:internet' ||
+        destination == '0.0.0.0/0' ||
+        destination == '::/0') {
+      return _routeSourceMap['0.0.0.0/0'] ?? _routeSourceMap['::/0'];
+    }
+    if (_routeSourceMap.containsKey(destination)) {
+      return _routeSourceMap[destination];
+    }
+    for (final entry in _routeSourceMap.entries) {
+      if (entry.key == '0.0.0.0/0' || entry.key == '::/0') continue;
+      for (final ip in destIps) {
+        if (_isIpInSubnet(ip, entry.key)) return entry.value;
+      }
+    }
+    return null;
+  }
+
+  bool _isSameUser(Node a, Node b) {
+    if (a.user.isNotEmpty && a.user == b.user) return true;
+    return a.getNormalizedOwner() == b.getNormalizedOwner();
+  }
+
+  static bool _grantIpListMatches(
+    List<String> ipSpecs, {
+    required String port,
+    required String protocol,
+  }) {
+    for (final rawSpec in ipSpecs) {
+      final spec = rawSpec.trim().toLowerCase();
+      if (spec.isEmpty) continue;
+      if (spec == '*') return true;
+
+      if (spec == 'icmp') {
+        if (protocol == 'icmp' || protocol == '*') return true;
+        continue;
+      }
+
+      if (spec.contains(':')) {
+        final parts = spec.split(':');
+        final specProto = parts.first.trim();
+        final specPort = parts.sublist(1).join(':').trim();
+        final protoMatch =
+            protocol == '*' || specProto == '*' || specProto == protocol;
+        if (protoMatch && _singlePortSpecMatches(specPort, port)) {
+          return true;
+        }
+      } else {
+        if (_singlePortSpecMatches(spec, port)) return true;
+      }
+    }
+    return false;
+  }
+
+  static _HostPortsPair _splitHostAndPorts(
+    String dest, {
+    required List<String> defaultPorts,
+  }) {
+    final lastColon = dest.lastIndexOf(':');
+    if (lastColon != -1) {
+      final potentialAddr = dest.substring(0, lastColon);
+      final potentialPort = dest.substring(lastColon + 1);
+      if ((potentialAddr.startsWith('[') && potentialAddr.endsWith(']')) ||
+          !potentialAddr.contains(':')) {
+        final cleanAddr =
+            potentialAddr.startsWith('[') && potentialAddr.endsWith(']')
+                ? potentialAddr.substring(1, potentialAddr.length - 1)
+                : potentialAddr;
+        return _HostPortsPair(cleanAddr, potentialPort.split(','));
+      }
+    }
+    return _HostPortsPair(dest, defaultPorts);
+  }
+
+  static String? _validateSingleTestPort(String value) {
+    final lastColon = value.lastIndexOf(':');
+    if (lastColon == -1) return 'missing port';
+    final beforeColon = value.substring(0, lastColon);
+    if (beforeColon.contains(':') &&
+        !(beforeColon.startsWith('[') && beforeColon.endsWith(']'))) {
+      return 'missing port';
+    }
+    final portStr = value.substring(lastColon + 1).trim();
+    final portNum = int.tryParse(portStr);
+    if (portNum == null || portNum < 1 || portNum > 65535) {
+      return 'not a single numeric port';
+    }
+    return null;
+  }
+
+  static bool _portsMatch(List<String> allowedPorts, String requestedPort) {
+    for (final p in allowedPorts) {
+      if (_singlePortSpecMatches(p.trim(), requestedPort)) return true;
+    }
+    return false;
+  }
+
+  static bool _singlePortSpecMatches(String allowedSpec, String requestedPort) {
+    if (allowedSpec == '*' || requestedPort == '*') return true;
+    if (allowedSpec == requestedPort) return true;
+    if (allowedSpec.contains('-')) {
+      final parts = allowedSpec.split('-');
+      if (parts.length == 2) {
+        final start = int.tryParse(parts[0].trim());
+        final end = int.tryParse(parts[1].trim());
+        final req = int.tryParse(requestedPort.trim());
+        if (start != null && end != null && req != null) {
+          return req >= start && req <= end;
+        }
+      }
+    }
+    return false;
+  }
+
+  static bool _isTailscaleMeshIp(String ip) {
+    // 100.64.0.0/10 (CGNAT Tailscale) ou préfixe IPv6 ULA Tailscale fd7a:115c:a1e0::
+    final lower = ip.toLowerCase();
+    if (lower.startsWith('fd7a:115c:a1e0:')) return true;
+    if (!IpUtils.isIPv4(ip)) return false;
+    final octets = ip.split('.');
+    if (octets.length != 4) return false;
+    final first = int.tryParse(octets[0]) ?? -1;
+    final second = int.tryParse(octets[1]) ?? -1;
+    return first == 100 && second >= 64 && second <= 127;
+  }
 }
+
+class _HostPortsPair {
+  final String host;
+  final List<String> ports;
+  const _HostPortsPair(this.host, this.ports);
+}
+
+/// Résultat détaillé d'une simulation de connectivité ACL / Grants.
+class SimulationResult {
+  final bool allowed;
+  final String? matchedRuleType; // 'grant', 'acl', ou null
+  final Map<String, dynamic>? matchedRule;
+  final String? matchedRuleSummary;
+  final String? viaTag;
+  final Node? viaNode;
+  final String normalizedDestination;
+  final String requestedPort;
+  final String requestedProtocol;
+
+  const SimulationResult({
+    required this.allowed,
+    this.matchedRuleType,
+    this.matchedRule,
+    this.matchedRuleSummary,
+    this.viaTag,
+    this.viaNode,
+    required this.normalizedDestination,
+    this.requestedPort = '*',
+    this.requestedProtocol = 'tcp',
+  });
+}
+
+/// Anomalie détectée dans `policy['tests']` avant export vers Headscale.
+class PolicyTestIssue {
+  final int testIndex;
+  final String field; // 'src', 'accept', 'deny'
+  final String value;
+  final String reasonFr;
+  final String reasonEn;
+
+  const PolicyTestIssue({
+    required this.testIndex,
+    required this.field,
+    required this.value,
+    required this.reasonFr,
+    required this.reasonEn,
+  });
+}
+
+/// Résultat de validation du bloc `"tests"` d'une politique ACL.
+class AclTestValidationResult {
+  final List<PolicyTestIssue> issues;
+
+  const AclTestValidationResult({required this.issues});
+
+  bool get isValid => issues.isEmpty;
+}
+

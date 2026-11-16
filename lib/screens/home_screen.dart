@@ -40,7 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _checkForWhatsNew() async {
     final provider = context.read<AppProvider>();
     // Update this version when releasing a new update with relevant "What's New" content
-    const currentVersion = '2.3.0';
+    const currentVersion = '2.4.0';
     const lastVersionKey = 'LAST_SEEN_VERSION';
 
     try {
@@ -150,8 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
       Icon(Icons.dashboard, size: 30, color: theme.colorScheme.onPrimary),
       Icon(Icons.people, size: 30, color: theme.colorScheme.onPrimary),
       Icon(Icons.shield, size: 30, color: theme.colorScheme.onPrimary),
-      Icon(Icons.public,
-          size: 30, color: theme.colorScheme.onPrimary),
+      Icon(Icons.public, size: 30, color: theme.colorScheme.onPrimary),
       Icon(Icons.dns_rounded, size: 30, color: theme.colorScheme.onPrimary),
     ];
 
