@@ -386,15 +386,29 @@ routes:
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),
-                    _buildBodyText(context,
-                        '**Moteurs ACL (v2.0)**', isBold: true),
+                    _buildBodyText(
+                        context, '**Moteurs ACL (v2.3+ — isolés par serveur)**',
+                        isBold: true),
                     const SizedBox(height: 4),
                     _buildBodyText(
                       context,
                       '- **Legacy** : tags fusionnés (ancien format).\n'
                       '- **Standard** : tags séparés (Identity vs Capability).\n'
                       '- **Grants V29** : grants Headscale ≥ 0.29 avec routage **via** pour isoler les LAN identiques entre utilisateurs.\n'
-                      'Sélection dans Paramètres. L\'écran ACL affiche des onglets Grants / ACLs / JSON.',
+                      'Sélection par serveur dans Paramètres. L\'écran ACL affiche 4 onglets : **Grants | ACLs | SSH | JSON**.',
+                      isSmall: true,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildBodyText(
+                        context, '**Outils ACL & Sécurité (v2.3–v2.4) :**',
+                        isBold: true),
+                    const SizedBox(height: 4),
+                    _buildBodyText(
+                      context,
+                      '- **Fusion non-destructive :** Préserve les blocs serveur (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `nodeAttrs`) et vos règles personnalisées/OIDC lors des régénérations.\n'
+                      '- **HuJSON & Vue Puzzle :** Support complet des commentaires `//` et `/* */` ; nommer une règle dans la Vue Puzzle ajoute `// <nom>` au JSON et inversement.\n'
+                      '- **Diff Visuel (+/-) & Orphelins :** Avant chaque export (ACL ou Puzzle), un diff coloré compare votre brouillon au serveur, et les références d\'anciens nœuds/utilisateurs supprimés sont signalées.\n'
+                      '- **Simulateur de flux ACL & Onglet SSH :** Testez en lecture seule qui peut joindre qui (avec épinglage facultatif dans `"tests"` sur port unique ≥ 0.29) et gérez vos règles **Tailscale SSH**.',
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),
@@ -446,7 +460,8 @@ routes:
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),
-                    _buildSubTitle(context, '3.5. Partages Taildrive (v0.29.0+)'),
+                    _buildSubTitle(
+                        context, '3.5. Partages Taildrive (v0.29.0+)'),
                     const SizedBox(height: 8),
                     _buildBodyText(context,
                         'Taildrive permet de partager des dossiers entre vos appareils directement via votre réseau Headscale. Cette fonctionnalité nécessite Headscale v0.29.0 ou supérieur.'),
@@ -463,8 +478,7 @@ routes:
                       isSmall: true,
                     ),
                     const SizedBox(height: 8),
-                    _buildBodyText(context, '**Requirements :**',
-                        isBold: true),
+                    _buildBodyText(context, '**Requirements :**', isBold: true),
                     const SizedBox(height: 4),
                     _buildBodyText(
                       context,
@@ -474,7 +488,7 @@ routes:
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),
-                    _buildSubTitle(context, '3.6. Vue d\'overview du réseau'),
+                    _buildSubTitle(context, '3.6. Vue d\'ensemble du réseau'),
                     const SizedBox(height: 8),
                     _buildBodyText(context,
                         'Cet écran, accessible depuis la barre de navigation, offre une vue dynamique et en temps réel de votre topologie réseau du point de vue de l\'appareil actuel. Il est particulièrement utile pour diagnostiquer les connexions et vérifier quel `exit node` est utilisé.'),
@@ -492,7 +506,7 @@ routes:
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),
-                    _buildSubTitle(context, '3.6. Commandes Clients'),
+                    _buildSubTitle(context, '3.7. Commandes Clients'),
                     const SizedBox(height: 8),
                     _buildBodyText(context,
                         'Cette page, accessible depuis la barre de navigation, fournit une bibliothèque de commandes en ligne de commande (`CLI`) pour le client Tailscale. Elle est conçue pour vous aider à trouver rapidement la commande dont vous avez besoin.'),
@@ -587,6 +601,18 @@ routes:
                       'Sur la page de **détails d\'un nœud**, activez **"Surveiller le statut"** pour être notifié chaque fois que ce nœud passe de "en ligne" à "hors ligne", ou vice-versa.',
                       isSmall: true,
                     ),
+                    const SizedBox(height: 16),
+                    _buildSubTitle(
+                        context, '4.3. Sécurité, Maintenance & Sessions'),
+                    const SizedBox(height: 8),
+                    _buildBodyText(
+                      context,
+                      '- **Code PIN renforcé (PBKDF2) :** Support 4 ou 6 chiffres, verrouillage après 5 échecs, biométrie et verrouillage automatique lors du passage en arrière-plan (**Paramètres → Sécurité**).\n'
+                      '- **Protection réseau :** Timeouts HTTP de 20s, alerte si connexion `http://` non chiffrée hors local et diagnostic IP publique opt-in.\n'
+                      '- **Expirer une session nœud :** Déconnectez proprement un appareil sans supprimer ses tags/routes depuis **Détails du Nœud** ou le menu de sa carte utilisateur (reconnexion via `tailscale up`).\n'
+                      '- **Backfill IPs (Paramètres) :** Prévisualisez et attribuez les adresses IP manquantes sur vos nœuds existants.',
+                      isSmall: true,
+                    ),
                   ]),
                   const SizedBox(height: 24),
 
@@ -624,8 +650,8 @@ routes:
       ),
       margin: const EdgeInsets.symmetric(vertical: 8.0),
       child: ListTile(
-        leading: Icon(Icons.storage,
-            color: theme.colorScheme.onPrimary, size: 32),
+        leading:
+            Icon(Icons.storage, color: theme.colorScheme.onPrimary, size: 32),
         title: Text(
           'Bibliothèque de Commandes Client',
           style: TextStyle(

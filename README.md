@@ -225,15 +225,29 @@ Le générateur de politique de cette application est basé sur un principe de s
 - Si un utilisateur partage un **sous-réseau local**, seuls ses propres appareils peuvent y accéder.
 - Jean ne peut pas voir ou contacter les appareils, exit nodes ou sous-réseaux de Clarisse, et vice-versa.
 
-**Moteurs ACL (Paramètres → Moteur de génération ACL) :**
+**Moteurs ACL (Paramètres → Moteur de génération ACL — isolé par serveur) :**
 
 | Moteur | Usage |
 |---|---|
 | **Legacy** | Tags fusionnés (`tag:user-client;exit-node`) — anciennes configs |
-| **Standard** | Tags séparés — Headscale < 0.29 ou préférence explicite |
+| **Standard** | Tags séparés (`tag:user-client`, `tag:user-exit-node`, `tag:user-lan-sharer`) — Headscale < 0.29 ou préférence explicite |
 | **Grants V29** | Grants Headscale ≥ 0.29 avec routage **`via`** — recommandé si plusieurs utilisateurs partagent le même CIDR LAN |
 
-L'écran ACL propose trois onglets : **Grants** (règles réseau + via), **ACLs** (exceptions classiques), **JSON** (édition brute). Le Puzzle ACL affiche trois colonnes : Source | Via | Destination.
+L'écran ACL propose **quatre onglets** :
+- **Grants** : visualisation et édition des grants réseau (`ip` + `via`) et Taildrive, ainsi que le **Composeur de grants** (bouton flottant / action rapide sur Headscale ≥ 0.29).
+- **ACLs** : exceptions classiques (`acls`) et autorisations spécifiques nœud-à-nœud.
+- **SSH** : gestionnaire visuel des règles **Tailscale SSH** (`"ssh": [...]`) avec validation stricte (`autogroup:self` ou `tag:` lorsque `src != dst`).
+- **JSON** : éditeur **HuJSON** complet (commentaires `//`, `/* */` et virgules finales) synchronisé en direct avec le serveur, avec bannière persistante **Appliquer / Annuler** et détection des orphelins (`PolicyOrphanCleaner`).
+
+**Vue Puzzle (Builder) & Commentaires sanctuarisés :**
+- La **Vue Puzzle** organise les règles en trois colonnes (`Source | Via | Destination`).
+- Tout nom donné à une règle dans le Puzzle génère un commentaire `// <nom>` juste au-dessus du bloc JSON correspondant — et inversement, tout commentaire `//` présent avant une règle sur le serveur nomme automatiquement la règle dans le Puzzle.
+
+**Sécurité des exports & Outils avancés (v2.3–v2.4) :**
+- **Fusion non-destructive (`PolicyPreserver`)** : lors des régénérations automatiques, les blocs serveur manuels (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `randomizeClientPort`, `nodeAttrs` non-Taildrive) et les règles personnalisées/OIDC inter-utilisateurs sont préservés.
+- **Diff Visuel ligne-par-ligne (`PolicyDiffDialog`)** : avant chaque publication (depuis l'écran ACL ou la Vue Puzzle), un comparateur coloré (`+` vert / `-` rouge) compare votre brouillon à la politique réellement en ligne sur le serveur (avec filtre *"Afficher uniquement les différences"* et résumé par section au-delà de 1500 lignes).
+- **Simulateur de flux ACL** : vérifiez en lecture seule si une machine source peut joindre une destination/port (`AUTORISÉ` avec routeur `via` ou `BLOQUÉ`), avec possibilité facultative d'épingler l'assertion dans le bloc `"tests"` (Headscale ≥ 0.29, port numérique unique) et validation pré-export.
+- **Comptes OIDC** : prise en charge multi-identifiants (`name`, `email`, `displayName`) et repli `group:` pour les appareils OIDC non tagués.
 
 **Workflow d'utilisation de la page ACL :**
 
@@ -283,6 +297,7 @@ Cet écran affiche toutes les informations détaillées d'un nœud spécifique, 
   - **Désactiver le nœud de sortie :** Désactive la fonctionnalité de nœud de sortie via l'API.
   - **Partager le sous-réseau local :** Ouvre un dialogue pour entrer un sous-réseau CIDR. Affiche une commande `tailscale up --advertise-routes` pour annoncer le sous-réseau. Cette commande doit être exécutée manuellement sur l'appareil.
   - **Désactiver les routes de sous-réseau :** Désactive les routes de sous-réseau annoncées via l'API.
+  - **Expirer la session (Déconnecter sans supprimer) :** Coupe immédiatement la session du nœud côté serveur sans le supprimer ni perdre ses tags, IPs et routes *(accessible également depuis le menu contextuel de la liste des nœuds d'un utilisateur)*. L'appareil devra être réauthentifié (`tailscale up`) pour se reconnecter.
   - **Supprimer l'appareil :** Supprime le nœud du serveur Headscale après confirmation.
 
 **Note Importante sur les Modifications des Nœuds :**
@@ -326,11 +341,17 @@ Pour toute question ou problème, veuillez consulter la documentation officielle
 Cet écran vous permet de configurer l'application pour qu'elle se connecte à votre serveur Headscale.
 
 **Champs et Fonctionnalités :**
-- **URL du Serveur :** Entrez l'adresse publique (FQDN) de votre serveur Headscale (ex: `https://headscale.mondomaine.com`).
-- **Clé API :** Collez la clé API unique que vous avez générée depuis votre serveur Headscale. Ce champ est masqué pour des raisons de sécurité.
-- **Bouton Enregistrer :** Sauvegarde les identifiants saisis. L'application redémarrera pour appliquer les nouveaux paramètres.
-- **Moteur ACL :** Choix entre Legacy, Standard et Grants V29 (si serveur ≥ 0.29).
-- **Migration Grants V29 :** Wizard guidé dans la zone Danger (ou au premier lancement sur serveur 0.29+).
+- **URL du Serveur :** Entrez l'adresse publique (FQDN) de votre serveur Headscale (ex: `https://headscale.mondomaine.com`). Une alerte s'affiche si une URL `http://` non chiffrée est utilisée hors réseau local.
+- **Clé API :** Collez la clé API unique que vous avez générée depuis votre serveur Headscale. Ce champ est masqué et stocké dans le coffre sécurisé du système.
+- **Moteur ACL (isolé par serveur) :** Choix entre `Legacy`, `Standard` et `Grants V29` (si serveur ≥ 0.29), mémorisé indépendamment pour chaque serveur configuré.
+- **Migration Grants V29 / Rollback :** Wizard guidé dans la zone Danger avec détection préalable des conflits CIDR avant rollback.
+- **Maintenance — Attribuer les IPs manquantes (Backfill IPs) :** Prévisualise (`confirmed=false`) puis applique (`confirmed=true`) l'attribution des adresses IPv4/IPv6 manquantes sur les nœuds existants.
+- **Sécurité de l'application (`Sécurité`) :** Code PIN à 4 ou 6 chiffres (haché en **PBKDF2-HMAC-SHA256 salé**, avec blocage anti-bruteforce après 5 échecs), déverrouillage biométrique et verrouillage automatique configurable lors du passage en arrière-plan.
+
+### 3.11. Partages Taildrive (Headscale ≥ 0.29)
+
+- Gérez vos partages de dossiers WebDAV entre nœuds depuis le menu de l'écran ACL (**Partages Taildrive**).
+- L'application injecte automatiquement les blocs `nodeAttrs` (`cap:taildrive`) et `grants` (`tailscale.com/cap/drive`) nécessaires sans écraser les autres attributs de nœuds présents sur le serveur.
 
 ### 3.11. Gestion des clés API
 
@@ -402,3 +423,9 @@ Si vous avez des appareils critiques (un serveur, une passerelle...), vous pouve
 1.  **Activation :** Naviguez vers la page de **détails d'un nœud**.
 2.  Activez l'interrupteur **"Surveiller le statut"**.
 3.  **Fonctionnement :** La tâche de fond vous enverra une notification chaque fois que ce nœud passera de "en ligne" à "hors ligne", ou vice-versa.
+
+### 4.3. Cybersécurité & Résilience Réseau
+
+- **Chiffrement local & PIN renforcé :** Dérivation de clé PIN via **PBKDF2-HMAC-SHA256** (migration transparente des anciens PINs), support 4 ou 6 chiffres, temporisation anti-bruteforce après 5 tentatives erronées et verrouillage automatique en arrière-plan.
+- **Protection réseau :** Timeouts de 20s sur toutes les requêtes API Headscale, encodage strict des paramètres d'URL (`Uri.encodeComponent`), avertissement sur les connexions HTTP en clair, et diagnostic Internet opt-in (aucune requête vers un service tiers sans action explicite de l'utilisateur).
+- **Compatibilité PreAuthKey v0.28+ :** Gestion unifiée de l'expiration et de l'identification des clés par ID selon la version de Headscale détectée.

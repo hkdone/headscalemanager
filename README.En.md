@@ -223,15 +223,29 @@ This application\'s policy generator is based on a fundamental security principl
 - If a user shares a **local subnet**, only their own devices can access it.
 - John cannot see or contact Jane\'s devices, exit nodes, or subnets, and vice-versa.
 
-**ACL Engines (Settings → ACL Generation Engine):**
+**ACL Engines (Settings → ACL Generation Engine — isolated per server):**
 
 | Engine | Usage |
 |---|---|
-| **Legacy** | Merged tags — legacy configs |
-| **Standard** | Split tags — Headscale < 0.29 |
+| **Legacy** | Merged tags (`tag:user-client;exit-node`) — legacy configs |
+| **Standard** | Split tags (`tag:user-client`, `tag:user-exit-node`, `tag:user-lan-sharer`) — Headscale < 0.29 |
 | **Grants V29** | Headscale ≥ 0.29 grants with **`via`** routing — recommended when multiple users share the same LAN CIDR |
 
-The ACL screen has three tabs: **Grants**, **ACLs**, **JSON**. The ACL Puzzle shows three columns: Source | Via | Destination.
+The ACL screen has **four tabs**:
+- **Grants**: network (`ip` + `via`) and Taildrive grants, plus the **Grant Composer** (Headscale ≥ 0.29).
+- **ACLs**: classic `acls` exceptions and node-to-node rules.
+- **SSH**: visual **Tailscale SSH** rule manager (`"ssh": [...]`) with strict validation (`autogroup:self` or `tag:` when `src != dst`).
+- **JSON**: live-synced **HuJSON** editor (`//`, `/* */`, trailing commas) with a persistent **Apply / Reset** banner and dead-reference cleanup (`PolicyOrphanCleaner`).
+
+**Puzzle View (Builder) & Comment Synchronization:**
+- The ACL Puzzle shows three columns: `Source | Via | Destination`.
+- Naming a rule in Puzzle writes a `// <name>` comment directly above that rule in JSON, and existing `//` comments on the server automatically hydrate rule names in Puzzle.
+
+**Export Safety & Advanced Tools (v2.3–v2.4):**
+- **Non-Destructive Merge (`PolicyPreserver`)**: preserves manual server blocks (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `randomizeClientPort`, non-Taildrive `nodeAttrs`) and custom/cross-user OIDC rules during regeneration.
+- **Line-by-Line Visual Diff (`PolicyDiffDialog`)**: colored `+`/`-` diff against the live server policy (with *"Show differences only"* filter and >1500-line section fallback) before exporting from both the ACL screen and Puzzle View.
+- **ACL Flow Simulator**: read-only reachability check (`ALLOWED` with `via` router or `BLOCKED`), plus optional non-regression `"tests"` pinning (Headscale ≥ 0.29, single numeric port required + pre-export validation).
+- **OIDC Multi-Identifier Support**: matches OIDC users across `name`, `email`, and `displayName` with `group:` fallback for untagged nodes.
 
 **ACL page workflow:**
 
@@ -334,3 +348,11 @@ If you have critical devices (a server, a gateway, etc.), you can be specificall
 1.  **Activation:** Navigate to a **node's detail page**.
 2.  Enable the **"Monitor Status"** switch.
 3.  **How it works:** The background task will send you a notification whenever this node goes from "online" to "offline", or vice-versa.
+
+### 4.3. Cybersecurity, Maintenance & Node Lifecycle
+
+- **Strengthened PIN & Auto-Lock (`Security`):** Salted **PBKDF2-HMAC-SHA256** PIN derivation (with seamless migration from legacy PINs), 4- or 6-digit PINs, 5-attempt anti-bruteforce lockout, biometrics, and configurable background auto-lock.
+- **Network Hardening:** 20-second API timeouts, strict URL parameter encoding (`Uri.encodeComponent`), cleartext HTTP warning outside local networks, and opt-in Internet exit diagnostics.
+- **Node Session Expiration (`expireNode`):** Disconnect a node from **Node Details** or **User Details** without deleting it or losing its tags/routes (`tailscale up` re-authenticates it).
+- **Backfill IPs (`Settings`):** Preview (`confirmed=false`) and assign (`confirmed=true`) missing IPv4/IPv6 addresses to existing nodes.
+- **Taildrive Shares (Headscale ≥ 0.29) & PreAuthKey v0.28+:** Manage WebDAV folder shares non-destructively and expire PreAuthKeys using v0.28+ IDs/names safely.

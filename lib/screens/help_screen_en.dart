@@ -382,7 +382,8 @@ routes:
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),
-                    _buildBodyText(context, '**ACL Engines (v2.0)**',
+                    _buildBodyText(
+                        context, '**ACL Engines (v2.3+ — per-server)**',
                         isBold: true),
                     const SizedBox(height: 4),
                     _buildBodyText(
@@ -390,7 +391,20 @@ routes:
                       '- **Legacy**: merged tags (old format).\n'
                       '- **Standard**: split tags (Identity vs Capability).\n'
                       '- **Grants V29**: Headscale ≥ 0.29 grants with **via** routing to isolate identical LAN CIDRs across users.\n'
-                      'Select in Settings. ACL screen has Grants / ACLs / JSON tabs.',
+                      'Stored independently per server in Settings. The ACL screen has 4 tabs: **Grants | ACLs | SSH | JSON**.',
+                      isSmall: true,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildBodyText(
+                        context, '**ACL Safety & Advanced Tools (v2.3–v2.4):**',
+                        isBold: true),
+                    const SizedBox(height: 4),
+                    _buildBodyText(
+                      context,
+                      '- **Non-destructive merge:** Preserves server blocks (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `nodeAttrs`) and custom/OIDC rules when regenerating.\n'
+                      '- **HuJSON & Puzzle View:** Full support for `//` and `/* */` comments; naming a rule in Puzzle adds `// <name>` in JSON and vice-versa.\n'
+                      '- **Visual Diff (+/-) & Orphans:** Colored line-by-line diff against the live server policy before every export (ACL screen & Puzzle View), plus dead-reference cleanup.\n'
+                      '- **ACL Flow Simulator & SSH Tab:** Read-only reachability tester (with optional single-port `"tests"` pinning ≥ 0.29) and visual **Tailscale SSH** rule editor.',
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),
@@ -486,7 +500,7 @@ routes:
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),
-                    _buildSubTitle(context, '3.6. Client Commands'),
+                    _buildSubTitle(context, '3.7. Client Commands'),
                     const SizedBox(height: 8),
                     _buildBodyText(context,
                         'This page, accessible from the navigation bar, provides a library of command-line interface (`CLI`) commands for the Tailscale client. It is designed to help you quickly find the command you need for various tasks.'),
@@ -575,6 +589,18 @@ routes:
                     _buildBodyText(
                       context,
                       'On a **node\'s detail page**, enable **"Monitor Status"** to be notified whenever that node goes from "online" to "offline", or vice-versa.',
+                      isSmall: true,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildSubTitle(
+                        context, '4.3. Security, Maintenance & Sessions'),
+                    const SizedBox(height: 8),
+                    _buildBodyText(
+                      context,
+                      '- **Strengthened PIN (PBKDF2):** Supports 4- or 6-digit PINs, 5-attempt lockout, biometrics, and background auto-lock (**Settings → Security**).\n'
+                      '- **Network hardening:** 20s HTTP timeouts, cleartext `http://` warning outside local networks, and opt-in public IP diagnostics.\n'
+                      '- **Expire node session:** Cleanly disconnect a node without deleting it or losing its tags/routes from **Node Details** or **User Details** (re-authenticate via `tailscale up`).\n'
+                      '- **Backfill IPs (Settings):** Preview and assign missing IP addresses on existing nodes.',
                       isSmall: true,
                     ),
                   ]),
