@@ -27,6 +27,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:headscalemanager/services/acl/policy_file_service.dart';
 import 'package:headscalemanager/widgets/acl/acl_workflow_guide.dart';
 import 'package:headscalemanager/screens/acl_puzzle_screen.dart';
+import 'package:headscalemanager/services/security_service.dart';
 
 class AclScreen extends StatefulWidget {
   const AclScreen({super.key});
@@ -154,7 +155,17 @@ class _AclScreenState extends State<AclScreen> {
     if (_users.isEmpty) {
       try {
         _users = await provider.apiService.getUsers();
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('AclScreen._openGrantComposer getUsers error: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(isFr
+                ? 'Impossible de charger les utilisateurs : $e'
+                : 'Failed to load users: $e'),
+          ));
+        }
+        return;
+      }
     }
 
     if (!mounted) return;
@@ -1620,11 +1631,19 @@ class _AclScreenState extends State<AclScreen> {
     final isFr = locale.languageCode == 'fr';
 
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        withData: false,
-      );
+      SecurityService.suppressNextResumeLock = true;
+      final FilePickerResult? result;
+      try {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['json'],
+          withData: false,
+        );
+      } finally {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          SecurityService.suppressNextResumeLock = false;
+        });
+      }
 
       if (result == null || result.files.isEmpty || !mounted) return;
 

@@ -14,6 +14,18 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '2.2.0',
+        title: isFr
+            ? 'Release 2.2.0 — Durcissement Cybersécurité & Résilience'
+            : 'Release 2.2.0 — Cybersecurity & Network Hardening',
+        description: isFr
+            ? 'Renforcement du code PIN (PBKDF2 salé avec migration transparente, support 4 ou 6 chiffres, anti-bruteforce), verrouillage automatique en arrière-plan, timeouts HTTP, alerte HTTP non chiffré et diagnostic Internet opt-in.'
+            : 'Strengthened PIN security (salted PBKDF2 with seamless migration, 4/6-digit support, anti-bruteforce lockout), background auto-lock, HTTP timeouts, cleartext HTTP warning, and opt-in Internet exit diagnostics.',
+        verification: isFr
+            ? 'Paramètres > Sécurité > Verrouillage automatique / Configurer PIN'
+            : 'Settings > Security > Auto-lock / Set up PIN',
+      ),
+      WhatsNewVersion(
         version: '2.1.9',
         title: isFr
             ? 'Release 2.1.9 — Outil de normalisation et suppression des tags'

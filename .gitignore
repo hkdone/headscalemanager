@@ -36,7 +36,11 @@ migrate_working_dir/
 # Sensitive files
 android/key.properties
 *.jks
+*.keystore
 GEMINI.md
+
+# Android Gradle cache
+android/.gradle/
 
 # Symbolication related
 app.*.symbols

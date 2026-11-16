@@ -13,6 +13,7 @@ import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/utils/string_utils.dart'; // For normalizeUserName
+import 'package:headscalemanager/services/security_service.dart';
 
 void _showEntityRenameDialog(BuildContext context, PuzzleEntity entity, VoidCallback onSaved) {
   final appProvider = context.read<AppProvider>();
@@ -653,15 +654,28 @@ class _PuzzleBlockCardState extends State<_PuzzleBlockCard> {
                           children: [
                             ElevatedButton.icon(
                               onPressed: () async {
-                                final picker = ImagePicker();
-                                final image = await picker.pickImage(source: ImageSource.gallery);
-                                if (image != null) {
-                                  final appDir = await getApplicationDocumentsDirectory();
-                                  final fileName = 'puzzle_${DateTime.now().millisecondsSinceEpoch}.png';
-                                  final savedFile = await File(image.path).copy('${appDir.path}/$fileName');
-                                  
-                                  setModalState(() {
-                                    selectedImagePath = savedFile.path;
+                                SecurityService.suppressNextResumeLock = true;
+                                try {
+                                  final picker = ImagePicker();
+                                  final image = await picker.pickImage(
+                                      source: ImageSource.gallery);
+                                  if (image != null) {
+                                    final appDir =
+                                        await getApplicationDocumentsDirectory();
+                                    final fileName =
+                                        'puzzle_${DateTime.now().millisecondsSinceEpoch}.png';
+                                    final savedFile = await File(image.path)
+                                        .copy('${appDir.path}/$fileName');
+
+                                    setModalState(() {
+                                      selectedImagePath = savedFile.path;
+                                    });
+                                  }
+                                } finally {
+                                  Future.delayed(
+                                      const Duration(milliseconds: 500), () {
+                                    SecurityService.suppressNextResumeLock =
+                                        false;
                                   });
                                 }
                               },

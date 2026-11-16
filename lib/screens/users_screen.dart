@@ -13,6 +13,7 @@ import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:headscalemanager/services/security_service.dart';
 
 
 /// Écran de gestion des utilisateurs Headscale.
@@ -283,8 +284,16 @@ class _UserCard extends StatelessWidget {
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
                   onPressed: () async {
+                    SecurityService.suppressNextResumeLock = true;
                     final picker = ImagePicker();
-                    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+                    XFile? picked;
+                    try {
+                      picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+                    } finally {
+                      Future.delayed(const Duration(milliseconds: 500), () {
+                        SecurityService.suppressNextResumeLock = false;
+                      });
+                    }
                     if (picked != null) {
                       final appDir = await getApplicationDocumentsDirectory();
                       final String extension = picked.path.split('.').last;
@@ -611,8 +620,16 @@ class _UserListTile extends StatelessWidget {
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
                   onPressed: () async {
+                    SecurityService.suppressNextResumeLock = true;
                     final picker = ImagePicker();
-                    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+                    XFile? picked;
+                    try {
+                      picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+                    } finally {
+                      Future.delayed(const Duration(milliseconds: 500), () {
+                        SecurityService.suppressNextResumeLock = false;
+                      });
+                    }
                     if (picked != null) {
                       final appDir = await getApplicationDocumentsDirectory();
                       final String extension = picked.path.split('.').last;

@@ -17,24 +17,38 @@ class _SetupPinScreenState extends State<SetupPinScreen> {
   String _enteredPin = '';
   String _firstPin = '';
   bool _isConfirming = false;
-  String _message = ''; // Will be set in didChangeDependencies
+  int _pinLength = 4;
+  String _message = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentLength();
+  }
+
+  Future<void> _loadCurrentLength() async {
+    final len = await _securityService.getPinLength();
+    if (!mounted) return;
+    setState(() {
+      _pinLength = len == 6 ? 6 : 4;
+    });
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Set initial message here to access context
     final isFr = context.watch<AppProvider>().locale.languageCode == 'fr';
-    setState(() {
+    if (_message.isEmpty) {
       _message = isFr ? 'Créez votre code PIN' : 'Create your PIN';
-    });
+    }
   }
 
   void _onNumberPressed(String number) {
-    if (_enteredPin.length < 4) {
+    if (_enteredPin.length < _pinLength) {
       setState(() {
         _enteredPin += number;
       });
-      if (_enteredPin.length == 4) {
+      if (_enteredPin.length == _pinLength) {
         Future.delayed(const Duration(milliseconds: 200), _submitPin);
       }
     }
@@ -48,7 +62,7 @@ class _SetupPinScreenState extends State<SetupPinScreen> {
     }
   }
 
-  void _submitPin() async {
+  Future<void> _submitPin() async {
     final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
     if (!_isConfirming) {
       setState(() {
@@ -59,17 +73,35 @@ class _SetupPinScreenState extends State<SetupPinScreen> {
       });
     } else {
       if (_firstPin == _enteredPin) {
-        await _securityService.savePin(_enteredPin);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isFr
-                ? 'Code PIN enregistré avec succès !'
-                : 'PIN saved successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop(true);
+        try {
+          await _securityService.savePin(_enteredPin);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isFr
+                  ? 'Code PIN enregistré avec succès !'
+                  : 'PIN saved successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop(true);
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isFr
+                  ? 'Erreur lors de la sauvegarde du PIN : $e'
+                  : 'Error saving PIN: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() {
+            _enteredPin = '';
+            _firstPin = '';
+            _isConfirming = false;
+            _message = isFr ? 'Créez votre code PIN' : 'Create your PIN';
+          });
+        }
       } else {
         setState(() {
           _enteredPin = '';
@@ -83,17 +115,29 @@ class _SetupPinScreenState extends State<SetupPinScreen> {
     }
   }
 
-  void _clearPin() async {
+  Future<void> _clearPin() async {
     final isFr = context.read<AppProvider>().locale.languageCode == 'fr';
-    await _securityService.clearPin();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(isFr ? 'Code PIN supprimé.' : 'PIN deleted.'),
-        backgroundColor: Colors.red,
-      ),
-    );
-    Navigator.of(context).pop(true);
+    try {
+      await _securityService.clearPin();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isFr ? 'Code PIN supprimé.' : 'PIN deleted.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isFr
+              ? 'Erreur lors de la suppression : $e'
+              : 'Error deleting PIN: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -114,35 +158,58 @@ class _SetupPinScreenState extends State<SetupPinScreen> {
           )
         ],
       ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Spacer(),
-          Text(_message, style: theme.textTheme.headlineSmall),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(4, (index) {
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 10),
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: index < _enteredPin.length
-                      ? theme.colorScheme.primary
-                      : theme.disabledColor,
-                ),
-              );
-            }),
-          ),
-          const Spacer(),
-          NumpadWidget(
-            onNumberPressed: _onNumberPressed,
-            onDeletePressed: _onDeletePressed,
-          ),
-          const SizedBox(height: 20),
-        ],
+      body: SafeArea(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 16),
+            if (!_isConfirming)
+              SegmentedButton<int>(
+                segments: [
+                  ButtonSegment<int>(
+                    value: 4,
+                    label: Text(isFr ? '4 chiffres' : '4 digits'),
+                  ),
+                  ButtonSegment<int>(
+                    value: 6,
+                    label: Text(isFr ? '6 chiffres' : '6 digits'),
+                  ),
+                ],
+                selected: {_pinLength},
+                onSelectionChanged: (sel) {
+                  setState(() {
+                    _pinLength = sel.first;
+                    _enteredPin = '';
+                  });
+                },
+              ),
+            const Spacer(),
+            Text(_message, style: theme.textTheme.headlineSmall),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_pinLength, (index) {
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  width: _pinLength > 4 ? 18 : 24,
+                  height: _pinLength > 4 ? 18 : 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: index < _enteredPin.length
+                        ? theme.colorScheme.primary
+                        : theme.disabledColor,
+                  ),
+                );
+              }),
+            ),
+            const Spacer(),
+            NumpadWidget(
+              onNumberPressed: _onNumberPressed,
+              onDeletePressed: _onDeletePressed,
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
