@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:headscalemanager/models/node.dart';
+import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/models/user.dart';
+import 'package:headscalemanager/services/acl/hujson_comment_service.dart';
 import 'package:headscalemanager/services/acl/policy_infrastructure_builder.dart';
 import 'package:headscalemanager/services/acl/policy_preserver.dart';
+import 'package:headscalemanager/utils/ip_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 
 enum AlignmentIssueSeverity { critical, warning, info }
@@ -14,6 +17,8 @@ enum AlignmentIssueType {
   legacyAutoApproversExitNodes,
   legacyOrDottedTags,
   invalidDnsNodeNames,
+  cascadeRuleReferencesUpdated,
+  brokenRuleReferences,
 }
 
 /// Action corrective ciblant un nœud Headscale (tags ou renommage DNS-1123).
@@ -62,21 +67,33 @@ class AlignmentIssue {
   });
 }
 
-/// Résultat complet du diagnostic d'alignement ACL + nœuds.
+/// Résultat complet du diagnostic d'alignement ACL + nœuds + règles locales.
 class AlignmentReport {
   final List<AlignmentIssue> issues;
   final Map<String, dynamic>? alignedPolicy;
   final bool policyHasChanges;
+  final List<Map<String, dynamic>>? alignedTemporaryRules;
+  final List<TaildriveShare>? alignedTaildriveShares;
+
+  /// Signatures de commentaires HuJSON déplacées suite à la réécriture
+  /// d'une règle (`oldSignature -> newSignature`).
+  final Map<String, String> migratedRuleCommentKeys;
 
   const AlignmentReport({
     required this.issues,
     required this.alignedPolicy,
     required this.policyHasChanges,
+    this.alignedTemporaryRules,
+    this.alignedTaildriveShares,
+    this.migratedRuleCommentKeys = const {},
   });
 
   bool get isClean => issues.isEmpty;
 
   bool get hasPolicyFix => policyHasChanges && alignedPolicy != null;
+
+  bool get hasLocalConfigFixes =>
+      alignedTemporaryRules != null || alignedTaildriveShares != null;
 
   bool get hasNodeFixes => issues.any(
         (i) => i.canAutoFixNodes && i.nodeActions.isNotEmpty,
@@ -89,15 +106,40 @@ class AlignmentReport {
       issues.where((i) => i.severity == AlignmentIssueSeverity.critical).length;
 }
 
+class _CascadeRewrites {
+  /// Ex: `'group:jean.dupont' -> 'group:jean-dupont'`
+  final Map<String, String> groupRenames = {};
+
+  /// Ex: `'bob' -> 'bob@'`, `'bob@headscale.local' -> 'bob@'`
+  final Map<String, String> userMemberRewrites = {};
+
+  /// Ex: `'tag:jean.dupont-client' -> ['tag:jean-dupont-client']`
+  /// ou `'tag:bob-client;exit-node' -> ['tag:bob-client', 'tag:bob-exit-node']`
+  final Map<String, List<String>> tagReplacements = {};
+
+  final Set<String> activeLegacyNodeTags = {};
+  final List<String> cascadedRuleItems = [];
+  final Map<String, String> migratedCommentKeys = {};
+
+  bool get hasAnyRewrite =>
+      groupRenames.isNotEmpty ||
+      userMemberRewrites.isNotEmpty ||
+      tagReplacements.isNotEmpty;
+}
+
 /// Service d'audit intelligent détectant les désalignements entre les comptes
-/// (locaux, OIDC mobiles), les nœuds (tags legacy, noms DNS-1123) et la
-/// politique ACL serveur (>= 0.26 Policy v2 / 0.29 Grants).
+/// (locaux, OIDC mobiles), les nœuds (tags legacy, noms DNS-1123), la
+/// politique ACL serveur et les règles spécifiques locales, puis répercutant
+/// chaque alignement en cascade partout (`acls`, `grants`, `ssh`, `nodeAttrs`,
+/// `autoApprovers`, `tests`, `temporaryRules`, `taildriveShares`).
 class AlignmentDiagnosticService {
   static AlignmentReport inspect({
     required List<User> users,
     required List<Node> nodes,
     Map<String, dynamic>? serverPolicy,
     String? serverVersion,
+    List<Map<String, dynamic>> temporaryRules = const [],
+    List<TaildriveShare> taildriveShares = const [],
   }) {
     final issues = <AlignmentIssue>[];
     final workingPolicy = serverPolicy != null
@@ -105,20 +147,23 @@ class AlignmentDiagnosticService {
         : null;
     final originalEncoded =
         serverPolicy != null ? jsonEncode(serverPolicy) : null;
+    final rewrites = _CascadeRewrites();
 
     // 1. Double profil Local + OIDC ou nœuds OIDC sans tags à côté de tagués
     _checkDoubleProfileLocalOidc(
       users: users,
       nodes: nodes,
       workingPolicy: workingPolicy,
+      rewrites: rewrites,
       issues: issues,
     );
 
-    // 2. Membres de "groups" mal formés pour Policy v2 (>= 0.26)
+    // 2. Membres de "groups" mal formés & clés de groupes non normalisées (. -> -)
     if (workingPolicy != null) {
-      _checkMalformedGroupMembers(
+      _checkGroupsAndMembers(
         users: users,
         workingPolicy: workingPolicy,
+        rewrites: rewrites,
         issues: issues,
       );
     }
@@ -129,6 +174,7 @@ class AlignmentDiagnosticService {
         users: users,
         nodes: nodes,
         workingPolicy: workingPolicy,
+        rewrites: rewrites,
         issues: issues,
       );
     }
@@ -141,11 +187,12 @@ class AlignmentDiagnosticService {
       );
     }
 
-    // 5. Tags fusionnés (;) ou contenant des points (.)
+    // 5. Tags fusionnés (;) ou contenant des points (.) sur les nœuds / policy
     _checkLegacyOrDottedTags(
       users: users,
       nodes: nodes,
       workingPolicy: workingPolicy,
+      rewrites: rewrites,
       issues: issues,
     );
 
@@ -155,6 +202,74 @@ class AlignmentDiagnosticService {
       issues: issues,
     );
 
+    // 7. Découvrir aussi les group:/tag:/user mal formés uniquement présents
+    // dans les règles (grants/acls/ssh/nodeAttrs/tests/temporaryRules/taildrive)
+    if (workingPolicy != null) {
+      _discoverRuleLevelRewrites(
+        users: users,
+        workingPolicy: workingPolicy,
+        temporaryRules: temporaryRules,
+        taildriveShares: taildriveShares,
+        rewrites: rewrites,
+      );
+    }
+
+    // 8. Répercuter EN CASCADE toutes les réécritures dans l'ensemble de la
+    // politique (acls, grants, ssh, nodeAttrs, autoApprovers, tests, tagOwners)
+    // ET dans les règles spécifiques / Taildrive locales !
+    List<Map<String, dynamic>>? alignedTempRules;
+    List<TaildriveShare>? alignedTaildrive;
+
+    if (workingPolicy != null && rewrites.hasAnyRewrite) {
+      _applyCascadeRewritesToPolicy(
+        workingPolicy: workingPolicy,
+        rewrites: rewrites,
+      );
+    }
+
+    if (rewrites.hasAnyRewrite) {
+      alignedTempRules = _applyCascadeRewritesToTemporaryRules(
+        temporaryRules: temporaryRules,
+        rewrites: rewrites,
+      );
+      alignedTaildrive = _applyCascadeRewritesToTaildrive(
+        taildriveShares: taildriveShares,
+        rewrites: rewrites,
+      );
+    }
+
+    if (rewrites.cascadedRuleItems.isNotEmpty) {
+      issues.add(
+        AlignmentIssue(
+          type: AlignmentIssueType.cascadeRuleReferencesUpdated,
+          severity: AlignmentIssueSeverity.warning,
+          titleFr:
+              'Références mises à jour en cascade dans les règles (${rewrites.cascadedRuleItems.length})',
+          titleEn:
+              'Rule references updated in cascade (${rewrites.cascadedRuleItems.length})',
+          descriptionFr:
+              'Pour éviter qu\'aucune règle spécifique (AdGuard DNS, Exit Node, SSH, Taildrive, tests…) ne soit cassée après l\'alignement d\'un groupe, d\'un "@" ou d\'un tag (. → -), toutes les références ont été répercutées automatiquement.',
+          descriptionEn:
+              'To keep specific rules (AdGuard DNS, Exit Node, SSH, Taildrive, tests…) working after group, "@", or tag (. → -) alignment, all references were automatically updated in cascade.',
+          affectedItems: rewrites.cascadedRuleItems.toSet().toList(),
+          canAutoFixPolicy: workingPolicy != null,
+        ),
+      );
+    }
+
+    // 9. Contrôle final : signaler toute référence résiduelle pointant vers un
+    // groupe ou tag qui n'existe toujours pas après alignement.
+    if (workingPolicy != null) {
+      _checkBrokenRuleReferences(
+        users: users,
+        nodes: nodes,
+        workingPolicy: workingPolicy,
+        temporaryRules: alignedTempRules ?? temporaryRules,
+        taildriveShares: alignedTaildrive ?? taildriveShares,
+        issues: issues,
+      );
+    }
+
     final policyChanged = workingPolicy != null &&
         originalEncoded != null &&
         jsonEncode(workingPolicy) != originalEncoded;
@@ -163,6 +278,11 @@ class AlignmentDiagnosticService {
       issues: issues,
       alignedPolicy: policyChanged ? workingPolicy : null,
       policyHasChanges: policyChanged,
+      alignedTemporaryRules: alignedTempRules,
+      alignedTaildriveShares: alignedTaildrive,
+      migratedRuleCommentKeys: Map<String, String>.from(
+        rewrites.migratedCommentKeys,
+      ),
     );
   }
 
@@ -170,15 +290,9 @@ class AlignmentDiagnosticService {
     required List<User> users,
     required List<Node> nodes,
     required Map<String, dynamic>? workingPolicy,
+    required _CascadeRewrites rewrites,
     required List<AlignmentIssue> issues,
   }) {
-    final bySlug = <String, List<User>>{};
-    for (final user in users) {
-      final slug = normalizeUserName(user.name);
-      bySlug.putIfAbsent(slug, () => []).add(user);
-    }
-
-    // Détecter aussi les utilisateurs liés par local-part d'email
     final siblingSlugs = <String, Set<User>>{};
     for (final user in users) {
       final norms = PolicyInfrastructureBuilder.candidateNormalizedNames(user);
@@ -278,7 +392,6 @@ class AlignmentDiagnosticService {
           affected.add('$groupName (+ ${missing.join(', ')})');
         }
 
-        // Assurer que tagOwners du tag client accepte aussi l'email OIDC + le groupe
         if (tagOwnersMap != null &&
             tagOwnersMap.containsKey('tag:$norm-client')) {
           final currentOwners = (tagOwnersMap['tag:$norm-client'] is List)
@@ -368,9 +481,10 @@ class AlignmentDiagnosticService {
     return false;
   }
 
-  static void _checkMalformedGroupMembers({
+  static void _checkGroupsAndMembers({
     required List<User> users,
     required Map<String, dynamic> workingPolicy,
+    required _CascadeRewrites rewrites,
     required List<AlignmentIssue> issues,
   }) {
     final groupsRaw = workingPolicy['groups'];
@@ -382,18 +496,40 @@ class AlignmentDiagnosticService {
     }
 
     final affected = <String>[];
-    final fixedGroups = Map<String, dynamic>.from(groupsRaw);
+    final fixedGroups = <String, dynamic>{};
     var changed = false;
 
     for (final entry in groupsRaw.entries) {
-      final groupKey = entry.key.toString();
-      if (entry.value is! List) continue;
+      final rawGroupKey = entry.key.toString();
+      var targetGroupKey = rawGroupKey;
+
+      // Normaliser les anciennes clés de groupe (ex: group:jean.dupont -> group:jean-dupont)
+      if (rawGroupKey.startsWith('group:')) {
+        final slug = rawGroupKey.substring('group:'.length);
+        final normalizedSlug = normalizeUserName(slug);
+        final candidateKey = 'group:$normalizedSlug';
+        if (candidateKey != rawGroupKey &&
+            (slug.contains('.') ||
+                slug != slug.toLowerCase() ||
+                userByGroupName.containsKey(candidateKey))) {
+          targetGroupKey = candidateKey;
+          rewrites.groupRenames[rawGroupKey] = candidateKey;
+          affected.add('$rawGroupKey → $candidateKey');
+          changed = true;
+        }
+      }
+
+      if (entry.value is! List) {
+        fixedGroups[targetGroupKey] = entry.value;
+        continue;
+      }
+
       final members =
           (entry.value as List).map((e) => e.toString().trim()).toList();
       final updated = <String>[];
       var groupModified = false;
 
-      final matchedUser = userByGroupName[groupKey];
+      final matchedUser = userByGroupName[targetGroupKey];
       final isPureLocalCliUser = matchedUser != null &&
           !matchedUser.name.contains('@') &&
           (matchedUser.email == null || matchedUser.email!.trim().isEmpty);
@@ -408,21 +544,21 @@ class AlignmentDiagnosticService {
           continue;
         }
         if (!member.contains('@')) {
-          // Format pré-0.26 sans '@' -> corriger en 'member@'
-          updated.add('$member@');
-          affected.add('$groupKey: "$member" → "$member@"');
+          final canonical = '$member@';
+          updated.add(canonical);
+          rewrites.userMemberRewrites[member] = canonical;
+          affected.add('$targetGroupKey: "$member" → "$canonical"');
           groupModified = true;
           continue;
         }
-        // Si utilisateur local CLI pur ("jean") mais membre pollué par un domaine
-        // inventé ("jean@headscale.local" ou "jean@synology.me")
         if (isPureLocalCliUser) {
           final prefix = member.split('@').first;
           final suffix = member.split('@').last;
           if (prefix == matchedUser.name && suffix.isNotEmpty) {
             final canonical = '${matchedUser.name}@';
             updated.add(canonical);
-            affected.add('$groupKey: "$member" → "$canonical"');
+            rewrites.userMemberRewrites[member] = canonical;
+            affected.add('$targetGroupKey: "$member" → "$canonical"');
             groupModified = true;
             continue;
           }
@@ -433,14 +569,19 @@ class AlignmentDiagnosticService {
       if (isPureLocalCliUser &&
           !updated.contains('${matchedUser.name}@')) {
         updated.add('${matchedUser.name}@');
-        affected.add('$groupKey: + "${matchedUser.name}@"');
+        affected.add('$targetGroupKey: + "${matchedUser.name}@"');
         groupModified = true;
       }
 
-      if (groupModified) {
-        changed = true;
-        fixedGroups[groupKey] = updated.toSet().toList();
-      }
+      if (groupModified) changed = true;
+
+      final existingList = (fixedGroups[targetGroupKey] is List)
+          ? (fixedGroups[targetGroupKey] as List)
+              .map((e) => e.toString())
+              .toList()
+          : const <String>[];
+      fixedGroups[targetGroupKey] =
+          <String>{...existingList, ...updated}.toList();
     }
 
     if (!changed) return;
@@ -450,13 +591,15 @@ class AlignmentDiagnosticService {
       AlignmentIssue(
         type: AlignmentIssueType.malformedGroupMembers,
         severity: AlignmentIssueSeverity.critical,
-        titleFr: 'Membres de groupes incompatibles Policy v2 (>= 0.26)',
-        titleEn: 'Group members incompatible with Policy v2 (>= 0.26)',
+        titleFr:
+            'Groupes ou membres incompatibles Policy v2 (>= 0.26) / normalisation (. → -)',
+        titleEn:
+            'Groups or members incompatible with Policy v2 (>= 0.26) / normalization (. → -)',
         descriptionFr:
-            'Headscale ≥ 0.26 exige un "@" dans chaque membre de groupe, et attend "nom@" (avec @ final) pour les utilisateurs locaux sans email afin de reconnaître leurs appareils sans tag.',
+            'Headscale ≥ 0.26 exige un "@" dans chaque membre, attend "nom@" pour les comptes locaux sans email, et des noms de groupes normalisés (sans "."). Les règles et partages pointant vers ces groupes seront mis à jour en cascade.',
         descriptionEn:
-            'Headscale ≥ 0.26 requires "@" in every group member and expects "username@" for local users without an email so their untagged devices match ACLs.',
-        affectedItems: affected,
+            'Headscale ≥ 0.26 requires "@" in every group member, expects "username@" for local accounts without email, and normalized group names (no "."). All downstream rules referencing them will be updated in cascade.',
+        affectedItems: affected.toSet().toList(),
         canAutoFixPolicy: true,
       ),
     );
@@ -466,6 +609,7 @@ class AlignmentDiagnosticService {
     required List<User> users,
     required List<Node> nodes,
     required Map<String, dynamic> workingPolicy,
+    required _CascadeRewrites rewrites,
     required List<AlignmentIssue> issues,
   }) {
     final tagOwnersRaw = workingPolicy['tagOwners'];
@@ -481,7 +625,6 @@ class AlignmentDiagnosticService {
     final affected = <String>[];
     var changed = false;
 
-    // A. Nettoyer les propriétaires invalides (ex: "jean" sans group:/autogroup:/@)
     for (final key in tagOwners.keys.toList()) {
       final rawList = tagOwners[key];
       if (rawList is! List) continue;
@@ -499,10 +642,10 @@ class AlignmentDiagnosticService {
           cleaned.add(owner);
         } else {
           final norm = normalizeUserName(owner);
-          final replacement = userByNorm.containsKey(norm)
-              ? 'group:$norm'
-              : '$owner@';
+          final replacement =
+              userByNorm.containsKey(norm) ? 'group:$norm' : '$owner@';
           cleaned.add(replacement);
+          rewrites.userMemberRewrites[owner] = replacement;
           affected.add('$key: "$owner" → "$replacement"');
           tagChanged = true;
         }
@@ -513,7 +656,6 @@ class AlignmentDiagnosticService {
       }
     }
 
-    // B. Vérifier que tous les tags portés par des nœuds actifs existent dans tagOwners
     for (final node in nodes) {
       final ownerNorm = node.getNormalizedOwner();
       final fallbackGroup = (ownerNorm.isNotEmpty &&
@@ -616,6 +758,7 @@ class AlignmentDiagnosticService {
     required List<User> users,
     required List<Node> nodes,
     required Map<String, dynamic>? workingPolicy,
+    required _CascadeRewrites rewrites,
     required List<AlignmentIssue> issues,
   }) {
     final actions = <AlignmentNodeAction>[];
@@ -635,6 +778,16 @@ class AlignmentDiagnosticService {
 
       final converted = convertTagsToCleanStandard(node);
       if (jsonEncode(converted) == jsonEncode(node.tags)) continue;
+
+      for (final oldTag in node.tags) {
+        if (oldTag.contains(';') || oldTag.contains('.')) {
+          rewrites.activeLegacyNodeTags.add(oldTag);
+          rewrites.tagReplacements[oldTag] = _mapSingleOldTag(
+            oldTag,
+            fallbackOwnerNorm: normalizeUserName(node.getNormalizedOwner()),
+          );
+        }
+      }
 
       affected.add('${node.name}: ${node.tags.join(', ')} → ${converted.join(', ')}');
       actions.add(
@@ -670,7 +823,38 @@ class AlignmentDiagnosticService {
       }
     }
 
-    if (actions.isEmpty) return;
+    // Détecter aussi les vieux tags (.;) déclarés uniquement dans tagOwners sans nœud
+    var tagOwnersCleaned = false;
+    if (tagOwners != null) {
+      for (final rawTag in tagOwners.keys.toList()) {
+        if (!rawTag.startsWith('tag:')) continue;
+        if (!rawTag.contains(';') && !rawTag.contains('.')) continue;
+
+        final replacementTags = _mapSingleOldTag(rawTag);
+        rewrites.tagReplacements.putIfAbsent(rawTag, () => replacementTags);
+
+        final oldOwners = (tagOwners[rawTag] is List)
+            ? (tagOwners[rawTag] as List).map((e) => e.toString()).toList()
+            : <String>[];
+        for (final newTag in replacementTags) {
+          final existing = (tagOwners[newTag] is List)
+              ? (tagOwners[newTag] as List).map((e) => e.toString()).toSet()
+              : <String>{};
+          existing.addAll(oldOwners);
+          if (existing.isNotEmpty) {
+            tagOwners[newTag] = existing.toList();
+          }
+        }
+        // Si plus aucun nœud actif ne porte cet ancien tag, on peut retirer la clé obsolète
+        if (!rewrites.activeLegacyNodeTags.contains(rawTag)) {
+          tagOwners.remove(rawTag);
+          affected.add('$rawTag → ${replacementTags.join(', ')} (tagOwners)');
+          tagOwnersCleaned = true;
+        }
+      }
+    }
+
+    if (actions.isEmpty && !tagOwnersCleaned) return;
 
     if (workingPolicy != null && tagOwners != null) {
       workingPolicy['tagOwners'] = tagOwners;
@@ -683,15 +867,45 @@ class AlignmentDiagnosticService {
         titleFr: 'Tags legacy (;) ou avec points (.) détectés',
         titleEn: 'Legacy (;) or dotted (.) tags detected',
         descriptionFr:
-            'Ces tags datent de l\'ancien moteur ou contiennent des points : ils empêchent une migration propre vers Grants V29 ou isolent l\'appareil. Ils peuvent être convertis au format Standard et déclarés dans tagOwners.',
+            'Ces tags datent de l\'ancien moteur ou contiennent des points : ils empêchent une migration propre vers Grants V29 ou isolent l\'appareil. Ils peuvent être convertis au format Standard et répercutés automatiquement dans toutes vos règles.',
         descriptionEn:
-            'These tags use the deprecated semicolon format or contain dots, blocking clean Grants V29 migration or isolating the node. They can be converted to Standard tags and declared in tagOwners.',
-        affectedItems: affected,
+            'These tags use the deprecated semicolon format or contain dots, blocking clean Grants V29 migration or isolating the node. They can be converted to Standard tags and updated across all rules.',
+        affectedItems: affected.toSet().toList(),
         canAutoFixPolicy: workingPolicy != null,
-        canAutoFixNodes: true,
+        canAutoFixNodes: actions.isNotEmpty,
         nodeActions: actions,
       ),
     );
+  }
+
+  static List<String> _mapSingleOldTag(
+    String rawTag, {
+    String fallbackOwnerNorm = 'user',
+  }) {
+    final cleanDot = rawTag.startsWith('tag:')
+        ? 'tag:${rawTag.substring(4).replaceAll('.', '-').toLowerCase()}'
+        : rawTag.replaceAll('.', '-').toLowerCase();
+
+    if (!cleanDot.contains(';')) {
+      return [cleanDot];
+    }
+
+    final result = <String>{};
+    final parts = cleanDot.split(';').where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return [cleanDot];
+
+    final base = parts.first.startsWith('tag:')
+        ? parts.first
+        : 'tag:${parts.first}';
+    result.add(base);
+
+    final slug = base.contains('-client')
+        ? base.replaceFirst('tag:', '').split('-client').first
+        : fallbackOwnerNorm;
+    for (int i = 1; i < parts.length; i++) {
+      result.add('tag:$slug-${parts[i]}');
+    }
+    return result.toList();
   }
 
   /// Convertit les tags d'un nœud (points `.` et séparateurs `;`) vers le
@@ -699,30 +913,8 @@ class AlignmentDiagnosticService {
   static List<String> convertTagsToCleanStandard(Node node) {
     final result = <String>{};
     final ownerNorm = normalizeUserName(node.getNormalizedOwner());
-
     for (final rawTag in node.tags) {
-      final cleanDot = rawTag.startsWith('tag:')
-          ? 'tag:${rawTag.substring(4).replaceAll('.', '-').toLowerCase()}'
-          : rawTag.replaceAll('.', '-').toLowerCase();
-
-      if (cleanDot.contains(';')) {
-        final parts = cleanDot.split(';').where((p) => p.isNotEmpty).toList();
-        if (parts.isEmpty) continue;
-        final base = parts.first.startsWith('tag:')
-            ? parts.first
-            : 'tag:${parts.first}';
-        result.add(base);
-
-        final slug = base.contains('-client')
-            ? base.replaceFirst('tag:', '').split('-client').first
-            : ownerNorm;
-        for (int i = 1; i < parts.length; i++) {
-          final cap = parts[i];
-          result.add('tag:$slug-$cap');
-        }
-      } else {
-        result.add(cleanDot);
-      }
+      result.addAll(_mapSingleOldTag(rawTag, fallbackOwnerNorm: ownerNorm));
     }
     return result.toList();
   }
@@ -783,6 +975,710 @@ class AlignmentDiagnosticService {
         affectedItems: affected,
         canAutoFixNodes: true,
         nodeActions: actions,
+      ),
+    );
+  }
+
+  /// Inspecte aussi les références dans les règles (`acls`, `grants`, `ssh`,
+  /// `nodeAttrs`, `tests`, `temporaryRules`, `taildriveShares`) pour détecter :
+  /// - un `group:<ancien.nom>` dont le nom normalisé existe dans `groups` ou `users`,
+  /// - un `tag:<ancien.tag>` contenant `.` ou `;` dont le tag propre existe dans `tagOwners`,
+  /// - un nom d'utilisateur nu sans `@` utilisé directement comme sujet/cible.
+  static void _discoverRuleLevelRewrites({
+    required List<User> users,
+    required Map<String, dynamic> workingPolicy,
+    required List<Map<String, dynamic>> temporaryRules,
+    required List<TaildriveShare> taildriveShares,
+    required _CascadeRewrites rewrites,
+  }) {
+    final groupsMap = (workingPolicy['groups'] is Map)
+        ? (workingPolicy['groups'] as Map)
+            .keys
+            .map((k) => k.toString())
+            .toSet()
+        : <String>{};
+    final tagOwnersMap = (workingPolicy['tagOwners'] is Map)
+        ? (workingPolicy['tagOwners'] as Map)
+            .keys
+            .map((k) => k.toString())
+            .toSet()
+        : <String>{};
+    final hostsMap = (workingPolicy['hosts'] is Map)
+        ? (workingPolicy['hosts'] as Map)
+            .keys
+            .map((k) => k.toString())
+            .toSet()
+        : <String>{};
+
+    final knownUserGroups = <String>{
+      ...groupsMap,
+      for (final u in users) 'group:${normalizeUserName(u.name)}',
+    };
+    final userRawNames = <String>{
+      for (final u in users)
+        if (!u.name.contains('@') &&
+            u.name.isNotEmpty &&
+            u.name != 'Unknown User')
+          u.name,
+    };
+
+    void inspectToken(String raw, {required bool allowPortSuffix}) {
+      final split = _splitTargetAndPort(raw, allowPortSuffix: allowPortSuffix);
+      final token = split.base;
+      if (token.isEmpty) return;
+
+      if (token.startsWith('group:')) {
+        if (!groupsMap.contains(token)) {
+          final norm = 'group:${normalizeUserName(token.substring(6))}';
+          if (norm != token && knownUserGroups.contains(norm)) {
+            rewrites.groupRenames.putIfAbsent(token, () => norm);
+          }
+        }
+        return;
+      }
+
+      if (token.startsWith('tag:')) {
+        if (!rewrites.tagReplacements.containsKey(token) &&
+            (token.contains('.') || token.contains(';'))) {
+          final mapped = _mapSingleOldTag(token);
+          if (mapped.any(tagOwnersMap.contains) ||
+              mapped.first != token) {
+            rewrites.tagReplacements[token] = mapped;
+          }
+        }
+        return;
+      }
+
+      if (userRawNames.contains(token) && !hostsMap.contains(token)) {
+        rewrites.userMemberRewrites.putIfAbsent(token, () => '$token@');
+      }
+    }
+
+    void scanList(dynamic list, {required bool allowPortSuffix}) {
+      if (list is! List) return;
+      for (final item in list) {
+        inspectToken(item.toString(), allowPortSuffix: allowPortSuffix);
+      }
+    }
+
+    final acls = workingPolicy['acls'];
+    if (acls is List) {
+      for (final rule in acls) {
+        if (rule is Map) {
+          scanList(rule['src'], allowPortSuffix: false);
+          scanList(rule['dst'], allowPortSuffix: true);
+        }
+      }
+    }
+    final grants = workingPolicy['grants'];
+    if (grants is List) {
+      for (final grant in grants) {
+        if (grant is Map) {
+          scanList(grant['src'], allowPortSuffix: false);
+          scanList(grant['dst'], allowPortSuffix: false);
+          scanList(grant['via'], allowPortSuffix: false);
+        }
+      }
+    }
+    final ssh = workingPolicy['ssh'];
+    if (ssh is List) {
+      for (final rule in ssh) {
+        if (rule is Map) {
+          scanList(rule['src'], allowPortSuffix: false);
+          scanList(rule['dst'], allowPortSuffix: false);
+        }
+      }
+    }
+    final nodeAttrs = workingPolicy['nodeAttrs'];
+    if (nodeAttrs is List) {
+      for (final attr in nodeAttrs) {
+        if (attr is Map) {
+          scanList(attr['target'], allowPortSuffix: false);
+        }
+      }
+    }
+    final tests = workingPolicy['tests'];
+    if (tests is List) {
+      for (final testEntry in tests) {
+        if (testEntry is Map) {
+          final srcVal = testEntry['src'];
+          if (srcVal is String) {
+            inspectToken(srcVal, allowPortSuffix: false);
+          } else {
+            scanList(srcVal, allowPortSuffix: false);
+          }
+          scanList(testEntry['accept'], allowPortSuffix: true);
+          scanList(testEntry['deny'], allowPortSuffix: true);
+        }
+      }
+    }
+    for (final rule in temporaryRules) {
+      final src = rule['src']?.toString() ?? '';
+      final dst = rule['dst']?.toString() ?? '';
+      if (src.isNotEmpty) inspectToken(src, allowPortSuffix: false);
+      for (final part in dst.split(',')) {
+        final trimmed = part.trim();
+        if (trimmed.isNotEmpty) inspectToken(trimmed, allowPortSuffix: false);
+      }
+    }
+    for (final share in taildriveShares) {
+      final recipient = share.recipient.trim();
+      if (recipient.isNotEmpty) {
+        inspectToken(recipient, allowPortSuffix: false);
+      }
+    }
+  }
+
+  static void _applyCascadeRewritesToPolicy({
+    required Map<String, dynamic> workingPolicy,
+    required _CascadeRewrites rewrites,
+  }) {
+    // 1. tagOwners : réécrire aussi les propriétaires si un group:/user a changé
+    final tagOwners = workingPolicy['tagOwners'];
+    if (tagOwners is Map) {
+      for (final key in tagOwners.keys.toList()) {
+        final rawList = tagOwners[key];
+        if (rawList is! List) continue;
+        final rewritten = _rewriteStringList(
+          rawList,
+          rewrites: rewrites,
+          allowPortSuffix: false,
+          sectionLabel: 'tagOwners[$key]',
+        );
+        if (rewritten != null) {
+          tagOwners[key] = rewritten;
+        }
+      }
+    }
+
+    // 2. autoApprovers.routes
+    final autoApprovers = workingPolicy['autoApprovers'];
+    if (autoApprovers is Map && autoApprovers['routes'] is Map) {
+      final routes = autoApprovers['routes'] as Map;
+      for (final cidr in routes.keys.toList()) {
+        final list = routes[cidr];
+        if (list is! List) continue;
+        final preferCapability = (cidr == '0.0.0.0/0' || cidr == '::/0')
+            ? '-exit-node'
+            : '-lan-sharer';
+        final rewritten = _rewriteStringList(
+          list,
+          rewrites: rewrites,
+          allowPortSuffix: false,
+          preferredTagSuffix: preferCapability,
+          sectionLabel: 'autoApprovers.routes[$cidr]',
+        );
+        if (rewritten != null) {
+          routes[cidr] = rewritten;
+        }
+      }
+    }
+
+    // 3. acls
+    final acls = workingPolicy['acls'];
+    if (acls is List) {
+      for (int i = 0; i < acls.length; i++) {
+        final rule = acls[i];
+        if (rule is! Map) continue;
+        final ruleMap = Map<String, dynamic>.from(rule);
+        final oldSig = HuJsonCommentService.ruleSignature(
+          ruleMap,
+          isGrant: false,
+        );
+        var modified = false;
+        final newSrc = _rewriteStringList(
+          rule['src'],
+          rewrites: rewrites,
+          allowPortSuffix: false,
+          sectionLabel: 'acls[$i].src',
+        );
+        if (newSrc != null) {
+          rule['src'] = newSrc;
+          modified = true;
+        }
+        final newDst = _rewriteStringList(
+          rule['dst'],
+          rewrites: rewrites,
+          allowPortSuffix: true,
+          sectionLabel: 'acls[$i].dst',
+        );
+        if (newDst != null) {
+          rule['dst'] = newDst;
+          modified = true;
+        }
+        if (modified) {
+          final newSig = HuJsonCommentService.ruleSignature(
+            Map<String, dynamic>.from(rule),
+            isGrant: false,
+          );
+          if (oldSig != newSig) {
+            rewrites.migratedCommentKeys[oldSig] = newSig;
+          }
+        }
+      }
+    }
+
+    // 4. grants
+    final grants = workingPolicy['grants'];
+    if (grants is List) {
+      for (int i = 0; i < grants.length; i++) {
+        final grant = grants[i];
+        if (grant is! Map) continue;
+        final grantMap = Map<String, dynamic>.from(grant);
+        final oldSig = HuJsonCommentService.ruleSignature(
+          grantMap,
+          isGrant: true,
+        );
+        var modified = false;
+
+        final newSrc = _rewriteStringList(
+          grant['src'],
+          rewrites: rewrites,
+          allowPortSuffix: false,
+          sectionLabel: 'grants[$i].src',
+        );
+        if (newSrc != null) {
+          grant['src'] = newSrc;
+          modified = true;
+        }
+        final newDst = _rewriteStringList(
+          grant['dst'],
+          rewrites: rewrites,
+          allowPortSuffix: false,
+          sectionLabel: 'grants[$i].dst',
+        );
+        if (newDst != null) {
+          grant['dst'] = newDst;
+          modified = true;
+        }
+
+        final dstList = (grant['dst'] is List)
+            ? (grant['dst'] as List).map((e) => e.toString()).toList()
+            : const <String>[];
+        final preferredViaSuffix = dstList.contains('autogroup:internet')
+            ? '-exit-node'
+            : (dstList.any(IpUtils.isCIDR) ? '-lan-sharer' : '-client');
+
+        final newVia = _rewriteStringList(
+          grant['via'],
+          rewrites: rewrites,
+          allowPortSuffix: false,
+          preferredTagSuffix: preferredViaSuffix,
+          sectionLabel: 'grants[$i].via',
+        );
+        if (newVia != null) {
+          grant['via'] = newVia;
+          modified = true;
+        }
+
+        if (modified) {
+          final newSig = HuJsonCommentService.ruleSignature(
+            Map<String, dynamic>.from(grant),
+            isGrant: true,
+          );
+          if (oldSig != newSig) {
+            rewrites.migratedCommentKeys[oldSig] = newSig;
+          }
+        }
+      }
+    }
+
+    // 5. ssh
+    final ssh = workingPolicy['ssh'];
+    if (ssh is List) {
+      for (int i = 0; i < ssh.length; i++) {
+        final rule = ssh[i];
+        if (rule is! Map) continue;
+        final newSrc = _rewriteStringList(
+          rule['src'],
+          rewrites: rewrites,
+          allowPortSuffix: false,
+          sectionLabel: 'ssh[$i].src',
+        );
+        if (newSrc != null) rule['src'] = newSrc;
+        final newDst = _rewriteStringList(
+          rule['dst'],
+          rewrites: rewrites,
+          allowPortSuffix: false,
+          sectionLabel: 'ssh[$i].dst',
+        );
+        if (newDst != null) rule['dst'] = newDst;
+      }
+    }
+
+    // 6. nodeAttrs
+    final nodeAttrs = workingPolicy['nodeAttrs'];
+    if (nodeAttrs is List) {
+      for (int i = 0; i < nodeAttrs.length; i++) {
+        final attr = nodeAttrs[i];
+        if (attr is! Map) continue;
+        final newTarget = _rewriteStringList(
+          attr['target'],
+          rewrites: rewrites,
+          allowPortSuffix: false,
+          sectionLabel: 'nodeAttrs[$i].target',
+        );
+        if (newTarget != null) attr['target'] = newTarget;
+      }
+    }
+
+    // 7. tests
+    final tests = workingPolicy['tests'];
+    if (tests is List) {
+      for (int i = 0; i < tests.length; i++) {
+        final t = tests[i];
+        if (t is! Map) continue;
+        if (t['src'] is String) {
+          final rewritten = _rewriteSingleToken(
+            t['src'] as String,
+            rewrites: rewrites,
+            allowPortSuffix: false,
+          );
+          if (rewritten.length == 1 && rewritten.first != t['src']) {
+            rewrites.cascadedRuleItems
+                .add('tests[$i].src: ${t['src']} → ${rewritten.first}');
+            t['src'] = rewritten.first;
+          }
+        } else {
+          final newSrc = _rewriteStringList(
+            t['src'],
+            rewrites: rewrites,
+            allowPortSuffix: false,
+            sectionLabel: 'tests[$i].src',
+          );
+          if (newSrc != null) t['src'] = newSrc;
+        }
+        final newAccept = _rewriteStringList(
+          t['accept'],
+          rewrites: rewrites,
+          allowPortSuffix: true,
+          sectionLabel: 'tests[$i].accept',
+        );
+        if (newAccept != null) t['accept'] = newAccept;
+        final newDeny = _rewriteStringList(
+          t['deny'],
+          rewrites: rewrites,
+          allowPortSuffix: true,
+          sectionLabel: 'tests[$i].deny',
+        );
+        if (newDeny != null) t['deny'] = newDeny;
+      }
+    }
+  }
+
+  static List<Map<String, dynamic>>? _applyCascadeRewritesToTemporaryRules({
+    required List<Map<String, dynamic>> temporaryRules,
+    required _CascadeRewrites rewrites,
+  }) {
+    if (temporaryRules.isEmpty) return null;
+    var anyChanged = false;
+    final updated = <Map<String, dynamic>>[];
+
+    for (int i = 0; i < temporaryRules.length; i++) {
+      final copy = Map<String, dynamic>.from(temporaryRules[i]);
+      final src = copy['src']?.toString() ?? '';
+      if (src.isNotEmpty) {
+        final newSrc = _rewriteSingleToken(
+          src,
+          rewrites: rewrites,
+          allowPortSuffix: false,
+        );
+        if (newSrc.isNotEmpty && newSrc.first != src) {
+          rewrites.cascadedRuleItems
+              .add('Règle spécifique [$i].src: $src → ${newSrc.first}');
+          copy['src'] = newSrc.first;
+          anyChanged = true;
+        }
+      }
+      final dst = copy['dst']?.toString() ?? '';
+      if (dst.isNotEmpty) {
+        final parts = dst.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty);
+        final rebuilt = <String>[];
+        var dstChanged = false;
+        for (final p in parts) {
+          final newParts = _rewriteSingleToken(
+            p,
+            rewrites: rewrites,
+            allowPortSuffix: false,
+          );
+          if (newParts.join(',') != p) dstChanged = true;
+          rebuilt.addAll(newParts);
+        }
+        if (dstChanged) {
+          final joined = rebuilt.toSet().join(',');
+          rewrites.cascadedRuleItems
+              .add('Règle spécifique [$i].dst: $dst → $joined');
+          copy['dst'] = joined;
+          anyChanged = true;
+        }
+      }
+      updated.add(copy);
+    }
+
+    return anyChanged ? updated : null;
+  }
+
+  static List<TaildriveShare>? _applyCascadeRewritesToTaildrive({
+    required List<TaildriveShare> taildriveShares,
+    required _CascadeRewrites rewrites,
+  }) {
+    if (taildriveShares.isEmpty) return null;
+    var anyChanged = false;
+    final updated = <TaildriveShare>[];
+
+    for (final share in taildriveShares) {
+      final rec = share.recipient.trim();
+      final candidate = rec.startsWith('group:') ? rec : 'group:${normalizeUserName(rec)}';
+      var nextRecipient = share.recipient;
+
+      if (rewrites.groupRenames.containsKey(rec)) {
+        nextRecipient = rewrites.groupRenames[rec]!;
+      } else if (rewrites.groupRenames.containsKey(candidate)) {
+        nextRecipient = rewrites.groupRenames[candidate]!;
+      } else if (rec.startsWith('group:')) {
+        final norm = 'group:${normalizeUserName(rec.substring(6))}';
+        if (norm != rec) nextRecipient = norm;
+      }
+
+      if (nextRecipient != share.recipient) {
+        rewrites.cascadedRuleItems.add(
+          'Taildrive "${share.shareName}": ${share.recipient} → $nextRecipient',
+        );
+        updated.add(share.copyWith(recipient: nextRecipient));
+        anyChanged = true;
+      } else {
+        updated.add(share);
+      }
+    }
+
+    return anyChanged ? updated : null;
+  }
+
+  static List<String>? _rewriteStringList(
+    dynamic rawList, {
+    required _CascadeRewrites rewrites,
+    required bool allowPortSuffix,
+    String? preferredTagSuffix,
+    required String sectionLabel,
+  }) {
+    if (rawList is! List) return null;
+    var changed = false;
+    final result = <String>[];
+
+    for (final item in rawList) {
+      final raw = item.toString();
+      final replaced = _rewriteSingleToken(
+        raw,
+        rewrites: rewrites,
+        allowPortSuffix: allowPortSuffix,
+        preferredTagSuffix: preferredTagSuffix,
+      );
+      if (replaced.length != 1 || replaced.first != raw) {
+        changed = true;
+        rewrites.cascadedRuleItems
+            .add('$sectionLabel: $raw → ${replaced.join(", ")}');
+      }
+      for (final val in replaced) {
+        if (!result.contains(val)) {
+          result.add(val);
+        }
+      }
+    }
+
+    return changed ? result : null;
+  }
+
+  static List<String> _rewriteSingleToken(
+    String raw, {
+    required _CascadeRewrites rewrites,
+    required bool allowPortSuffix,
+    String? preferredTagSuffix,
+  }) {
+    final split = _splitTargetAndPort(raw, allowPortSuffix: allowPortSuffix);
+    final base = split.base;
+    final portSuffix = split.portSuffix;
+
+    if (rewrites.groupRenames.containsKey(base)) {
+      return ['${rewrites.groupRenames[base]!}$portSuffix'];
+    }
+    if (rewrites.userMemberRewrites.containsKey(base)) {
+      return ['${rewrites.userMemberRewrites[base]!}$portSuffix'];
+    }
+    if (rewrites.tagReplacements.containsKey(base)) {
+      final candidates = rewrites.tagReplacements[base]!;
+      if (preferredTagSuffix != null) {
+        final match = candidates.where((t) => t.endsWith(preferredTagSuffix));
+        if (match.isNotEmpty) {
+          return ['${match.first}$portSuffix'];
+        }
+      }
+      return candidates.map((t) => '$t$portSuffix').toList();
+    }
+    return [raw];
+  }
+
+  static ({String base, String portSuffix}) _splitTargetAndPort(
+    String raw, {
+    required bool allowPortSuffix,
+  }) {
+    final trimmed = raw.trim();
+    if (!allowPortSuffix || trimmed.isEmpty) {
+      return (base: trimmed, portSuffix: '');
+    }
+
+    if (trimmed.startsWith('[')) {
+      final closeIdx = trimmed.indexOf(']');
+      if (closeIdx != -1 &&
+          closeIdx + 1 < trimmed.length &&
+          trimmed[closeIdx + 1] == ':') {
+        return (
+          base: trimmed.substring(0, closeIdx + 1),
+          portSuffix: trimmed.substring(closeIdx + 1),
+        );
+      }
+      return (base: trimmed, portSuffix: '');
+    }
+
+    if (trimmed.startsWith('tag:') ||
+        trimmed.startsWith('group:') ||
+        trimmed.startsWith('autogroup:')) {
+      final firstColon = trimmed.indexOf(':');
+      final secondColon = trimmed.indexOf(':', firstColon + 1);
+      if (secondColon != -1) {
+        return (
+          base: trimmed.substring(0, secondColon),
+          portSuffix: trimmed.substring(secondColon),
+        );
+      }
+      return (base: trimmed, portSuffix: '');
+    }
+
+    final firstColon = trimmed.indexOf(':');
+    final lastColon = trimmed.lastIndexOf(':');
+    if (firstColon != -1 && firstColon == lastColon) {
+      return (
+        base: trimmed.substring(0, firstColon),
+        portSuffix: trimmed.substring(firstColon),
+      );
+    }
+
+    return (base: trimmed, portSuffix: '');
+  }
+
+  static void _checkBrokenRuleReferences({
+    required List<User> users,
+    required List<Node> nodes,
+    required Map<String, dynamic> workingPolicy,
+    required List<Map<String, dynamic>> temporaryRules,
+    required List<TaildriveShare> taildriveShares,
+    required List<AlignmentIssue> issues,
+  }) {
+    final validGroups = <String>{
+      if (workingPolicy['groups'] is Map)
+        ...(workingPolicy['groups'] as Map).keys.map((k) => k.toString()),
+    };
+    final validTags = <String>{
+      if (workingPolicy['tagOwners'] is Map)
+        ...(workingPolicy['tagOwners'] as Map).keys.map((k) => k.toString()),
+      for (final n in nodes) ...n.tags,
+      for (final u in users) ...[
+        'tag:${normalizeUserName(u.name)}-client',
+        'tag:${normalizeUserName(u.name)}-exit-node',
+        'tag:${normalizeUserName(u.name)}-lan-sharer',
+      ],
+    };
+
+    final broken = <String>[];
+
+    void inspectRef(String raw, String where, {required bool allowPortSuffix}) {
+      final token =
+          _splitTargetAndPort(raw, allowPortSuffix: allowPortSuffix).base;
+      if (token.startsWith('group:') && !validGroups.contains(token)) {
+        broken.add('$where: $token introuvable dans "groups"');
+      } else if (token.startsWith('tag:') && !validTags.contains(token)) {
+        broken.add('$where: $token introuvable dans "tagOwners"');
+      }
+    }
+
+    void inspectList(dynamic list, String where,
+        {required bool allowPortSuffix}) {
+      if (list is! List) return;
+      for (final item in list) {
+        inspectRef(item.toString(), where, allowPortSuffix: allowPortSuffix);
+      }
+    }
+
+    final grants = workingPolicy['grants'];
+    if (grants is List) {
+      for (int i = 0; i < grants.length; i++) {
+        final g = grants[i];
+        if (g is! Map) continue;
+        inspectList(g['src'], 'grants[$i]', allowPortSuffix: false);
+        inspectList(g['dst'], 'grants[$i]', allowPortSuffix: false);
+        inspectList(g['via'], 'grants[$i]', allowPortSuffix: false);
+      }
+    }
+
+    final acls = workingPolicy['acls'];
+    if (acls is List) {
+      for (int i = 0; i < acls.length; i++) {
+        final a = acls[i];
+        if (a is! Map) continue;
+        inspectList(a['src'], 'acls[$i]', allowPortSuffix: false);
+        inspectList(a['dst'], 'acls[$i]', allowPortSuffix: true);
+      }
+    }
+
+    final ssh = workingPolicy['ssh'];
+    if (ssh is List) {
+      for (int i = 0; i < ssh.length; i++) {
+        final s = ssh[i];
+        if (s is! Map) continue;
+        inspectList(s['src'], 'ssh[$i]', allowPortSuffix: false);
+        inspectList(s['dst'], 'ssh[$i]', allowPortSuffix: false);
+      }
+    }
+
+    for (final share in taildriveShares) {
+      final rec = share.recipient.trim();
+      final groupKey =
+          rec.startsWith('group:') ? rec : 'group:${normalizeUserName(rec)}';
+      if (!validGroups.contains(groupKey)) {
+        broken.add(
+            'Taildrive "${share.shareName}": $groupKey introuvable dans "groups"');
+      }
+    }
+
+    for (int i = 0; i < temporaryRules.length; i++) {
+      final r = temporaryRules[i];
+      final src = r['src']?.toString() ?? '';
+      final dst = r['dst']?.toString() ?? '';
+      if (src.isNotEmpty) {
+        inspectRef(src, 'Règle spécifique [$i]', allowPortSuffix: false);
+      }
+      for (final p in dst.split(',')) {
+        final trimmed = p.trim();
+        if (trimmed.isNotEmpty) {
+          inspectRef(trimmed, 'Règle spécifique [$i]', allowPortSuffix: false);
+        }
+      }
+    }
+
+    if (broken.isEmpty) return;
+
+    issues.add(
+      AlignmentIssue(
+        type: AlignmentIssueType.brokenRuleReferences,
+        severity: AlignmentIssueSeverity.warning,
+        titleFr:
+            'Références inconnues dans vos règles spécifiques (${broken.length})',
+        titleEn:
+            'Unknown references in your specific rules (${broken.length})',
+        descriptionFr:
+            'Certaines règles manuelles (grants, acls, ssh, Taildrive…) pointent vers un groupe ou tag absent (ex: ancien nom ou compte OIDC différent). Vérifiez ces règles avant régénération.',
+        descriptionEn:
+            'Some manual rules (grants, acls, ssh, Taildrive…) point to a missing group or tag (e.g. old name or separate OIDC account). Review these rules.',
+        affectedItems: broken.toSet().toList(),
       ),
     );
   }

@@ -81,11 +81,18 @@ class _AlignmentAssistantDialogState extends State<AlignmentAssistantDialog> {
       final nodes = results[1] as List<Node>;
 
       final bundle = await PolicyPreserver.fetchServerPolicyBundleSafely(api);
+      final serverId = provider.activeServer?.id;
+      final tempRules = serverId != null
+          ? await provider.storageService.getTemporaryRules(serverId)
+          : const <Map<String, dynamic>>[];
+
       final report = AlignmentDiagnosticService.inspect(
         users: users,
         nodes: nodes,
         serverPolicy: bundle.policy,
         serverVersion: provider.serverVersion,
+        temporaryRules: tempRules,
+        taildriveShares: provider.taildriveShares,
       );
 
       if (!mounted) return;
@@ -115,10 +122,22 @@ class _AlignmentAssistantDialogState extends State<AlignmentAssistantDialog> {
 
     final hasComments = _ruleComments.isNotEmpty ||
         (_leadingComments != null && _leadingComments!.trim().isNotEmpty);
+
+    // Migrer aussi les signatures des commentaires HuJSON dont la règle a été réécrite en cascade
+    final migratedComments = Map<String, String>.from(_ruleComments);
+    final removedCommentSigs = <String>{};
+    report.migratedRuleCommentKeys.forEach((oldSig, newSig) {
+      final comment = migratedComments.remove(oldSig);
+      if (comment != null && comment.trim().isNotEmpty) {
+        removedCommentSigs.add(oldSig);
+        migratedComments[newSig] = comment;
+      }
+    });
+
     final previewNewText = hasComments
         ? HuJsonCommentService.formatPolicyWithComments(
             aligned,
-            ruleComments: _ruleComments,
+            ruleComments: migratedComments,
             leadingComments: _leadingComments,
           )
         : const JsonEncoder.withIndent('  ').convert(aligned);
@@ -142,8 +161,19 @@ class _AlignmentAssistantDialogState extends State<AlignmentAssistantDialog> {
         generatedPolicy: aligned,
         serverPolicy: _serverPolicy,
         rawServerPolicy: _rawPolicyText.isNotEmpty ? _rawPolicyText : null,
+        overrideRuleComments: migratedComments,
+        removedCommentSignatures: removedCommentSigs,
         pretty: true,
       );
+      final serverId = provider.activeServer?.id;
+      if (serverId != null && report.alignedTemporaryRules != null) {
+        await provider.storageService
+            .saveTemporaryRules(serverId, report.alignedTemporaryRules!);
+      }
+      if (report.alignedTaildriveShares != null) {
+        await provider
+            .replaceTaildriveShares(report.alignedTaildriveShares!);
+      }
       _appliedAnyFix = true;
       if (mounted) {
         showSafeSnackBar(
@@ -526,6 +556,46 @@ class _AlignmentAssistantDialogState extends State<AlignmentAssistantDialog> {
               isFr
                   ? 'Corriger nœuds (${report.allNodeActions.length})'
                   : 'Fix nodes (${report.allNodeActions.length})',
+            ),
+          ),
+        if (report != null && report.hasLocalConfigFixes && !report.hasPolicyFix)
+          FilledButton.icon(
+            onPressed: (_loading || _applying)
+                ? null
+                : () async {
+                    setState(() => _applying = true);
+                    try {
+                      final provider = context.read<AppProvider>();
+                      final serverId = provider.activeServer?.id;
+                      if (serverId != null &&
+                          report.alignedTemporaryRules != null) {
+                        await provider.storageService.saveTemporaryRules(
+                          serverId,
+                          report.alignedTemporaryRules!,
+                        );
+                      }
+                      if (report.alignedTaildriveShares != null) {
+                        await provider.replaceTaildriveShares(
+                          report.alignedTaildriveShares!,
+                        );
+                      }
+                      _appliedAnyFix = true;
+                      if (context.mounted) {
+                        showSafeSnackBar(
+                          context,
+                          isFr
+                              ? 'Règles locales et partages Taildrive alignés.'
+                              : 'Local rules and Taildrive shares aligned.',
+                        );
+                      }
+                      await _runInspection();
+                    } finally {
+                      if (mounted) setState(() => _applying = false);
+                    }
+                  },
+            icon: const Icon(Icons.sync_alt, size: 18),
+            label: Text(
+              isFr ? 'Aligner règles locales' : 'Align local rules',
             ),
           ),
         if (report != null && report.hasPolicyFix)

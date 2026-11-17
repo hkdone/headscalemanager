@@ -763,11 +763,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final policy = await PolicyPreserver.fetchServerPolicySafely(
           appProvider.apiService,
         );
+        final serverId = appProvider.activeServer?.id;
+        final tempRules = serverId != null
+            ? await appProvider.storageService.getTemporaryRules(serverId)
+            : const <Map<String, dynamic>>[];
         final report = AlignmentDiagnosticService.inspect(
           users: results[0] as List<User>,
           nodes: results[1] as List<Node>,
           serverPolicy: policy,
           serverVersion: appProvider.serverVersion,
+          temporaryRules: tempRules,
+          taildriveShares: appProvider.taildriveShares,
         );
         if (!report.isClean && context.mounted) {
           final proceed = await AlignmentAssistantDialog.show(
