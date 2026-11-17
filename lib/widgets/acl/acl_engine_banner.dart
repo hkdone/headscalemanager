@@ -12,6 +12,7 @@ class AclEngineBanner extends StatelessWidget {
   final List<Node> nodes;
   final bool isFr;
   final bool compact;
+  final VoidCallback? onOpenDiagnostic;
 
   const AclEngineBanner({
     super.key,
@@ -21,6 +22,7 @@ class AclEngineBanner extends StatelessWidget {
     required this.nodes,
     required this.isFr,
     this.compact = false,
+    this.onOpenDiagnostic,
   });
 
   List<String> _usersWithoutTaggedNodes() {
@@ -99,7 +101,18 @@ class AclEngineBanner extends StatelessWidget {
                   style: TextStyle(color: Colors.orange[800], fontSize: 11),
                 ),
               ),
-            ],
+            ] else if (onOpenDiagnostic != null)
+              const Spacer(),
+            if (onOpenDiagnostic != null)
+              IconButton(
+                icon: const Icon(Icons.health_and_safety_outlined,
+                    size: 20, color: Colors.teal),
+                tooltip: isFr
+                    ? 'Diagnostic & Alignement ACL'
+                    : 'ACL Alignment Diagnostic',
+                visualDensity: VisualDensity.compact,
+                onPressed: onOpenDiagnostic,
+              ),
           ],
         ),
       );

@@ -51,34 +51,38 @@ String normalizeUserName(String userName) {
   return sanitized.isEmpty ? 'user' : sanitized;
 }
 
-/// Résout les membres valides pour les groupes Tailscale/Headscale ACL.
-/// Règle Headscale/Tailscale stricte : chaque membre d'un groupe doit impérativement
-/// contenir un '@' (username must contain @), sauf s'il s'agit d'un autre groupe (group:).
+/// Résout les membres valides pour les groupes Tailscale/Headscale ACL (Policy v2 >= 0.26).
+///
+/// Règles Headscale strictes :
+/// - Un utilisateur OIDC ou basé sur un email est référencé par son email complet.
+/// - Un utilisateur dont le `name` contient déjà `@` est conservé tel quel.
+/// - Un utilisateur local sans `@` ni email est référencé avec un `@` final vide
+///   (`"username@"`, et jamais un domaine inventé), tel qu'exigé par `hscontrol/policy/v2`.
 List<String> resolveAclGroupMembers(
   String userName, {
   String? email,
   String? fallbackDomain,
 }) {
-  final domain = (fallbackDomain != null && fallbackDomain.isNotEmpty)
-      ? fallbackDomain
-      : 'headscale.local';
   final members = <String>{};
+  final trimmedEmail = email?.trim() ?? '';
+  final trimmedName = userName.trim();
 
-  // 1. Priorité à l'email si présent et valide (format OIDC / Tailscale standard)
-  if (email != null && email.contains('@')) {
-    members.add(email);
+  // 1. Email valide (OIDC ou compte avec email explicite)
+  if (trimmedEmail.isNotEmpty && trimmedEmail.contains('@')) {
+    members.add(trimmedEmail);
   }
 
-  // 2. Si le nom d'utilisateur contient un '@' (ex: user@domaine.com)
-  if (userName.contains('@')) {
-    members.add(userName);
+  // 2. Nom d'utilisateur exact : tel quel s'il contient '@', sinon suffixé par '@'
+  if (trimmedName.isNotEmpty && trimmedName != 'Unknown User') {
+    if (trimmedName.contains('@')) {
+      members.add(trimmedName);
+    } else {
+      members.add('$trimmedName@');
+    }
   }
 
-  // 3. Si aucun identifiant ne contient de '@' (ex: utilisateur local simple sans domaine),
-  // Headscale / Tailscale v2.Groups rejette tout nom sans '@'.
-  // On lui accole donc le domaine du serveur pour satisfaire la règle Tailscale.
-  if (members.isEmpty) {
-    members.add('$userName@$domain');
+  if (members.isEmpty && trimmedName.isNotEmpty) {
+    members.add(trimmedName.contains('@') ? trimmedName : '$trimmedName@');
   }
 
   return members.toList();

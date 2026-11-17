@@ -27,7 +27,7 @@ class ServerListTile extends StatelessWidget {
       child: ListTile(
         title: Text(server.name),
         subtitle: Text(
-          '${server.url}${server.version != null ? ' (v${server.version})' : ''}',
+          '${server.url}${server.version != null ? ' (v${server.version!.replaceFirst(RegExp(r'^v+'), '')})' : ''}',
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,

@@ -51,8 +51,8 @@ Afin d'éviter que le code de **Headscale Manager** n'accumule indéfiniment de 
 
 ---
 
-### 🔮 Palier 4 : Headscale `0.29` (`/api/v1`) — **VERSION COURANTE (Entrera en Bandeau Rouge en `0.31` lors de la suppression de `/api/v1`)**
+### 🔮 Palier 4 : Headscale `0.29` (`/api/v1`) — **VERSION COURANTE (Maintenu en `0.30`–`0.32`, suppression confirmée en `0.33`)**
 
 | Fonctionnalité / Spécificité 0.29 | Fichiers & Emplacements concernés | Note pour la future transition `0.30` (`/api/headscale/v0`) |
 |---|---|---|
-| **Client REST `/api/v1`** (gelé en `0.30`, supprimé en `0.31`) | - `lib/api/headscale_api_service.dart` | En `0.30`, ajout du support `/api/headscale/v0` (pagination `pageSize=1000`, `ETag`/`If-Match`, `dryRun=true`, `owner_conflict` sur PreAuthKey, `tags_not_permitted` avec push `tagOwners` préalable). |
+| **Client REST `/api/v1`** (gelé en `0.30`, supprimé en `0.33` suite aux retours PR `#3375`) | - `lib/api/headscale_api_service.dart` | En `0.30`, ajout progressif du support `/api/headscale/v0` (pagination `pageSize=1000`, `ETag`/`If-Match`, `dryRun=true`, `owner_conflict` sur PreAuthKey, `tags_not_permitted` avec push `tagOwners` préalable, `expire` actif même sur nœuds tagués). |

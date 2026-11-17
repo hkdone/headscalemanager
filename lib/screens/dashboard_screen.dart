@@ -8,6 +8,8 @@ import 'package:headscalemanager/services/route_conflict_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:headscalemanager/utils/tag_capability_helper.dart';
+import 'package:headscalemanager/widgets/acl/alignment_assistant_dialog.dart';
+import 'package:headscalemanager/widgets/deprecated_server_banner.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/screens/node_detail_screen.dart';
 
@@ -52,14 +54,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final locale = context.watch<AppProvider>().locale;
+    final appProvider = context.watch<AppProvider>();
+    final locale = appProvider.locale;
     final isFr = locale.languageCode == 'fr';
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: FutureBuilder<({List<Node> nodes, List<User> users})>(
-          future: _dataFuture,
+        child: Column(
+          children: [
+            DeprecatedServerBanner(
+              serverVersion: appProvider.serverVersion,
+              isFr: isFr,
+              onOpenDiagnostic: () async {
+                final changed = await AlignmentAssistantDialog.show(context);
+                if (changed && mounted) {
+                  _refreshNodes();
+                }
+              },
+            ),
+            Expanded(
+              child: FutureBuilder<({List<Node> nodes, List<User> users})>(
+                future: _dataFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting &&
                 !snapshot.hasData) {
@@ -161,6 +177,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             );
           },
+        ),
+            ),
+          ],
         ),
       ),
     );

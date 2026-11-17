@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:headscalemanager/models/acl_engine_mode.dart';
+import 'package:headscalemanager/models/node.dart';
+import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/models/version_info.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/help_screen.dart';
@@ -15,7 +17,11 @@ import 'package:headscalemanager/services/tag_migration_service.dart';
 import 'package:headscalemanager/widgets/server_list_tile.dart';
 import 'package:headscalemanager/widgets/grants_migration_dialog.dart';
 import 'package:headscalemanager/screens/api_keys_screen.dart';
+import 'package:headscalemanager/services/acl/alignment_diagnostic_service.dart';
+import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
+import 'package:headscalemanager/widgets/acl/alignment_assistant_dialog.dart';
+import 'package:headscalemanager/widgets/deprecated_server_banner.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -61,6 +67,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              DeprecatedServerBanner(
+                serverVersion: appProvider.serverVersion,
+                isFr: isFr,
+                margin: const EdgeInsets.only(bottom: 12),
+                onOpenDiagnostic: () => AlignmentAssistantDialog.show(context),
+              ),
               Text(isFr ? 'Serveurs' : 'Servers',
                   style: theme.textTheme.headlineSmall),
               const SizedBox(height: 16),
@@ -216,6 +228,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                               ListTile(
                                 contentPadding: EdgeInsets.zero,
+                                leading: const Icon(
+                                    Icons.health_and_safety_outlined,
+                                    color: Colors.teal),
+                                title: Text(
+                                  isFr
+                                      ? 'Diagnostic & Alignement ACL'
+                                      : 'ACL Alignment Diagnostic',
+                                  style: theme.textTheme.bodyLarge,
+                                ),
+                                subtitle: Text(
+                                  isFr
+                                      ? 'Vérifie identités Local/OIDC, groups (@), tagOwners et noms DNS-1123.'
+                                      : 'Checks Local/OIDC identities, groups (@), tagOwners and DNS-1123 names.',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () =>
+                                    AlignmentAssistantDialog.show(context),
+                              ),
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
                                 leading: const Icon(Icons.alt_route,
                                     color: Colors.teal),
                                 title: Text(
@@ -226,8 +259,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ),
                                 subtitle: Text(
                                   isFr
-                                      ? 'Prévisualise puis attribue les IPs manquantes aux nœuds.'
-                                      : 'Previews and assigns missing IPs to existing nodes.',
+                                      ? 'Recalcule les IPs (IPv4/IPv6) des nœuds selon config.yaml (ex: après ajout IPv6).'
+                                      : 'Recalculates node IPs (IPv4/IPv6) to match config.yaml prefixes (e.g. after enabling IPv6).',
                                   style: theme.textTheme.bodySmall,
                                 ),
                                 trailing: const Icon(Icons.chevron_right),
@@ -560,85 +593,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
     AppProvider appProvider,
     bool isFr,
   ) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-
-    List<String> previewChanges;
-    try {
-      previewChanges =
-          await appProvider.apiService.backfillNodeIps(confirmed: false);
-    } catch (e) {
-      if (context.mounted) Navigator.of(context).pop();
-      if (context.mounted) {
-        showSafeSnackBar(
-          context,
-          isFr
-              ? 'Erreur lors de la prévisualisation Backfill IPs : $e'
-              : 'Backfill IPs preview error: $e',
-        );
-      }
-      return;
-    }
-
-    if (!context.mounted) return;
-    Navigator.of(context).pop(); // Ferme le loader
-
     final shouldApply = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
         title: Text(
-          isFr ? 'Prévisualisation Backfill IPs' : 'Backfill IPs Preview',
+          isFr
+              ? 'Recalculer les IPs des nœuds ?'
+              : 'Recalculate Node IPs (Backfill)?',
         ),
         content: SizedBox(
           width: 460,
-          child: SingleChildScrollView(
-            child: previewChanges.isEmpty
-                ? Text(
-                    isFr
-                        ? 'Aucune IP manquante détectée : tous les nœuds possèdent déjà leurs adresses.'
-                        : 'No missing IP detected: all nodes already have assigned addresses.',
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        isFr
-                            ? 'Modifications proposées (${previewChanges.length}) :'
-                            : 'Proposed changes (${previewChanges.length}):',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      ...previewChanges.map(
-                        (c) => Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: SelectableText(
-                            '• $c',
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+          child: Text(
+            isFr
+                ? 'Cet outil de maintenance Headscale vérifie les adresses IP (IPv4 / IPv6) de tous vos nœuds existants par rapport aux plages ("prefixes") de votre fichier config.yaml.\n\n• Utile si vous avez activé IPv6 après avoir déjà enregistré des appareils.\n• Attention : les IPs manquantes seront ajoutées, et d\'éventuelles IPs hors de vos plages actuelles peuvent être retirées.'
+                : 'This Headscale maintenance tool reconciles IPv4 / IPv6 addresses of existing nodes with the "prefixes" in your server config.yaml.\n\n• Useful after enabling IPv6 on an existing server.\n• Warning: missing IPs are assigned, and out-of-range IPs may be removed.',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogCtx).pop(false),
-            child: Text(isFr ? 'Fermer' : 'Close'),
+            child: Text(isFr ? 'Annuler' : 'Cancel'),
           ),
-          if (previewChanges.isNotEmpty)
-            FilledButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(true),
-              child: Text(
-                  isFr ? 'Confirmer l\'attribution' : 'Confirm assignment'),
-            ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: Text(isFr ? 'Exécuter Backfill IPs' : 'Run Backfill IPs'),
+          ),
         ],
       ),
     );
@@ -655,22 +634,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final appliedChanges =
           await appProvider.apiService.backfillNodeIps(confirmed: true);
       if (context.mounted) Navigator.of(context).pop();
-      if (context.mounted) {
-        showSafeSnackBar(
-          context,
-          isFr
-              ? 'Attribution terminée (${appliedChanges.length} modification(s)).'
-              : 'Assignment completed (${appliedChanges.length} change(s)).',
-        );
-      }
+      if (!context.mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        builder: (resultCtx) => AlertDialog(
+          title: Text(
+            isFr ? 'Résultat Backfill IPs' : 'Backfill IPs Result',
+          ),
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
+              child: appliedChanges.isEmpty
+                  ? Text(
+                      isFr
+                          ? 'Aucune modification nécessaire : tous vos nœuds possèdent déjà des adresses IP conformes aux plages de config.yaml.'
+                          : 'No changes needed: all nodes already have IPs matching your config.yaml prefixes.',
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          isFr
+                              ? 'Modifications effectuées (${appliedChanges.length}) :'
+                              : 'Changes applied (${appliedChanges.length}):',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        ...appliedChanges.map(
+                          (c) => Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: SelectableText(
+                              '• $c',
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(resultCtx).pop(),
+              child: Text(isFr ? 'Fermer' : 'Close'),
+            ),
+          ],
+        ),
+      );
     } catch (e) {
       if (context.mounted) Navigator.of(context).pop();
       if (context.mounted) {
         showSafeSnackBar(
           context,
           isFr
-              ? 'Erreur lors de l\'attribution Backfill IPs : $e'
-              : 'Backfill IPs assignment error: $e',
+              ? 'Erreur lors du Backfill IPs : $e'
+              : 'Backfill IPs error: $e',
         );
       }
     }
@@ -727,6 +750,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool forceConfirm = false,
   }) async {
     if (appProvider.aclEngineMode == targetMode && !forceConfirm) return;
+
+    // Pre-flight check d'alignement avant bascule vers un moteur moderne (Grants V29 ou sortie Legacy)
+    if (targetMode == AclEngineMode.grantsV29 ||
+        (appProvider.aclEngineMode == AclEngineMode.legacy &&
+            targetMode != AclEngineMode.legacy)) {
+      try {
+        final results = await Future.wait([
+          appProvider.apiService.getUsers(),
+          appProvider.apiService.getNodes(),
+        ]);
+        final policy = await PolicyPreserver.fetchServerPolicySafely(
+          appProvider.apiService,
+        );
+        final serverId = appProvider.activeServer?.id;
+        final tempRules = serverId != null
+            ? await appProvider.storageService.getTemporaryRules(serverId)
+            : const <Map<String, dynamic>>[];
+        final report = AlignmentDiagnosticService.inspect(
+          users: results[0] as List<User>,
+          nodes: results[1] as List<Node>,
+          serverPolicy: policy,
+          serverVersion: appProvider.serverVersion,
+          engineMode: targetMode,
+          temporaryRules: tempRules,
+          taildriveShares: appProvider.taildriveShares,
+        );
+        if (!report.isClean && context.mounted) {
+          final proceed = await AlignmentAssistantDialog.show(
+            context,
+            isPreflight: true,
+            targetEngineMode: targetMode,
+          );
+          if (!proceed || !context.mounted) return;
+        }
+      } catch (_) {
+        // Serveur inaccessible : ne pas bloquer le changement manuel.
+      }
+    }
 
     if (appProvider.aclEngineMode == AclEngineMode.grantsV29 &&
         targetMode != AclEngineMode.grantsV29) {

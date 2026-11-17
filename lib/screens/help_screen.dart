@@ -400,7 +400,7 @@ routes:
                     ),
                     const SizedBox(height: 12),
                     _buildBodyText(
-                        context, '**Outils ACL & Sécurité (v2.3–v2.4) :**',
+                        context, '**Outils ACL & Sécurité (v2.3–v2.5) :**',
                         isBold: true),
                     const SizedBox(height: 4),
                     _buildBodyText(
@@ -408,7 +408,8 @@ routes:
                       '- **Fusion non-destructive :** Préserve les blocs serveur (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `nodeAttrs`) et vos règles personnalisées/OIDC lors des régénérations.\n'
                       '- **HuJSON & Vue Puzzle :** Support complet des commentaires `//` et `/* */` ; nommer une règle dans la Vue Puzzle ajoute `// <nom>` au JSON et inversement.\n'
                       '- **Diff Visuel (+/-) & Orphelins :** Avant chaque export (ACL ou Puzzle), un diff coloré compare votre brouillon au serveur, et les références d\'anciens nœuds/utilisateurs supprimés sont signalées.\n'
-                      '- **Simulateur de flux ACL & Onglet SSH :** Testez en lecture seule qui peut joindre qui (avec épinglage facultatif dans `"tests"` sur port unique ≥ 0.29) et gérez vos règles **Tailscale SSH**.',
+                      '- **Simulateur de flux ACL & Onglet SSH :** Testez en lecture seule qui peut joindre qui (avec épinglage facultatif dans `"tests"` sur port unique ≥ 0.29) et gérez vos règles **Tailscale SSH**.\n'
+                      '- **Diagnostic & Alignement ACL (v2.5) :** Vérifie identités Local/OIDC, groupes (`"nom@"`), `tagOwners` et noms DNS-1123 selon la version serveur et le moteur actif, avec répercussion en cascade et aperçu Diff. Alerte automatique sur serveurs obsolètes (`≤ 0.27`).',
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),

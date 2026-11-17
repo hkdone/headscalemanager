@@ -241,10 +241,11 @@ The ACL screen has **four tabs**:
 - The ACL Puzzle shows three columns: `Source | Via | Destination`.
 - Naming a rule in Puzzle writes a `// <name>` comment directly above that rule in JSON, and existing `//` comments on the server automatically hydrate rule names in Puzzle.
 
-**Export Safety & Advanced Tools (v2.3–v2.4):**
+**Export Safety & Advanced Tools (v2.3–v2.5):**
 - **Non-Destructive Merge (`PolicyPreserver`)**: preserves manual server blocks (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `randomizeClientPort`, non-Taildrive `nodeAttrs`) and custom/cross-user OIDC rules during regeneration.
 - **Line-by-Line Visual Diff (`PolicyDiffDialog`)**: colored `+`/`-` diff against the live server policy (with *"Show differences only"* filter and >1500-line section fallback) before exporting from both the ACL screen and Puzzle View.
 - **ACL Flow Simulator**: read-only reachability check (`ALLOWED` with `via` router or `BLOCKED`), plus optional non-regression `"tests"` pinning (Headscale ≥ 0.29, single numeric port required + pre-export validation).
+- **ACL Alignment Diagnostic (v2.5)**: audits Local/OIDC profiles, Policy v2 groups (`"username@"`), `tagOwners`, legacy/dotted tags, and DNS-1123 node names, cascading fixes across all rules and shares (with Diff preview) according to the active server version and ACL engine. Also shows a red deprecation banner for outdated servers (`≤ 0.27`, $N-2$ rule).
 - **OIDC Multi-Identifier Support**: matches OIDC users across `name`, `email`, and `displayName` with `group:` fallback for untagged nodes.
 
 **ACL page workflow:**
@@ -354,5 +355,5 @@ If you have critical devices (a server, a gateway, etc.), you can be specificall
 - **Strengthened PIN & Auto-Lock (`Security`):** Salted **PBKDF2-HMAC-SHA256** PIN derivation (with seamless migration from legacy PINs), 4- or 6-digit PINs, 5-attempt anti-bruteforce lockout, biometrics, and configurable background auto-lock.
 - **Network Hardening:** 20-second API timeouts, strict URL parameter encoding (`Uri.encodeComponent`), cleartext HTTP warning outside local networks, and opt-in Internet exit diagnostics.
 - **Node Session Expiration (`expireNode`):** Disconnect a node from **Node Details** or **User Details** without deleting it or losing its tags/routes (`tailscale up` re-authenticates it).
-- **Backfill IPs (`Settings`):** Preview (`confirmed=false`) and assign (`confirmed=true`) missing IPv4/IPv6 addresses to existing nodes.
+- **Backfill IPs (`Settings`):** After explicit confirmation (`confirmed=true`), reconciles missing or out-of-range IPv4/IPv6 addresses for existing nodes against `config.yaml` prefixes (e.g. after enabling IPv6).
 - **Taildrive Shares (Headscale ≥ 0.29) & PreAuthKey v0.28+:** Manage WebDAV folder shares non-destructively and expire PreAuthKeys using v0.28+ IDs/names safely.

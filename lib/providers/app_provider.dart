@@ -367,6 +367,14 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> replaceTaildriveShares(List<TaildriveShare> shares) async {
+    if (_activeServer == null) return;
+    _taildriveShares = List<TaildriveShare>.from(shares);
+    await _storageService.saveTaildriveShares(
+        _activeServer!.id, _taildriveShares.map((s) => s.toJson()).toList());
+    notifyListeners();
+  }
+
   Future<void> _loadLocale() async {
     final languageCode = await _storageService.getLanguage();
     if (languageCode != null) {
