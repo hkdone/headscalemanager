@@ -172,6 +172,7 @@ class _AlignmentAssistantDialogState extends State<AlignmentAssistantDialog> {
         overrideRuleComments: migratedComments,
         removedCommentSignatures: removedCommentSigs,
         pretty: true,
+        preserveCustomRules: false,
       );
       final serverId = provider.activeServer?.id;
       if (serverId != null && report.alignedTemporaryRules != null) {

@@ -63,6 +63,7 @@ class _AclScreenState extends State<AclScreen> {
   Node? _selectedDestinationNode;
   final TextEditingController _portController = TextEditingController();
   final List<Map<String, dynamic>> _temporaryRules = [];
+  final List<Map<String, dynamic>> _pendingRemovedTempRules = [];
   String _selectedProtocol = 'any'; // 'any', 'tcp', 'udp'
   String? _activeServerId;
   AclEngineMode? _lastAclEngineMode;
@@ -1043,6 +1044,7 @@ class _AclScreenState extends State<AclScreen> {
         icon: const Icon(Icons.delete, color: Colors.red),
         onPressed: () async {
           setState(() {
+            _pendingRemovedTempRules.add(_temporaryRules[index]);
             _temporaryRules.removeAt(index);
           });
 
@@ -1707,30 +1709,22 @@ class _AclScreenState extends State<AclScreen> {
     final generatedGrants = List<dynamic>.from(
       (mergedPolicy['grants'] as List?) ?? const [],
     );
-    final serverGrants = List<dynamic>.from(
-      (serverPolicy['grants'] as List?) ?? const [],
-    );
     final generatedAcls = List<dynamic>.from(
       (mergedPolicy['acls'] as List?) ?? const [],
     );
-    final serverAcls = List<dynamic>.from(
-      (serverPolicy['acls'] as List?) ?? const [],
+
+    final excludedServerAcls = _pendingRemovedTempRules.isNotEmpty
+        ? PolicyPreserver.compileTemporaryRulesToAcls(_pendingRemovedTempRules)
+        : const <Map<String, dynamic>>[];
+    _pendingRemovedTempRules.clear();
+
+    final extra = PolicyPreserver.extractExtraCustomRules(
+      generatedPolicy: mergedPolicy,
+      serverPolicy: serverPolicy,
+      excludedServerAcls: excludedServerAcls,
     );
-
-    final genGrantJson = generatedGrants.map(jsonEncode).toSet();
-    final genAclJson = generatedAcls.map(jsonEncode).toSet();
-
-    final extraGrants = serverGrants.where((g) {
-      if (g is! Map) return false;
-      final encoded = jsonEncode(g);
-      return !genGrantJson.contains(encoded);
-    }).toList();
-
-    final extraAcls = serverAcls.where((a) {
-      if (a is! Map) return false;
-      final encoded = jsonEncode(a);
-      return !genAclJson.contains(encoded);
-    }).toList();
+    final extraGrants = extra.extraGrants;
+    final extraAcls = extra.extraAcls;
 
     final totalExtra = extraGrants.length + extraAcls.length;
     if (totalExtra == 0) return mergedPolicy;
@@ -1806,6 +1800,7 @@ class _AclScreenState extends State<AclScreen> {
     if (!confirm || !mounted) return;
 
     setState(() {
+      _pendingRemovedTempRules.addAll(_temporaryRules);
       _temporaryRules.clear();
     });
     final appProvider = context.read<AppProvider>();

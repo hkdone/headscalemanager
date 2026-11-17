@@ -142,6 +142,30 @@ class Node {
 
   /// Getter pour le Fully Qualified Domain Name (FQDN) du nœud.
   ///
+  /// Retourne une copie du nœud avec les champs spécifiés mis à jour.
+  Node copyWith({
+    List<String>? tags,
+  }) {
+    return Node(
+      id: id,
+      machineKey: machineKey,
+      hostname: hostname,
+      name: name,
+      user: user,
+      userId: userId,
+      ipAddresses: List<String>.from(ipAddresses),
+      online: online,
+      lastSeen: lastSeen,
+      sharedRoutes: List<String>.from(sharedRoutes),
+      availableRoutes: List<String>.from(availableRoutes),
+      isExitNode: isExitNode,
+      isLanSharer: isLanSharer,
+      tags: tags != null ? List<String>.from(tags) : List<String>.from(this.tags),
+      baseDomain: baseDomain,
+      endpoint: endpoint,
+    );
+  }
+
   /// Construit le FQDN en utilisant le nom du nœud et le domaine de base du serveur.
   String get fqdn => '$name.$baseDomain'; // Utilisation du nouveau champ
 

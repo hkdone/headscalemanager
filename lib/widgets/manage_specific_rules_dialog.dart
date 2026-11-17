@@ -86,6 +86,7 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
 
     if (!confirm || !mounted) return;
 
+    final removedRule = _temporaryRules[index];
     setState(() {
       _temporaryRules.removeAt(index);
       _rulesChanged = true;
@@ -98,12 +99,18 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
       await storage.saveTemporaryRules(serverId, _temporaryRules);
     }
     await _generateAndExportPolicy(
-        message: isFr
-            ? 'Règle supprimée et politique mise à jour.'
-            : 'Rule deleted and policy updated.');
+      message: isFr
+          ? 'Règle supprimée et politique mise à jour.'
+          : 'Rule deleted and policy updated.',
+      excludedServerAcls:
+          PolicyPreserver.compileTemporaryRulesToAcls([removedRule]),
+    );
   }
 
-  Future<void> _generateAndExportPolicy({String? message}) async {
+  Future<void> _generateAndExportPolicy({
+    String? message,
+    List<Map<String, dynamic>> excludedServerAcls = const [],
+  }) async {
     if (!mounted) return;
     setState(() => _isLoading = true);
     final locale = context.read<AppProvider>().locale;
@@ -129,6 +136,7 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
         apiService: apiService,
         generatedPolicy: newPolicy,
         pretty: true,
+        excludedServerAcls: excludedServerAcls,
       );
 
       if (mounted) {

@@ -279,6 +279,7 @@ class _LegacyMigrationDialogState extends State<LegacyMigrationDialog> {
       await PolicyPreserver.applyPreservingPolicy(
         apiService: appProvider.apiService,
         generatedPolicy: policy,
+        preserveCustomRules: false,
       );
       log("Configuration ACL appliquée avec succès.",
           "ACL configuration applied successfully.");

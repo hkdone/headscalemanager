@@ -187,11 +187,17 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
             final tempRules =
                 await appProvider.storageService.getTemporaryRules(serverId);
 
+            final allNodesForPolicy = allNodes
+                .map((n) => n.id == widget.node.id
+                    ? n.copyWith(tags: _currentTags)
+                    : n)
+                .toList();
+
             final aclOrchestrator = AclPolicyOrchestrator();
             final newPolicyMap = aclOrchestrator.generatePolicy(
               engineMode: appProvider.aclEngineMode,
               users: allUsers,
-              nodes: allNodes,
+              nodes: allNodesForPolicy,
               temporaryRules: tempRules,
               taildriveShares: appProvider.taildriveShares,
               serverVersion: appProvider.serverVersion,
@@ -246,6 +252,8 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
             await PolicyPreserver.applyPreservingPolicy(
               apiService: apiService,
               generatedPolicy: newPolicyMap,
+              pretty: true,
+              preserveCustomRules: true,
             );
             // Retenter l'assignation des tags maintenant que tagOwners est à jour
             await apiService.setTags(widget.node.id, _currentTags);
@@ -369,6 +377,8 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
             apiService: apiService,
             generatedPolicy: newPolicyMap,
             rawServerPolicy: rawServerPolicy,
+            pretty: true,
+            preserveCustomRules: true,
           );
 
           if (!mounted) return;

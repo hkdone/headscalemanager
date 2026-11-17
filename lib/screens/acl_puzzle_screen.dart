@@ -406,6 +406,7 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
         overrideRuleComments: puzzleComments,
         removedCommentSignatures: removedCommentSigs,
         pretty: true,
+        preserveCustomRules: false,
       );
 
       if (mounted) {

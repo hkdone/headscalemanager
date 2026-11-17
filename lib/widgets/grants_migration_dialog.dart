@@ -165,6 +165,7 @@ class _GrantsMigrationDialogState extends State<GrantsMigrationDialog> {
         apiService: provider.apiService,
         generatedPolicy: policy,
         pretty: true,
+        preserveCustomRules: false,
       );
 
       await provider.storageService.setGrantsMigrationCompleted(serverId, true);
