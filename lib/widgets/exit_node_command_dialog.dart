@@ -6,6 +6,7 @@ import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
 import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/tag_capability_helper.dart';
+import 'package:headscalemanager/widgets/acl/tagless_route_choice_dialog.dart';
 import 'package:provider/provider.dart';
 
 /// Dialogue pour configurer un nœud comme nœud de sortie.
@@ -180,19 +181,37 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog>
             onPressed: () async {
               // Show loading or just wait
               try {
-                // 1. Update Tags (add exit-node capability)
+                // 1. Update Tags (uniquement si le nœud est déjà tagué ou si l'admin choisit la conversion)
                 final List<String> currentTags = List.from(widget.node.tags);
-                final List<String> newTags = TagCapabilityHelper.addCapabilities(
-                  currentTags,
-                  engineMode: appProvider.aclEngineMode,
-                  normalizedUser: widget.node.getNormalizedOwner(),
-                  addExitNode: true,
-                );
+                bool shouldTag = currentTags.isNotEmpty;
+                if (currentTags.isEmpty) {
+                  final choice = await showTaglessRouteChoiceDialog(
+                    context,
+                    node: widget.node,
+                    isFr: isFr,
+                    isExitNode: true,
+                    isLanSharer: false,
+                  );
+                  if (choice == TaglessRouteApprovalChoice.cancel) return;
+                  shouldTag =
+                      choice == TaglessRouteApprovalChoice.convertToTaggedRouter;
+                }
 
-                if (newTags.length != currentTags.length ||
-                    !newTags.asMap().entries.every(
-                        (e) => currentTags[e.key] == e.value)) {
-                  await appProvider.apiService.setTags(widget.node.id, newTags);
+                if (shouldTag) {
+                  final List<String> newTags =
+                      TagCapabilityHelper.addCapabilities(
+                    currentTags,
+                    engineMode: appProvider.aclEngineMode,
+                    normalizedUser: widget.node.getNormalizedOwner(),
+                    addExitNode: true,
+                  );
+
+                  if (newTags.length != currentTags.length ||
+                      !newTags.asMap().entries.every(
+                          (e) => currentTags[e.key] == e.value)) {
+                    await appProvider.apiService
+                        .setTags(widget.node.id, newTags);
+                  }
                 }
 
                 // 2. Set Routes

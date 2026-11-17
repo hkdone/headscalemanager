@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
+import 'package:headscalemanager/screens/acl_migration_center_screen.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
 import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/services/route_conflict_service.dart';
@@ -785,6 +786,47 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
               icon: Icon(Icons.edit, color: theme.colorScheme.onPrimary),
               label: Text(
                 isFr ? 'Modifier les tags' : 'Edit tags',
+                style: TextStyle(color: theme.colorScheme.onPrimary),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(
+                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final provider = context.read<AppProvider>();
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AclMigrationCenterScreen(
+                      initialNode: _currentNode,
+                      initialTabIndex: _currentNode.tags.isNotEmpty ? 0 : 1,
+                    ),
+                  ),
+                );
+                if (!mounted) return;
+                try {
+                  final updated =
+                      await provider.apiService.getNodeDetails(_currentNode.id);
+                  if (mounted) {
+                    setState(() {
+                      _currentNode = updated;
+                      _selectedRoutes =
+                          Set<String>.from(_currentNode.sharedRoutes);
+                    });
+                  }
+                } catch (_) {}
+              },
+              icon: Icon(Icons.swap_horiz, color: theme.colorScheme.onPrimary),
+              label: Text(
+                isFr
+                    ? 'Basculer ce nœud (Taggé ↔ Sans tag)'
+                    : 'Switch mode (Tagged ↔ Tagless)',
                 style: TextStyle(color: theme.colorScheme.onPrimary),
               ),
               style: OutlinedButton.styleFrom(

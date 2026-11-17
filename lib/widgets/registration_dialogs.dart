@@ -679,7 +679,14 @@ Future<void> _showAddTagsDialog(BuildContext context, Node node) async {
               children: [
                 Text(
                     '${isFr ? 'Configurez les capacités de' : 'Configure capabilities for'} "${node.name}".'),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+                Text(
+                  isFr
+                      ? 'Optionnel : avec le Mode Hybride, un appareil personnel sans tag fonctionne automatiquement via group:<utilisateur> sans basculer vers tagged-devices.'
+                      : 'Optional: with Hybrid Mode, a tagless personal device works automatically via group:<user> without switching to tagged-devices.',
+                  style: Theme.of(dialogContext).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
                 CheckboxListTile(
                   title: const Text('Exit Node'),
                   subtitle: Text(isFr
@@ -708,7 +715,9 @@ Future<void> _showAddTagsDialog(BuildContext context, Node node) async {
             ),
             actions: [
               TextButton(
-                child: Text(isFr ? 'Ignorer' : 'Skip'),
+                child: Text(isFr
+                    ? 'Conserver sans tag (Appareil personnel)'
+                    : 'Keep tagless (Personal device)'),
                 onPressed: () => Navigator.of(dialogContext).pop(),
               ),
               ElevatedButton(

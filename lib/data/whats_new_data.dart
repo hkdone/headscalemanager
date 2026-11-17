@@ -14,6 +14,18 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '2.5.2',
+        title: isFr
+            ? 'Release 2.5.2 — Centre d\'Assistance à la Bascule & Fin du Taggage Forcé'
+            : 'Release 2.5.2 — ACL Migration Center & No Forced Auto-Tagging',
+        description: isFr
+            ? 'Nouveau Centre d\'Assistance à la Bascule nœud par nœud (Taggé ↔ Sans tag / OIDC) avec préparation du filet ACL, commande CLI/OIDC pré-remplie et vérification en direct dans le simulateur, plus protection anti-tagging forcé sur les clés PreAuthKey, déplacements et approbations de routes.'
+            : 'New node-by-node ACL Migration Center (Tagged ↔ Tagless / OIDC) with ACL net prep, pre-filled CLI/OIDC instructions, and live simulator validation, plus opt-in tagging on PreAuthKeys, moves, and route approvals.',
+        verification: isFr
+            ? 'Paramètres > Assistant de bascule guidée • ACLs > menu ⋮ • Fiche Nœud'
+            : 'Settings > Guided Migration Assistant • ACLs > ⋮ menu • Node Details',
+      ),
+      WhatsNewVersion(
         version: '2.5.1',
         title: isFr
             ? 'Release 2.5.1 — Cœur Hybride Zéro-Coupure (Tags + Sans Tags)'

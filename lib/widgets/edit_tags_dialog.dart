@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
+import 'package:headscalemanager/screens/acl_migration_center_screen.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
 import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
@@ -615,7 +616,32 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
                   foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 ),
               )
-            ]
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final navigator = Navigator.of(context);
+                  navigator.pop();
+                  await navigator.push(
+                    MaterialPageRoute(
+                      builder: (_) => AclMigrationCenterScreen(
+                        initialNode: widget.node,
+                        initialTabIndex: widget.node.tags.isNotEmpty ? 0 : 1,
+                      ),
+                    ),
+                  );
+                  widget.onTagsUpdated();
+                },
+                icon: const Icon(Icons.swap_horiz),
+                label: Text(
+                  isFr
+                      ? 'Basculer ce nœud (Assistant guidé)'
+                      : 'Switch node (Guided Assistant)',
+                ),
+              ),
+            ),
           ],
         ),
       ),

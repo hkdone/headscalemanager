@@ -5,6 +5,7 @@ import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/models/version_info.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
+import 'package:headscalemanager/screens/acl_migration_center_screen.dart';
 import 'package:headscalemanager/screens/help_screen.dart';
 import 'package:headscalemanager/screens/help_screen_en.dart';
 import 'package:headscalemanager/screens/security_settings_screen.dart';
@@ -282,6 +283,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 trailing: const Icon(Icons.chevron_right),
                                 onTap: () =>
                                     AlignmentAssistantDialog.show(context),
+                              ),
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(Icons.explore_outlined,
+                                    color: Colors.indigo),
+                                title: Text(
+                                  isFr
+                                      ? 'Ouvrir l\'assistant de bascule guidée'
+                                      : 'Open Guided Migration Assistant',
+                                  style: theme.textTheme.bodyLarge,
+                                ),
+                                subtitle: Text(
+                                  isFr
+                                      ? 'Basculer nœud par nœud (Taggé ↔ Sans tag / OIDC) avec test en direct.'
+                                      : 'Switch node by node (Tagged ↔ Tagless / OIDC) with live validation.',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const AclMigrationCenterScreen(),
+                                  ),
+                                ),
                               ),
                               ListTile(
                                 contentPadding: EdgeInsets.zero,

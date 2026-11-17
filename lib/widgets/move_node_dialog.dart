@@ -44,16 +44,18 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
       await provider.apiService.moveNode(widget.node.id, _selectedUser!);
       if (!mounted) return;
 
-      // 2. Update tags to reflect the new owner (y compris -exit-node / -lan-sharer séparés)
-      final newUserName = normalizeUserName(_selectedUser!.name);
-      final newTags = TagCapabilityHelper.reassignOwnerTags(
-        widget.node.tags,
-        newNormalizedUser: newUserName,
-        engineMode: provider.aclEngineMode,
-      );
+      // 2. Update tags uniquement si le nœud est déjà tagué (ne jamais taguer de force)
+      if (widget.node.tags.isNotEmpty) {
+        final newUserName = normalizeUserName(_selectedUser!.name);
+        final newTags = TagCapabilityHelper.reassignOwnerTags(
+          widget.node.tags,
+          newNormalizedUser: newUserName,
+          engineMode: provider.aclEngineMode,
+        );
 
-      await provider.apiService.setTags(widget.node.id, newTags);
-      if (!mounted) return;
+        await provider.apiService.setTags(widget.node.id, newTags);
+        if (!mounted) return;
+      }
 
       // 3. Handle ACLs if necessary
       bool aclMode = true;

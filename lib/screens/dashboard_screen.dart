@@ -9,6 +9,7 @@ import 'package:headscalemanager/services/route_conflict_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/tag_capability_helper.dart';
 import 'package:headscalemanager/widgets/acl/alignment_assistant_dialog.dart';
+import 'package:headscalemanager/widgets/acl/tagless_route_choice_dialog.dart';
 import 'package:headscalemanager/widgets/deprecated_server_banner.dart';
 import 'package:provider/provider.dart';
 import 'package:headscalemanager/screens/node_detail_screen.dart';
@@ -616,15 +617,32 @@ class _UserNodeCard extends StatelessWidget {
                   }
 
                   if (aclMode) {
-                    // Full logic: Tags + Routes + ACLs
-                    final newTags = TagCapabilityHelper.addCapabilities(
-                      List.from(node.tags),
-                      engineMode: appProvider.aclEngineMode,
-                      normalizedUser: node.getNormalizedOwner(),
-                      addExitNode: isExitNodeRequest,
-                      addLanSharer: approvableLanRoutes.isNotEmpty,
-                    );
-                    await appProvider.apiService.setTags(node.id, newTags);
+                    // Respecter l'absence de tags : demander avant toute conversion vers tagged-devices
+                    bool shouldTag = node.tags.isNotEmpty;
+                    if (node.tags.isEmpty) {
+                      if (!context.mounted) return;
+                      final choice = await showTaglessRouteChoiceDialog(
+                        context,
+                        node: node,
+                        isFr: isFr,
+                        isExitNode: isExitNodeRequest,
+                        isLanSharer: approvableLanRoutes.isNotEmpty,
+                      );
+                      if (choice == TaglessRouteApprovalChoice.cancel) return;
+                      shouldTag = choice ==
+                          TaglessRouteApprovalChoice.convertToTaggedRouter;
+                    }
+
+                    if (shouldTag) {
+                      final newTags = TagCapabilityHelper.addCapabilities(
+                        List.from(node.tags),
+                        engineMode: appProvider.aclEngineMode,
+                        normalizedUser: node.getNormalizedOwner(),
+                        addExitNode: isExitNodeRequest,
+                        addLanSharer: approvableLanRoutes.isNotEmpty,
+                      );
+                      await appProvider.apiService.setTags(node.id, newTags);
+                    }
 
                     await appProvider.apiService
                         .setNodeRoutes(node.id, routesToApprove);
@@ -776,13 +794,15 @@ class _UserNodeCard extends StatelessWidget {
                       .toList();
 
                   if (aclMode) {
-                    // Full logic: Tags + Routes + ACLs
-                    final newTags = TagCapabilityHelper.removeCapabilities(
-                      List.from(node.tags),
-                      removeExitNode: hadExitNode,
-                      removeLanSharer: hadLanSharing,
-                    );
-                    await appProvider.apiService.setTags(node.id, newTags);
+                    // Retirer les tags de capacité uniquement si le nœud porte déjà des tags
+                    if (node.tags.isNotEmpty) {
+                      final newTags = TagCapabilityHelper.removeCapabilities(
+                        List.from(node.tags),
+                        removeExitNode: hadExitNode,
+                        removeLanSharer: hadLanSharing,
+                      );
+                      await appProvider.apiService.setTags(node.id, newTags);
+                    }
 
                     await appProvider.apiService
                         .setNodeRoutes(node.id, remainingRoutes);
