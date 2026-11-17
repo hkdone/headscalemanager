@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/models/user.dart';
+import 'package:headscalemanager/models/version_info.dart';
 import 'package:headscalemanager/services/acl/hujson_comment_service.dart';
 import 'package:headscalemanager/services/acl/policy_infrastructure_builder.dart';
 import 'package:headscalemanager/services/acl/policy_preserver.dart';
@@ -17,6 +19,7 @@ enum AlignmentIssueType {
   legacyAutoApproversExitNodes,
   legacyOrDottedTags,
   invalidDnsNodeNames,
+  incompatibleEngineOrVersion,
   cascadeRuleReferencesUpdated,
   brokenRuleReferences,
 }
@@ -138,6 +141,7 @@ class AlignmentDiagnosticService {
     required List<Node> nodes,
     Map<String, dynamic>? serverPolicy,
     String? serverVersion,
+    AclEngineMode engineMode = AclEngineMode.standard,
     List<Map<String, dynamic>> temporaryRules = const [],
     List<TaildriveShare> taildriveShares = const [],
   }) {
@@ -149,12 +153,31 @@ class AlignmentDiagnosticService {
         serverPolicy != null ? jsonEncode(serverPolicy) : null;
     final rewrites = _CascadeRewrites();
 
+    final isPre26 = VersionInfo.isPreV26(serverVersion);
+    final supportsDns1123 = serverVersion == null ||
+        serverVersion.trim().isEmpty ||
+        serverVersion == 'unknown' ||
+        VersionInfo.checkVersionAtLeast(serverVersion, '0.27.0');
+    final supportsGrants = serverVersion == null ||
+        serverVersion.trim().isEmpty ||
+        serverVersion == 'unknown' ||
+        VersionInfo.checkVersionAtLeast(serverVersion, '0.29.0');
+
+    // 0. Cohérence version serveur <-> mode ACL (grants vs sans grants)
+    _checkEngineVersionCompatibility(
+      workingPolicy: workingPolicy,
+      serverVersion: serverVersion,
+      engineMode: engineMode,
+      supportsGrants: supportsGrants,
+      issues: issues,
+    );
+
     // 1. Double profil Local + OIDC ou nœuds OIDC sans tags à côté de tagués
     _checkDoubleProfileLocalOidc(
       users: users,
       nodes: nodes,
       workingPolicy: workingPolicy,
-      rewrites: rewrites,
+      isPre26: isPre26,
       issues: issues,
     );
 
@@ -163,6 +186,7 @@ class AlignmentDiagnosticService {
       _checkGroupsAndMembers(
         users: users,
         workingPolicy: workingPolicy,
+        isPre26: isPre26,
         rewrites: rewrites,
         issues: issues,
       );
@@ -174,40 +198,45 @@ class AlignmentDiagnosticService {
         users: users,
         nodes: nodes,
         workingPolicy: workingPolicy,
+        isPre26: isPre26,
         rewrites: rewrites,
         issues: issues,
       );
     }
 
-    // 4. Ancien bloc autoApprovers.exitNodes (pré-0.26)
+    // 4. Ancien bloc autoApprovers.exitNodes (supprimé en >= 0.26)
     if (workingPolicy != null) {
       _checkLegacyAutoApproversExitNodes(
         workingPolicy: workingPolicy,
+        isPre26: isPre26,
         issues: issues,
       );
     }
 
-    // 5. Tags fusionnés (;) ou contenant des points (.) sur les nœuds / policy
+    // 5. Tags fusionnés (;) ou contenant des points (.) selon le moteur actif
     _checkLegacyOrDottedTags(
       users: users,
       nodes: nodes,
       workingPolicy: workingPolicy,
+      engineMode: engineMode,
       rewrites: rewrites,
       issues: issues,
     );
 
-    // 6. Noms de machines non conformes RFC 1123 (0.27+)
+    // 6. Noms de machines non conformes RFC 1123 (exigé en >= 0.27)
     _checkInvalidDnsNodeNames(
       nodes: nodes,
+      supportsDns1123: supportsDns1123,
       issues: issues,
     );
 
     // 7. Découvrir aussi les group:/tag:/user mal formés uniquement présents
     // dans les règles (grants/acls/ssh/nodeAttrs/tests/temporaryRules/taildrive)
-    if (workingPolicy != null) {
+    if (workingPolicy != null && !isPre26) {
       _discoverRuleLevelRewrites(
         users: users,
         workingPolicy: workingPolicy,
+        engineMode: engineMode,
         temporaryRules: temporaryRules,
         taildriveShares: taildriveShares,
         rewrites: rewrites,
@@ -286,11 +315,85 @@ class AlignmentDiagnosticService {
     );
   }
 
+  static void _checkEngineVersionCompatibility({
+    required Map<String, dynamic>? workingPolicy,
+    required String? serverVersion,
+    required AclEngineMode engineMode,
+    required bool supportsGrants,
+    required List<AlignmentIssue> issues,
+  }) {
+    final hasPolicyGrants = workingPolicy != null &&
+        workingPolicy['grants'] is List &&
+        (workingPolicy['grants'] as List).isNotEmpty;
+    final hasPolicyAcls = workingPolicy != null &&
+        workingPolicy['acls'] is List &&
+        (workingPolicy['acls'] as List).isNotEmpty;
+
+    if (!supportsGrants) {
+      if (hasPolicyGrants) {
+        issues.add(
+          AlignmentIssue(
+            type: AlignmentIssueType.incompatibleEngineOrVersion,
+            severity: AlignmentIssueSeverity.critical,
+            titleFr:
+                'Bloc "grants" incompatible avec Headscale ${serverVersion ?? "< 0.29"}',
+            titleEn:
+                '"grants" block incompatible with Headscale ${serverVersion ?? "< 0.29"}',
+            descriptionFr:
+                'La politique active contient des règles "grants", supportées uniquement à partir de Headscale 0.29.0. Sur ce serveur, utilisez le moteur Standard ("acls") ou mettez Headscale à jour.',
+            descriptionEn:
+                'Active policy contains "grants" rules, which require Headscale 0.29.0+. Use the Standard engine ("acls") on this server or upgrade Headscale.',
+            affectedItems: [
+              'Serveur : ${serverVersion ?? "?"}',
+              'grants (${(workingPolicy['grants'] as List).length})',
+            ],
+          ),
+        );
+      } else if (engineMode == AclEngineMode.grantsV29) {
+        issues.add(
+          AlignmentIssue(
+            type: AlignmentIssueType.incompatibleEngineOrVersion,
+            severity: AlignmentIssueSeverity.warning,
+            titleFr:
+                'Moteur Grants V29 sélectionné sur serveur < 0.29 (${serverVersion ?? "?"})',
+            titleEn:
+                'Grants V29 engine selected on server < 0.29 (${serverVersion ?? "?"})',
+            descriptionFr:
+                'Headscale < 0.29 ne supporte pas les "grants". L\'application bascule automatiquement sur le moteur Standard ("acls") pour ce serveur.',
+            descriptionEn:
+                'Headscale < 0.29 does not support "grants". The app automatically falls back to the Standard engine ("acls") for this server.',
+            affectedItems: ['Moteur : Grants V29 → Fallback Standard'],
+          ),
+        );
+      }
+      return;
+    }
+
+    if (engineMode == AclEngineMode.grantsV29 &&
+        !hasPolicyGrants &&
+        hasPolicyAcls) {
+      issues.add(
+        AlignmentIssue(
+          type: AlignmentIssueType.incompatibleEngineOrVersion,
+          severity: AlignmentIssueSeverity.info,
+          titleFr:
+              'Serveur prêt pour Grants V29 (politique encore en "acls" seul)',
+          titleEn:
+              'Server ready for Grants V29 (policy still uses "acls" only)',
+          descriptionFr:
+              'Votre serveur (${serverVersion ?? "0.29+"}) est configuré sur le moteur Grants V29, mais la politique active sur le serveur ne contient pas encore de "grants". Régénérez la politique depuis l\'écran ACL si vous souhaitez passer aux Grants avec routage "via".',
+          descriptionEn:
+              'Your server (${serverVersion ?? "0.29+"}) is set to Grants V29, but the live policy has no "grants" yet. Regenerate policy from the ACL screen when ready to use Grants with "via" routing.',
+        ),
+      );
+    }
+  }
+
   static void _checkDoubleProfileLocalOidc({
     required List<User> users,
     required List<Node> nodes,
     required Map<String, dynamic>? workingPolicy,
-    required _CascadeRewrites rewrites,
+    required bool isPre26,
     required List<AlignmentIssue> issues,
   }) {
     final siblingSlugs = <String, Set<User>>{};
@@ -332,7 +435,7 @@ class AlignmentDiagnosticService {
         '${accountList.map((u) => u.email?.isNotEmpty == true ? '${u.name} (${u.email})' : u.name).join(' + ')} → $groupName',
       );
 
-      if (workingPolicy != null && groupsMap != null) {
+      if (!isPre26 && workingPolicy != null && groupsMap != null) {
         final mergedMembers = <String>{};
         final existing = groupsMap[groupName];
         if (existing is List) {
@@ -376,7 +479,10 @@ class AlignmentDiagnosticService {
           user.email!.contains('@') &&
           user.email!.trim().toLowerCase() != user.name.trim().toLowerCase();
 
-      if (workingPolicy != null && groupsMap != null && hasDistinctOidcEmail) {
+      if (!isPre26 &&
+          workingPolicy != null &&
+          groupsMap != null &&
+          hasDistinctOidcEmail) {
         final expected = resolveAclGroupMembers(user.name, email: user.email);
         final currentRaw = groupsMap[groupName];
         final currentList = (currentRaw is List)
@@ -484,9 +590,11 @@ class AlignmentDiagnosticService {
   static void _checkGroupsAndMembers({
     required List<User> users,
     required Map<String, dynamic> workingPolicy,
+    required bool isPre26,
     required _CascadeRewrites rewrites,
     required List<AlignmentIssue> issues,
   }) {
+    if (isPre26) return;
     final groupsRaw = workingPolicy['groups'];
     if (groupsRaw is! Map) return;
 
@@ -609,6 +717,7 @@ class AlignmentDiagnosticService {
     required List<User> users,
     required List<Node> nodes,
     required Map<String, dynamic> workingPolicy,
+    required bool isPre26,
     required _CascadeRewrites rewrites,
     required List<AlignmentIssue> issues,
   }) {
@@ -625,7 +734,8 @@ class AlignmentDiagnosticService {
     final affected = <String>[];
     var changed = false;
 
-    for (final key in tagOwners.keys.toList()) {
+    if (!isPre26) {
+      for (final key in tagOwners.keys.toList()) {
       final rawList = tagOwners[key];
       if (rawList is! List) continue;
       final cleaned = <String>[];
@@ -650,9 +760,10 @@ class AlignmentDiagnosticService {
           tagChanged = true;
         }
       }
-      if (tagChanged) {
-        tagOwners[key] = cleaned.toSet().toList();
-        changed = true;
+        if (tagChanged) {
+          tagOwners[key] = cleaned.toSet().toList();
+          changed = true;
+        }
       }
     }
 
@@ -701,6 +812,7 @@ class AlignmentDiagnosticService {
 
   static void _checkLegacyAutoApproversExitNodes({
     required Map<String, dynamic> workingPolicy,
+    required bool isPre26,
     required List<AlignmentIssue> issues,
   }) {
     final autoApproversRaw = workingPolicy['autoApprovers'];
@@ -708,12 +820,7 @@ class AlignmentDiagnosticService {
       return;
     }
 
-    final autoApprovers = Map<String, dynamic>.from(autoApproversRaw);
-    final oldExitNodes = autoApprovers['exitNodes'];
-    final routes = (autoApprovers['routes'] is Map)
-        ? Map<String, dynamic>.from(autoApprovers['routes'] as Map)
-        : <String, dynamic>{};
-
+    final oldExitNodes = autoApproversRaw['exitNodes'];
     final migratedApprovers = <String>[];
     if (oldExitNodes is List) {
       for (final item in oldExitNodes) {
@@ -721,6 +828,31 @@ class AlignmentDiagnosticService {
         if (str.isNotEmpty) migratedApprovers.add(str);
       }
     }
+
+    if (isPre26) {
+      issues.add(
+        AlignmentIssue(
+          type: AlignmentIssueType.legacyAutoApproversExitNodes,
+          severity: AlignmentIssueSeverity.info,
+          titleFr: 'Bloc "autoApprovers.exitNodes" (pré-0.26) à migrer après upgrade',
+          titleEn: '"autoApprovers.exitNodes" (pre-0.26) to migrate after server upgrade',
+          descriptionFr:
+              'Votre serveur est encore en < 0.26 où "exitNodes" fonctionne, mais ce champ est supprimé dès la 0.26+. Il sera converti vers routes["0.0.0.0/0", "::/0"] après mise à jour.',
+          descriptionEn:
+              'Your server is still on < 0.26 where "exitNodes" works, but it is removed in 0.26+. Upgrade the server first, then migrate to routes["0.0.0.0/0", "::/0"].',
+          affectedItems: migratedApprovers.isEmpty
+              ? const ['autoApprovers.exitNodes']
+              : migratedApprovers,
+          canAutoFixPolicy: false,
+        ),
+      );
+      return;
+    }
+
+    final autoApprovers = Map<String, dynamic>.from(autoApproversRaw);
+    final routes = (autoApprovers['routes'] is Map)
+        ? Map<String, dynamic>.from(autoApprovers['routes'] as Map)
+        : <String, dynamic>{};
 
     for (final cidr in const ['0.0.0.0/0', '::/0']) {
       final list = (routes[cidr] is List)
@@ -758,11 +890,13 @@ class AlignmentDiagnosticService {
     required List<User> users,
     required List<Node> nodes,
     required Map<String, dynamic>? workingPolicy,
+    required AclEngineMode engineMode,
     required _CascadeRewrites rewrites,
     required List<AlignmentIssue> issues,
   }) {
     final actions = <AlignmentNodeAction>[];
     final affected = <String>[];
+    final keepLegacyMerged = engineMode == AclEngineMode.legacy;
 
     Map<String, dynamic>? tagOwners;
     if (workingPolicy != null) {
@@ -771,7 +905,64 @@ class AlignmentDiagnosticService {
           : <String, dynamic>{};
     }
 
+    final legacyNodesInLegacyMode = <String>[];
+
     for (final node in nodes) {
+      if (keepLegacyMerged) {
+        if (node.tags.any((t) => t.contains(';'))) {
+          legacyNodesInLegacyMode.add(node.name);
+        }
+        // En mode Legacy : ne corriger QUE les points (.) tout en gardant ';'
+        if (!node.tags.any((t) => t.contains('.'))) continue;
+        final dotFixed = node.tags.map((t) {
+          if (!t.contains('.')) return t;
+          return t.startsWith('tag:')
+              ? 'tag:${t.substring(4).replaceAll('.', '-').toLowerCase()}'
+              : t.replaceAll('.', '-').toLowerCase();
+        }).toList();
+        if (jsonEncode(dotFixed) == jsonEncode(node.tags)) continue;
+
+        for (int idx = 0; idx < node.tags.length; idx++) {
+          final oldTag = node.tags[idx];
+          if (oldTag.contains('.')) {
+            rewrites.activeLegacyNodeTags.add(oldTag);
+            rewrites.tagReplacements[oldTag] = [dotFixed[idx]];
+          }
+        }
+        affected.add('${node.name}: ${node.tags.join(', ')} → ${dotFixed.join(', ')}');
+        actions.add(
+          AlignmentNodeAction(
+            nodeId: node.id,
+            nodeName: node.name,
+            newTags: dotFixed,
+            summaryFr: '${node.name} : ${node.tags.join(", ")} → ${dotFixed.join(", ")}',
+            summaryEn: '${node.name}: ${node.tags.join(", ")} → ${dotFixed.join(", ")}',
+          ),
+        );
+        if (tagOwners != null) {
+          final ownerNorm = node.getNormalizedOwner();
+          final ownerGroup = (ownerNorm.isNotEmpty &&
+                  ownerNorm != 'tagged-devices' &&
+                  ownerNorm != 'n-a' &&
+                  ownerNorm != 'na')
+              ? 'group:${normalizeUserName(ownerNorm)}'
+              : (users.isNotEmpty
+                  ? 'group:${normalizeUserName(users.first.name)}'
+                  : null);
+          if (ownerGroup != null) {
+            for (final tag in dotFixed) {
+              if (!tag.startsWith('tag:')) continue;
+              final owners = (tagOwners[tag] is List)
+                  ? (tagOwners[tag] as List).map((e) => e.toString()).toSet()
+                  : <String>{};
+              owners.add(ownerGroup);
+              tagOwners[tag] = owners.toList();
+            }
+          }
+        }
+        continue;
+      }
+
       final needsFix =
           node.tags.any((t) => t.contains(';') || t.contains('.'));
       if (!needsFix) continue;
@@ -828,9 +1019,14 @@ class AlignmentDiagnosticService {
     if (tagOwners != null) {
       for (final rawTag in tagOwners.keys.toList()) {
         if (!rawTag.startsWith('tag:')) continue;
-        if (!rawTag.contains(';') && !rawTag.contains('.')) continue;
+        final needsSplit = !keepLegacyMerged && rawTag.contains(';');
+        if (!needsSplit && !rawTag.contains('.')) continue;
 
-        final replacementTags = _mapSingleOldTag(rawTag);
+        final replacementTags = keepLegacyMerged
+            ? [
+                'tag:${rawTag.substring(4).replaceAll('.', '-').toLowerCase()}'
+              ]
+            : _mapSingleOldTag(rawTag);
         rewrites.tagReplacements.putIfAbsent(rawTag, () => replacementTags);
 
         final oldOwners = (tagOwners[rawTag] is List)
@@ -854,28 +1050,48 @@ class AlignmentDiagnosticService {
       }
     }
 
-    if (actions.isEmpty && !tagOwnersCleaned) return;
+    if (actions.isNotEmpty || tagOwnersCleaned) {
+      if (workingPolicy != null && tagOwners != null) {
+        workingPolicy['tagOwners'] = tagOwners;
+      }
 
-    if (workingPolicy != null && tagOwners != null) {
-      workingPolicy['tagOwners'] = tagOwners;
+      issues.add(
+        AlignmentIssue(
+          type: AlignmentIssueType.legacyOrDottedTags,
+          severity: AlignmentIssueSeverity.warning,
+          titleFr: keepLegacyMerged
+              ? 'Tags avec points (.) détectés'
+              : 'Tags legacy (;) ou avec points (.) détectés',
+          titleEn: keepLegacyMerged
+              ? 'Dotted (.) tags detected'
+              : 'Legacy (;) or dotted (.) tags detected',
+          descriptionFr: keepLegacyMerged
+              ? 'Ces tags contiennent des points qui isolent l\'appareil. Ils peuvent être normalisés avec des tirets (-) sans casser vos tags Legacy (;).'
+              : 'Ces tags datent de l\'ancien moteur ou contiennent des points : ils empêchent une migration propre vers Grants V29 ou isolent l\'appareil. Ils peuvent être convertis au format Standard et répercutés automatiquement dans toutes vos règles.',
+          descriptionEn: keepLegacyMerged
+              ? 'These tags contain dots that isolate devices. They can be normalized with hyphens (-) while preserving Legacy (;) tags.'
+              : 'These tags use the deprecated semicolon format or contain dots, blocking clean Grants V29 migration or isolating the node. They can be converted to Standard tags and updated across all rules.',
+          affectedItems: affected.toSet().toList(),
+          canAutoFixPolicy: workingPolicy != null,
+          canAutoFixNodes: actions.isNotEmpty,
+          nodeActions: actions,
+        ),
+      );
+    } else if (keepLegacyMerged && legacyNodesInLegacyMode.isNotEmpty) {
+      issues.add(
+        AlignmentIssue(
+          type: AlignmentIssueType.legacyOrDottedTags,
+          severity: AlignmentIssueSeverity.info,
+          titleFr: 'Tags fusionnés (;) actifs en mode Legacy',
+          titleEn: 'Merged (;) tags active in Legacy mode',
+          descriptionFr:
+              'Votre serveur utilise actuellement le moteur Legacy : vos tags fusionnés (;) restent conservés. Pensez à migrer vers Standard ou Grants V29 avant l\'arrivée de Headscale 0.30.',
+          descriptionEn:
+              'Your server is currently using the Legacy engine: merged (;) tags are preserved. Consider migrating to Standard or Grants V29 ahead of Headscale 0.30.',
+          affectedItems: legacyNodesInLegacyMode,
+        ),
+      );
     }
-
-    issues.add(
-      AlignmentIssue(
-        type: AlignmentIssueType.legacyOrDottedTags,
-        severity: AlignmentIssueSeverity.warning,
-        titleFr: 'Tags legacy (;) ou avec points (.) détectés',
-        titleEn: 'Legacy (;) or dotted (.) tags detected',
-        descriptionFr:
-            'Ces tags datent de l\'ancien moteur ou contiennent des points : ils empêchent une migration propre vers Grants V29 ou isolent l\'appareil. Ils peuvent être convertis au format Standard et répercutés automatiquement dans toutes vos règles.',
-        descriptionEn:
-            'These tags use the deprecated semicolon format or contain dots, blocking clean Grants V29 migration or isolating the node. They can be converted to Standard tags and updated across all rules.',
-        affectedItems: affected.toSet().toList(),
-        canAutoFixPolicy: workingPolicy != null,
-        canAutoFixNodes: actions.isNotEmpty,
-        nodeActions: actions,
-      ),
-    );
   }
 
   static List<String> _mapSingleOldTag(
@@ -921,6 +1137,7 @@ class AlignmentDiagnosticService {
 
   static void _checkInvalidDnsNodeNames({
     required List<Node> nodes,
+    required bool supportsDns1123,
     required List<AlignmentIssue> issues,
   }) {
     final existingLowerNames = nodes.map((n) => n.name.toLowerCase()).toSet();
@@ -965,13 +1182,21 @@ class AlignmentDiagnosticService {
     issues.add(
       AlignmentIssue(
         type: AlignmentIssueType.invalidDnsNodeNames,
-        severity: AlignmentIssueSeverity.warning,
-        titleFr: 'Noms de nœuds non conformes DNS-1123 (>= 0.27)',
-        titleEn: 'Node names non-compliant with DNS-1123 (>= 0.27)',
-        descriptionFr:
-            'Headscale ≥ 0.27 exige des noms de machines en minuscules alphanumériques/tirets uniquement (RFC 1123). Ces noms seront également indispensables pour les alias "hosts" sans tags.',
-        descriptionEn:
-            'Headscale ≥ 0.27 requires lowercase alphanumeric/hyphen DNS-1123 node names. Valid names are also required for tagless "hosts" aliases.',
+        severity: supportsDns1123
+            ? AlignmentIssueSeverity.warning
+            : AlignmentIssueSeverity.info,
+        titleFr: supportsDns1123
+            ? 'Noms de nœuds non conformes DNS-1123 (>= 0.27)'
+            : 'Noms de nœuds à préparer pour DNS-1123 (>= 0.27)',
+        titleEn: supportsDns1123
+            ? 'Node names non-compliant with DNS-1123 (>= 0.27)'
+            : 'Node names to prepare for DNS-1123 (>= 0.27)',
+        descriptionFr: supportsDns1123
+            ? 'Headscale ≥ 0.27 exige des noms de machines en minuscules alphanumériques/tirets uniquement (RFC 1123). Ces noms seront également indispensables pour les alias "hosts" sans tags.'
+            : 'Votre serveur est encore en < 0.27, mais anticiper ces renommages évitera tout blocage lors de la mise à jour vers Headscale ≥ 0.27 ou pour les alias "hosts".',
+        descriptionEn: supportsDns1123
+            ? 'Headscale ≥ 0.27 requires lowercase alphanumeric/hyphen DNS-1123 node names. Valid names are also required for tagless "hosts" aliases.'
+            : 'Your server is below 0.27, but renaming these nodes now prepares cleanly for Headscale ≥ 0.27.',
         affectedItems: affected,
         canAutoFixNodes: true,
         nodeActions: actions,
@@ -987,6 +1212,7 @@ class AlignmentDiagnosticService {
   static void _discoverRuleLevelRewrites({
     required List<User> users,
     required Map<String, dynamic> workingPolicy,
+    required AclEngineMode engineMode,
     required List<Map<String, dynamic>> temporaryRules,
     required List<TaildriveShare> taildriveShares,
     required _CascadeRewrites rewrites,
@@ -1038,11 +1264,18 @@ class AlignmentDiagnosticService {
       }
 
       if (token.startsWith('tag:')) {
+        final hasDot = token.contains('.');
+        final hasSemicolon = token.contains(';');
+        final shouldSplit =
+            engineMode != AclEngineMode.legacy && hasSemicolon;
         if (!rewrites.tagReplacements.containsKey(token) &&
-            (token.contains('.') || token.contains(';'))) {
-          final mapped = _mapSingleOldTag(token);
-          if (mapped.any(tagOwnersMap.contains) ||
-              mapped.first != token) {
+            (hasDot || shouldSplit)) {
+          final mapped = shouldSplit
+              ? _mapSingleOldTag(token)
+              : [
+                  'tag:${token.substring(4).replaceAll('.', '-').toLowerCase()}'
+                ];
+          if (mapped.any(tagOwnersMap.contains) || mapped.first != token) {
             rewrites.tagReplacements[token] = mapped;
           }
         }
@@ -1581,11 +1814,6 @@ class AlignmentDiagnosticService {
       if (workingPolicy['tagOwners'] is Map)
         ...(workingPolicy['tagOwners'] as Map).keys.map((k) => k.toString()),
       for (final n in nodes) ...n.tags,
-      for (final u in users) ...[
-        'tag:${normalizeUserName(u.name)}-client',
-        'tag:${normalizeUserName(u.name)}-exit-node',
-        'tag:${normalizeUserName(u.name)}-lan-sharer',
-      ],
     };
 
     final broken = <String>[];

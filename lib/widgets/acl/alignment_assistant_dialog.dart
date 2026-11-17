@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/models/version_info.dart';
@@ -19,10 +20,12 @@ import 'package:provider/provider.dart';
 /// envoi vers Headscale.
 class AlignmentAssistantDialog extends StatefulWidget {
   final bool isPreflight;
+  final AclEngineMode? targetEngineMode;
 
   const AlignmentAssistantDialog({
     super.key,
     this.isPreflight = false,
+    this.targetEngineMode,
   });
 
   /// Ouvre le diagnostic et retourne `true` si des modifications ont été
@@ -30,10 +33,14 @@ class AlignmentAssistantDialog extends StatefulWidget {
   static Future<bool> show(
     BuildContext context, {
     bool isPreflight = false,
+    AclEngineMode? targetEngineMode,
   }) async {
     final result = await showDialog<bool>(
       context: context,
-      builder: (_) => AlignmentAssistantDialog(isPreflight: isPreflight),
+      builder: (_) => AlignmentAssistantDialog(
+        isPreflight: isPreflight,
+        targetEngineMode: targetEngineMode,
+      ),
     );
     return result ?? false;
   }
@@ -91,6 +98,7 @@ class _AlignmentAssistantDialogState extends State<AlignmentAssistantDialog> {
         nodes: nodes,
         serverPolicy: bundle.policy,
         serverVersion: provider.serverVersion,
+        engineMode: widget.targetEngineMode ?? provider.aclEngineMode,
         temporaryRules: tempRules,
         taildriveShares: provider.taildriveShares,
       );

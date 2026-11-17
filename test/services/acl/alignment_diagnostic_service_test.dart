@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/models/user.dart';
@@ -382,6 +383,103 @@ void main() {
       expect(report.alignedTemporaryRules!.first['src'], equals('group:clarisse-leclerc'));
       expect(report.alignedTemporaryRules!.first['dst'], equals('tag:clarisse-leclerc-client'));
       expect(report.alignedTaildriveShares!.first.recipient, equals('group:clarisse-leclerc'));
+    });
+
+    test('respecte le mode Legacy (ne split pas les tags ;) et les versions serveur (< 0.26, < 0.29, no-tag)', () {
+      final users = [
+        User(id: '1', name: 'bob', createdAt: DateTime(2026, 1, 1)),
+      ];
+      final nodesLegacy = [
+        _makeNode(
+          id: '1',
+          name: 'bob-router',
+          user: 'bob',
+          userId: '1',
+          tags: const ['tag:bob-client;exit-node'],
+        ),
+      ];
+      final policyLegacy = {
+        'groups': {
+          'group:bob': ['bob@'],
+        },
+        'tagOwners': {
+          'tag:bob-client;exit-node': ['group:bob'],
+        },
+        'acls': [
+          {
+            'action': 'accept',
+            'src': ['tag:bob-client;exit-node'],
+            'dst': ['autogroup:internet:*'],
+          },
+        ],
+      };
+
+      // 1. En mode Legacy sur 0.28, ne doit PAS demander à découper ;exit-node
+      final legacyReport = AlignmentDiagnosticService.inspect(
+        users: users,
+        nodes: nodesLegacy,
+        serverPolicy: policyLegacy,
+        serverVersion: '0.28.0',
+        engineMode: AclEngineMode.legacy,
+      );
+      expect(legacyReport.hasNodeFixes, isFalse);
+      expect(legacyReport.hasPolicyFix, isFalse);
+
+      // 2. Serveur < 0.29 avec bloc grants -> signale l'incompatibilité
+      final grantsOn28 = AlignmentDiagnosticService.inspect(
+        users: users,
+        nodes: [
+          _makeNode(id: '2', name: 'bob-phone', user: 'bob', userId: '1'),
+        ],
+        serverPolicy: {
+          'groups': {'group:bob': ['bob@']},
+          'grants': [
+            {'src': ['group:bob'], 'dst': ['group:bob'], 'ip': ['*']},
+          ],
+        },
+        serverVersion: '0.28.0',
+        engineMode: AclEngineMode.standard,
+      );
+      expect(
+        grantsOn28.issues.any(
+          (i) => i.type == AlignmentIssueType.incompatibleEngineOrVersion,
+        ),
+        isTrue,
+      );
+
+      // 3. Flotte 100% sans tag sur 0.29 -> aucune erreur ni exigence de tag
+      final noTagClean = AlignmentDiagnosticService.inspect(
+        users: users,
+        nodes: [
+          _makeNode(id: '3', name: 'bob-phone', user: 'bob', userId: '1'),
+        ],
+        serverPolicy: {
+          'groups': {'group:bob': ['bob@']},
+          'grants': [
+            {'src': ['group:bob'], 'dst': ['group:bob'], 'ip': ['*']},
+          ],
+        },
+        serverVersion: '0.29.2',
+        engineMode: AclEngineMode.grantsV29,
+      );
+      expect(noTagClean.isClean, isTrue);
+
+      // 4. Serveur pré-0.26 : ne supprime pas autoApprovers.exitNodes automatiquement
+      final pre26Report = AlignmentDiagnosticService.inspect(
+        users: users,
+        nodes: [
+          _makeNode(id: '4', name: 'bob-pc', user: 'bob', userId: '1'),
+        ],
+        serverPolicy: {
+          'groups': {'group:bob': ['bob']},
+          'autoApprovers': {
+            'exitNodes': ['tag:bob-exit-node'],
+          },
+        },
+        serverVersion: '0.25.1',
+        engineMode: AclEngineMode.standard,
+      );
+      expect(pre26Report.hasPolicyFix, isFalse);
     });
   });
 }

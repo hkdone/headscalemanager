@@ -772,6 +772,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           nodes: results[1] as List<Node>,
           serverPolicy: policy,
           serverVersion: appProvider.serverVersion,
+          engineMode: targetMode,
           temporaryRules: tempRules,
           taildriveShares: appProvider.taildriveShares,
         );
@@ -779,6 +780,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           final proceed = await AlignmentAssistantDialog.show(
             context,
             isPreflight: true,
+            targetEngineMode: targetMode,
           );
           if (!proceed || !context.mounted) return;
         }
