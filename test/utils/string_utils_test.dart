@@ -37,13 +37,13 @@ void main() {
   });
 
   group('resolveAclGroupMembers', () {
-    test('utilise l\'email si présent et valide (cas OIDC Marine Leclerc)', () {
+    test('utilise l\'email si présent et le nom local avec @ (cas OIDC Marine Leclerc)', () {
       final members = resolveAclGroupMembers(
         'marine',
         email: 'marine.leclerc.pro@gmail.com',
       );
-      // Doit contenir l'email et NE DOIT PAS contenir 'marine' sans @
       expect(members, contains('marine.leclerc.pro@gmail.com'));
+      expect(members, contains('marine@'));
       expect(members.contains('marine'), isFalse);
       for (final m in members) {
         expect(m.contains('@'), isTrue, reason: 'Tailscale/Headscale exige @ dans chaque membre');
@@ -55,9 +55,9 @@ void main() {
       expect(members, ['jean@synology.me']);
     });
 
-    test('ajoute le domaine de repli pour un utilisateur local sans @', () {
+    test('utilise username@ (Policy v2) pour un utilisateur local sans @ ni email', () {
       final members = resolveAclGroupMembers('localuser', fallbackDomain: 'mydomain.com');
-      expect(members, ['localuser@mydomain.com']);
+      expect(members, ['localuser@']);
     });
 
     test('tous les membres produits contiennent impérativement @', () {

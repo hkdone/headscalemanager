@@ -45,7 +45,7 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 | **1** | [Plan 10 — Cybersécurité & Résilience](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_10_v2.4.0_cybersecurite_et_resilience.md) | `2.2.0+157` | `sec/hardening-pin-network-sast` | Aucune | 🟢 Très Faible | ✅ Validé & Mergé |
 | **2** | [Plan 08 — Compatibilité & Non-Destructif](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_08_v2.2.0_compatibilite_et_securite_acl.md) | `2.3.0+158` | `fix/compat-non-destructive-acl` | Aucune | 🟡 Moyen | ✅ Validé & Mergé |
 | **3** | [Plan 11 — Diff, Simulateur, SSH & API](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_11_v2.5.0_simulateur_diff_ssh_et_api.md) | `2.4.0+161` | `feat/acl-simulator-diff-ssh-api` | Plan 08 | 🟢 Très Faible | ✅ Validé, Mergé & Publié |
-| **4.0** | [Sous-Plan 09-0 — Dépréciation $N-2$ & Diagnostic d'Alignement](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_0_deprecation_audit_et_alignement.md) | `2.5.0+162` | `feat/acl-09-0-deprecation-and-alignment` | Plan 11 | 🟢 Très Faible | ⬜ À faire |
+| **4.0** | [Sous-Plan 09-0 — Dépréciation $N-2$ & Diagnostic d'Alignement](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_0_deprecation_audit_et_alignement.md) | `2.5.0+162` | `feat/acl-09-0-deprecation-and-alignment` | Plan 11 | 🟢 Très Faible | 🧪 En test interne |
 | **4.A** | [Sous-Plan 09-A — Cœur Hybride & Résolution Simulateur/Graphe](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_A_coeur_hybride_et_groupes.md) | `2.5.1+163` | `feat/acl-09-a-hybrid-core` | Sous-Plan 09-0 | 🟢 Faible | ⬜ À faire |
 | **4.B** | [Sous-Plan 09-B — Stop Auto-Tagging & Centre de Bascule Guidée](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_B_arret_autotagging_et_assistant_bascule.md) | `2.5.2+164` | `feat/acl-09-b-stop-autotag-and-wizard` | Sous-Plan 09-A | 🟡 Faible-Moyen | ⬜ À faire |
 | **4.C** | [Sous-Plan 09-C — Moteur `Sans Tags` & Constructeurs Manuels](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_C_moteur_tagless_et_constructeurs.md) | `2.6.0+165` | `feat/acl-09-c-tagless-and-builders` | Sous-Plan 09-B | 🟡 Moyen | ⬜ À faire |
@@ -71,10 +71,10 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 ---
 
 ### Étape 4.0 — Sous-Plan 09-0 (`feat/acl-09-0-deprecation-and-alignment` → `2.5.0+162`)
-- [ ] **09-0.1** `VersionInfo.isServerDeprecated` + `DeprecatedServerBanner` (bandeau rouge sur Dashboard et Paramètres pour tout serveur $\le 0.27$, soit $\le N-2$)
-- [ ] **09-0.2** Purge des règles pré-v0.26 obsolètes + alignement de `resolveAclGroupMembers` sur Policy v2 (`"user@"` pour les comptes locaux sans email, email pour OIDC)
-- [ ] **09-0.3** `AlignmentDiagnosticService` + `AlignmentAssistantDialog` : détection et mise en conformité assistée avec accord utilisateur et aperçu Diff (unification double profil Local + Mobile OIDC, `groups` mal formés, `tagOwners` incomplets, `exitNodes` pré-0.26, tags `;`/`.`, noms DNS-1123)
-- [ ] **Gate 4.0 (Validation avant merge)** : `flutter analyze` (0 issue) • Tests unitaires `resolveAclGroupMembers` & `AlignmentDiagnosticService` • Vérification visuelle du bandeau rouge ($\le 0.27$) et du Diagnostic d'Alignement sur le serveur actif
+- [x] **09-0.1** `VersionInfo.isServerDeprecated` + `DeprecatedServerBanner` (bandeau rouge sur Dashboard et Paramètres pour tout serveur $\le 0.27$, soit $\le N-2$)
+- [x] **09-0.2** Purge des règles pré-v0.26 obsolètes + alignement de `resolveAclGroupMembers` sur Policy v2 (`"user@"` pour les comptes locaux sans email, email pour OIDC)
+- [x] **09-0.3** `AlignmentDiagnosticService` + `AlignmentAssistantDialog` : détection et mise en conformité assistée avec accord utilisateur et aperçu Diff (unification double profil Local + Mobile OIDC, `groups` mal formés, `tagOwners` incomplets, `exitNodes` pré-0.26, tags `;`/`.`, noms DNS-1123)
+- [ ] **Gate 4.0 (Validation avant merge)** : `flutter analyze` (0 issue) ✅ • Tests unitaires `resolveAclGroupMembers` & `AlignmentDiagnosticService` ✅ • Vérification visuelle du bandeau rouge ($\le 0.27$) et du Diagnostic d'Alignement sur le serveur actif *(à valider en test interne)*
 
 ### Étape 4.A — Sous-Plan 09-A (`feat/acl-09-a-hybrid-core` → `2.5.1+163`)
 - [ ] **09-A.1** Union hybride `[...sortedTags, groupName]` dans `GrantsV29GeneratorService` et `StandardAclGeneratorService` pour les parcs mixtes (machines taguées + machines sans tags) + gestion conditionnelle de `"via"` (avec ou sans tag routeur)

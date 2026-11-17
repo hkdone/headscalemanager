@@ -1,4 +1,11 @@
 class VersionInfo {
+  /// Version majeure/mineure de référence courante de Headscale supportée par l'app.
+  static const String currentReferenceVersion = '0.29.0';
+  static const String currentReferenceShort = '0.29';
+
+  /// Seuil minimal activement supporté sans avertissement (fenêtre N et N-1).
+  static const String minActivelySupportedVersion = '0.28.0';
+
   final String version;
   final String commit;
   final String buildTime;
@@ -21,6 +28,23 @@ class VersionInfo {
       dirty: json['dirty'] ?? false,
       go: GoInfo.fromJson(json['go'] ?? {}),
     );
+  }
+
+  /// Indique si la version serveur connectée a au moins 2 versions de retard
+  /// (<= N-2, soit < 0.28.0 par rapport à la référence 0.29).
+  static bool isServerDeprecated(String? serverVersion) {
+    if (serverVersion == null) return false;
+    final trimmed = serverVersion.trim();
+    if (trimmed.isEmpty || trimmed == 'unknown') return false;
+    return !checkVersionAtLeast(trimmed, minActivelySupportedVersion);
+  }
+
+  /// Indique si le serveur est antérieur à Headscale 0.26.0 (palier déjà échu).
+  static bool isPreV26(String? serverVersion) {
+    if (serverVersion == null) return false;
+    final trimmed = serverVersion.trim();
+    if (trimmed.isEmpty || trimmed == 'unknown') return false;
+    return !checkVersionAtLeast(trimmed, '0.26.0');
   }
 
   /// Helper statique pour vérifier une version sans instancier l'objet.

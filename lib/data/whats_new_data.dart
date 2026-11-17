@@ -14,6 +14,18 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '2.5.0',
+        title: isFr
+            ? 'Release 2.5.0 — Gouvernance N-2 & Diagnostic Intelligent ACL'
+            : 'Release 2.5.0 — N-2 Governance & Smart ACL Diagnostic',
+        description: isFr
+            ? 'Alerte visuelle pour les serveurs Headscale obsolètes (≤ 0.27), alignement automatique des groupes Policy v2 ("nom@" pour comptes locaux et unification Local/OIDC), et nouvel assistant Diagnostic & Alignement ACL avec correction 1-clic sur aperçu Diff.'
+            : 'Visual warning banner for outdated Headscale servers (≤ 0.27), Policy v2 group alignment ("username@" for local accounts and Local/OIDC identity unification), and new ACL Alignment Diagnostic assistant with 1-click Diff-preview fixes.',
+        verification: isFr
+            ? 'ACLs > icône bouclier/santé (ou menu ⋮) • Paramètres > Diagnostic & Alignement ACL'
+            : 'ACLs > health shield icon (or ⋮ menu) • Settings > ACL Alignment Diagnostic',
+      ),
+      WhatsNewVersion(
         version: '2.4.0',
         title: isFr
             ? 'Release 2.4.0 — Diff Visuel, Simulateur ACL, Tailscale SSH & API'

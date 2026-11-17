@@ -36,6 +36,7 @@ import 'package:headscalemanager/utils/json_utils.dart';
 import 'package:headscalemanager/utils/tag_capability_helper.dart';
 import 'package:headscalemanager/models/version_info.dart';
 import 'package:headscalemanager/widgets/acl/acl_simulator_sheet.dart';
+import 'package:headscalemanager/widgets/acl/alignment_assistant_dialog.dart';
 import 'package:headscalemanager/widgets/acl/ssh_rules_list_view.dart';
 
 class AclScreen extends StatefulWidget {
@@ -352,6 +353,7 @@ class _AclScreenState extends State<AclScreen> {
                 nodes: _allNodes,
                 isFr: isFr,
                 compact: true,
+                onOpenDiagnostic: _openAlignmentDiagnostic,
               ),
             ),
             if (_isLocalDraft) AclWorkflowGuide(isFr: isFr),
@@ -581,6 +583,13 @@ class _AclScreenState extends State<AclScreen> {
       _jsonParseError = null;
       _updateAclControllerText();
     });
+  }
+
+  Future<void> _openAlignmentDiagnostic() async {
+    final changed = await AlignmentAssistantDialog.show(context);
+    if (changed && mounted) {
+      await _loadInitialData();
+    }
   }
 
   Future<void> _openAclSimulator() async {
@@ -914,6 +923,9 @@ class _AclScreenState extends State<AclScreen> {
           case 'simulate':
             _openAclSimulator();
             break;
+          case 'diagnostic':
+            _openAlignmentDiagnostic();
+            break;
           case 'backup':
             _exportPolicyBackup();
             break;
@@ -948,6 +960,14 @@ class _AclScreenState extends State<AclScreen> {
               leading: const Icon(Icons.radar),
               title: Text(
                   isFr ? 'Simulateur de flux ACL' : 'ACL Flow Simulator')),
+        ),
+        PopupMenuItem<String>(
+          value: 'diagnostic',
+          child: ListTile(
+              leading: const Icon(Icons.health_and_safety_outlined),
+              title: Text(isFr
+                  ? 'Diagnostic & Alignement ACL'
+                  : 'ACL Alignment Diagnostic')),
         ),
         const PopupMenuDivider(),
         PopupMenuItem<String>(

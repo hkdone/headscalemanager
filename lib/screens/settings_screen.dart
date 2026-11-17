@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:headscalemanager/models/acl_engine_mode.dart';
+import 'package:headscalemanager/models/node.dart';
+import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/models/version_info.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/help_screen.dart';
@@ -15,7 +17,11 @@ import 'package:headscalemanager/services/tag_migration_service.dart';
 import 'package:headscalemanager/widgets/server_list_tile.dart';
 import 'package:headscalemanager/widgets/grants_migration_dialog.dart';
 import 'package:headscalemanager/screens/api_keys_screen.dart';
+import 'package:headscalemanager/services/acl/alignment_diagnostic_service.dart';
+import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
+import 'package:headscalemanager/widgets/acl/alignment_assistant_dialog.dart';
+import 'package:headscalemanager/widgets/deprecated_server_banner.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -61,6 +67,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              DeprecatedServerBanner(
+                serverVersion: appProvider.serverVersion,
+                isFr: isFr,
+                margin: const EdgeInsets.only(bottom: 12),
+                onOpenDiagnostic: () => AlignmentAssistantDialog.show(context),
+              ),
               Text(isFr ? 'Serveurs' : 'Servers',
                   style: theme.textTheme.headlineSmall),
               const SizedBox(height: 16),
@@ -213,6 +225,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     color: Colors.blue,
                                   ),
                                 ),
+                              ),
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(
+                                    Icons.health_and_safety_outlined,
+                                    color: Colors.teal),
+                                title: Text(
+                                  isFr
+                                      ? 'Diagnostic & Alignement ACL'
+                                      : 'ACL Alignment Diagnostic',
+                                  style: theme.textTheme.bodyLarge,
+                                ),
+                                subtitle: Text(
+                                  isFr
+                                      ? 'Vérifie identités Local/OIDC, groups (@), tagOwners et noms DNS-1123.'
+                                      : 'Checks Local/OIDC identities, groups (@), tagOwners and DNS-1123 names.',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () =>
+                                    AlignmentAssistantDialog.show(context),
                               ),
                               ListTile(
                                 contentPadding: EdgeInsets.zero,
@@ -727,6 +760,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool forceConfirm = false,
   }) async {
     if (appProvider.aclEngineMode == targetMode && !forceConfirm) return;
+
+    // Pre-flight check d'alignement avant bascule vers un moteur moderne (Grants V29 ou sortie Legacy)
+    if (targetMode == AclEngineMode.grantsV29 ||
+        (appProvider.aclEngineMode == AclEngineMode.legacy &&
+            targetMode != AclEngineMode.legacy)) {
+      try {
+        final results = await Future.wait([
+          appProvider.apiService.getUsers(),
+          appProvider.apiService.getNodes(),
+        ]);
+        final policy = await PolicyPreserver.fetchServerPolicySafely(
+          appProvider.apiService,
+        );
+        final report = AlignmentDiagnosticService.inspect(
+          users: results[0] as List<User>,
+          nodes: results[1] as List<Node>,
+          serverPolicy: policy,
+          serverVersion: appProvider.serverVersion,
+        );
+        if (!report.isClean && context.mounted) {
+          final proceed = await AlignmentAssistantDialog.show(
+            context,
+            isPreflight: true,
+          );
+          if (!proceed || !context.mounted) return;
+        }
+      } catch (_) {
+        // Serveur inaccessible : ne pas bloquer le changement manuel.
+      }
+    }
 
     if (appProvider.aclEngineMode == AclEngineMode.grantsV29 &&
         targetMode != AclEngineMode.grantsV29) {
