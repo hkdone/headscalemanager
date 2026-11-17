@@ -14,6 +14,18 @@ class WhatsNewVersion {
   static List<WhatsNewVersion> getVersions(bool isFr) {
     return [
       WhatsNewVersion(
+        version: '2.5.1',
+        title: isFr
+            ? 'Release 2.5.1 — Cœur Hybride Zéro-Coupure (Tags + Sans Tags)'
+            : 'Release 2.5.1 — Zero-Downtime Hybrid Core (Tagged + Tagless)',
+        description: isFr
+            ? 'Support hybride natif (Grants V29 & Standard) : les appareils sans tag (OIDC/Locaux) sont reliés automatiquement à la flotte via group:<user>, conservent leurs règles personnalisées inter-utilisateurs (avec hybridation automatique), génèrent des alias hosts dédiés et sont pleinement résolus dans le Simulateur et le Graphe ACL.'
+            : 'Native hybrid support (Grants V29 & Standard): tagless devices (OIDC/Local) are automatically linked via group:<user>, preserve and auto-hybridize cross-user custom rules, get managed hosts aliases, and resolve cleanly in the ACL Simulator and Graph.',
+        verification: isFr
+            ? 'Paramètres > Inclure les nœuds sans tags • ACLs > Simulateur & Composeur de Grants'
+            : 'Settings > Include tagless nodes • ACLs > Simulator & Grant Composer',
+      ),
+      WhatsNewVersion(
         version: '2.5.0',
         title: isFr
             ? 'Release 2.5.0 — Gouvernance N-2 & Diagnostic Intelligent ACL'

@@ -1,6 +1,6 @@
 # Suivi d'Implémentation — Ordre Logique & Graduel (du moins risqué au plus risqué)
 
-**Branche de référence (stable) :** `master` *(version publiée : `2.5.0+162`)*  
+**Branche de référence (stable) :** `master` *(version publiée : `2.5.1+166`)*  
 **Dernière mise à jour :** 17 novembre 2026  
 **Registre de dépréciation :** [REGISTRE_DEPRECATION_HEADSCALE.md](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/REGISTRE_DEPRECATION_HEADSCALE.md)
 
@@ -46,7 +46,7 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 | **2** | [Plan 08 — Compatibilité & Non-Destructif](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_08_v2.2.0_compatibilite_et_securite_acl.md) | `2.3.0+158` | `fix/compat-non-destructive-acl` | Aucune | 🟡 Moyen | ✅ Validé & Mergé |
 | **3** | [Plan 11 — Diff, Simulateur, SSH & API](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_11_v2.5.0_simulateur_diff_ssh_et_api.md) | `2.4.0+161` | `feat/acl-simulator-diff-ssh-api` | Plan 08 | 🟢 Très Faible | ✅ Validé, Mergé & Publié |
 | **4.0** | [Sous-Plan 09-0 — Dépréciation $N-2$ & Diagnostic d'Alignement](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_0_deprecation_audit_et_alignement.md) | `2.5.0+165` | `feat/acl-09-0-deprecation-and-alignment` | Plan 11 | 🟢 Très Faible | ✅ Validé, Mergé & Test interne OK |
-| **4.A** | [Sous-Plan 09-A — Cœur Hybride & Résolution Simulateur/Graphe](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_A_coeur_hybride_et_groupes.md) | `2.5.1+166` | `feat/acl-09-a-hybrid-core` | Sous-Plan 09-0 | 🟢 Faible | 🧪 En test interne |
+| **4.A** | [Sous-Plan 09-A — Cœur Hybride & Résolution Simulateur/Graphe](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_A_coeur_hybride_et_groupes.md) | `2.5.1+166` | `feat/acl-09-a-hybrid-core` | Sous-Plan 09-0 | 🟢 Faible | ✅ Validé & Mergé |
 | **4.B** | [Sous-Plan 09-B — Stop Auto-Tagging & Centre de Bascule Guidée](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_B_arret_autotagging_et_assistant_bascule.md) | `2.5.2+167` | `feat/acl-09-b-stop-autotag-and-wizard` | Sous-Plan 09-A | 🟡 Faible-Moyen | ⬜ À faire |
 | **4.C** | [Sous-Plan 09-C — Moteur `Sans Tags` & Constructeurs Manuels](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_C_moteur_tagless_et_constructeurs.md) | `2.6.0+168` | `feat/acl-09-c-tagless-and-builders` | Sous-Plan 09-B | 🟡 Moyen | ⬜ À faire |
 
@@ -80,7 +80,7 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 - [x] **09-A.1** Union hybride `[...sortedTags, groupName]` dans `GrantsV29GeneratorService` et `StandardAclGeneratorService` pour les parcs mixtes (machines taguées + machines sans tags) + gestion conditionnelle de `"via"` (avec ou sans tag routeur) + réglage `includeUntaggedNodes` dans Paramètres
 - [x] **09-A.2** `PolicyInfrastructureBuilder` : `autoApprovers` hybrides (`group:` pour routes de nœuds sans tags) + génération et nettoyage automatique des alias `hosts` (`"host-<user>-<node>"`) dans `PolicyPreserver._mergeHosts` et `PolicyOrphanCleaner`
 - [x] **09-A.3** `AclParserService` : résolution de `aclPolicy['hosts']`, `"user@"`, emails OIDC, `autogroup:member` et ports `tag:`/`group:`/`autogroup:` dans le Simulateur de flux et le Graphe Visuel ACL + rattachement `nodeBelongsToUser` dans `DashboardScreen`, `UserDetailScreen` et `TaildriveBuilder`
-- [ ] **Point de contrôle 4.A (Validation avant merge)** : `flutter analyze` (0 issue) ✅ • Tests unitaires parc 100% tagué, 100% sans tag, mixte et Simulateur ✅ (78/78) • En attente de validation terrain (Test 2 sans tag sur serveur `0.29.2`) avant merge dans `master`
+- [x] **Point de contrôle 4.A (Validation avant merge)** : `flutter analyze` (0 issue) ✅ • Tests unitaires parc 100% tagué, 100% sans tag, mixte, hybridation auto des règles inter-utilisateurs et Simulateur ✅ (79/79) • Test réel validé sur serveur `0.29.2` (`dkdone` basculé sans tag sous `ely@synology.me` vers `jean`) ✅ • Mergé dans `master` (`2.5.1+166`) ✅
 
 ### Étape 4.B — Sous-Plan 09-B (`feat/acl-09-b-stop-autotag-and-wizard` → `2.5.2+164`)
 - [ ] **09-B.1** Arrêt de l'auto-tagging forcé dans `CreatePreAuthKeyDialog` (interrupteur optionnel), `registration_dialogs.dart`, `DashboardScreen`, `NodeDetailScreen`, `ExitNodeCommandDialog`, `ShareSubnetDialog` et `MoveNodeDialog`
@@ -110,10 +110,14 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 | 2026-11-16 | Étape 3 — Plan 11 | `feat/acl-simulator-diff-ssh-api` | Implémentation `JsonDiffUtils` + `PolicyDiffDialog` v2, `AclSimulatorSheet` + `"tests"` port unique, onglet SSH, `expireNode` + `backfillNodeIps`, fix matching OIDC + préservation des règles personnalisées. `flutter analyze` (0 issue) & 64/64 tests passés (`2.4.0+161`). Mergé et publié. |
 | 2026-11-17 | Découpage Plan 09 | `master` | Création de `REGISTRE_DEPRECATION_HEADSCALE.md` et découpage du Plan 09 en 4 sous-plans atomiques (`09-0`, `09-A`, `09-B`, `09-C`) avec branches dédiées. |
 | 2026-11-17 | Étape 4.0 — Sous-Plan 09-0 | `feat/acl-09-0-deprecation-and-alignment` | Bandeau rouge $N-2$ ($\le 0.27$), alignement Policy v2 (`"nom@"`), `AlignmentDiagnosticService` sensible à la version/moteur avec répercussion en cascade (`groups`, `tagOwners`, `grants`, `acls`, `ssh`, `nodeAttrs`, `tests`, commentaires HuJSON, règles locales, Taildrive), fix Backfill IPs (confirmation directe `?confirmed=true`) & normalisation `(v0.29.2)`. `flutter analyze` (0 issue), 70/70 tests passés (`2.5.0+162`). Validé et mergé dans `master`. |
+| 2026-11-17 | Étape 4.A — Sous-Plan 09-A | `feat/acl-09-a-hybrid-core` | Correctif préservation globale `grants`/`acls` dans `PolicyPreserver` (`EditTagsDialog` & co.), union hybride `[...tags, group]` dans `GrantsV29` & `Standard`, `autoApprovers` + `hosts` gérés (`host-*`), résolution `hosts`/`user@`/OIDC/`autogroup:member` dans `AclParserService`, hybridation automatique des règles inter-utilisateurs existantes et options `group:`/`host-` dans `GrantComposerService`. `flutter analyze` (0 issue), 79/79 tests passés, test réel validé (`dkdone` sans tag sous `ely@synology.me`). Mergé dans `master` (`2.5.1+166`). |
 
 ---
 
 ## 5. Chantiers Techniques & Échéances Annexes (Hors Plans ACL)
+
+* **📌 En attente (fin des plans ACL) — Bascule automatique d'un routeur tiers (`Exit Node` / `LAN`) vers le mode sans tag** :
+  - Si un utilisateur **tiers** servant d'`Exit Node` ou de routeur `LAN` dans les règles d'autres utilisateurs (`via: ["tag:<tiers>-exit-node"]` / `via: ["tag:<tiers>-lan-sharer"]` ou `dst: ["tag:<tiers>-*"]`) passe **à 100 % sans tag** (0 nœud tagué restant), adapter automatiquement les règles tierces dépendantes (retrait de `via` pour routage direct ou bascule vers `group:<tiers>` / `host-<tiers>-<noeud>` selon le rôle, avec alerte si conflit CIDR LAN sans `via`).
 
 * **⏳ Avant Février 2027 — Optimisation Android DEX / R8 & ProGuard (Play Console)** :
   - Activer `isMinifyEnabled = true` et `isShrinkResources = true` dans [build.gradle.kts](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/android/app/build.gradle.kts) avec un `proguard-rules.pro` vérifié pour `workmanager`, `flutter_local_notifications`, `flutter_secure_storage`, `local_auth`, et tester en APK `--release` sur appareil physique avant upload `.aab` (`mapping.txt`).
