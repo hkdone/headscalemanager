@@ -117,6 +117,9 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
             apiService: provider.apiService,
             generatedPolicy: newPolicyMap,
             rawServerPolicy: rawServerPolicy,
+            users: allUsers,
+            nodes: allNodes,
+            includeUntaggedNodes: provider.includeUntaggedNodes,
           );
 
           if (!mounted) return;

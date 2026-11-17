@@ -255,6 +255,9 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
               generatedPolicy: newPolicyMap,
               pretty: true,
               preserveCustomRules: true,
+              users: allUsers,
+              nodes: allNodesForPolicy,
+              includeUntaggedNodes: appProvider.includeUntaggedNodes,
             );
             // Retenter l'assignation des tags maintenant que tagOwners est à jour
             await apiService.setTags(widget.node.id, _currentTags);
@@ -381,6 +384,9 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
             rawServerPolicy: rawServerPolicy,
             pretty: true,
             preserveCustomRules: true,
+            users: allUsers,
+            nodes: allNodes,
+            includeUntaggedNodes: appProvider.includeUntaggedNodes,
           );
 
           if (!mounted) return;

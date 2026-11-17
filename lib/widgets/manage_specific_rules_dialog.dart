@@ -138,6 +138,9 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
         generatedPolicy: newPolicy,
         pretty: true,
         excludedServerAcls: excludedServerAcls,
+        users: users,
+        nodes: nodes,
+        includeUntaggedNodes: appProvider.includeUntaggedNodes,
       );
 
       if (mounted) {

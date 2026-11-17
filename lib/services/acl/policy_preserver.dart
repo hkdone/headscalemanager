@@ -1,7 +1,11 @@
 import 'dart:convert';
 import 'package:headscalemanager/api/headscale_api_service.dart';
+import 'package:headscalemanager/models/node.dart';
+import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/services/acl/hujson_comment_service.dart';
+import 'package:headscalemanager/services/acl/policy_infrastructure_builder.dart';
 import 'package:headscalemanager/utils/json_utils.dart';
+import 'package:headscalemanager/utils/string_utils.dart';
 
 /// Préserve les blocs manuels ou hors périmètre d'une politique ACL serveur
 /// lors des régénérations automatiques (`ssh`, `tests`, `ipsets`, `derpMap`,
@@ -27,11 +31,17 @@ class PolicyPreserver {
   /// Si [preserveCustomRules] est `true`, préserve également les règles `grants`
   /// et `acls` personnalisées présentes sur [serverPolicy] qui ne sont pas
   /// déjà couvertes par [generatedPolicy] (hors [excludedServerAcls]).
+  /// Si [users], [nodes] et [includeUntaggedNodes] sont fournis, étend
+  /// automatiquement les règles personnalisées ciblant `tag:<user>-client` pour
+  /// y associer `group:<user>` dès que l'utilisateur possède un nœud sans tag.
   static Map<String, dynamic> merge(
     Map<String, dynamic> generatedPolicy,
     Map<String, dynamic>? serverPolicy, {
     bool preserveCustomRules = false,
     List<Map<String, dynamic>> excludedServerAcls = const [],
+    List<User> users = const [],
+    List<Node> nodes = const [],
+    bool includeUntaggedNodes = true,
   }) {
     final result = deepCopyMap(generatedPolicy);
     if (serverPolicy == null || serverPolicy.isEmpty) {
@@ -80,6 +90,9 @@ class PolicyPreserver {
         generatedPolicy: result,
         serverPolicy: serverPolicy,
         excludedServerAcls: excludedServerAcls,
+        users: users,
+        nodes: nodes,
+        includeUntaggedNodes: includeUntaggedNodes,
       );
       if (extra.extraGrants.isNotEmpty) {
         final existingGrants = List<dynamic>.from(
@@ -100,6 +113,10 @@ class PolicyPreserver {
 
   /// Extrait les règles `grants` et `acls` personnalisées de [serverPolicy]
   /// qui ne sont ni générées ni subsumées par [generatedPolicy].
+  ///
+  /// En mode hybride (`includeUntaggedNodes == true` et [users]/[nodes] fournis),
+  /// ajoute automatiquement `group:<user>` à côté de `tag:<user>-client` dans
+  /// `src`/`dst` pour tout utilisateur ayant au moins un nœud sans tag.
   static ({
     List<Map<String, dynamic>> extraGrants,
     List<Map<String, dynamic>> extraAcls,
@@ -107,6 +124,9 @@ class PolicyPreserver {
     required Map<String, dynamic> generatedPolicy,
     required Map<String, dynamic>? serverPolicy,
     List<Map<String, dynamic>> excludedServerAcls = const [],
+    List<User> users = const [],
+    List<Node> nodes = const [],
+    bool includeUntaggedNodes = true,
   }) {
     if (serverPolicy == null || serverPolicy.isEmpty) {
       return (extraGrants: const [], extraAcls: const []);
@@ -141,6 +161,16 @@ class PolicyPreserver {
             .toSet()
         : null;
 
+    final hybridTagToGroup = (includeUntaggedNodes &&
+            users.isNotEmpty &&
+            nodes.isNotEmpty)
+        ? _buildHybridTagToGroupMap(
+            users: users,
+            nodes: nodes,
+            declaredGroups: groups,
+          )
+        : const <String, String>{};
+
     final extraGrants = <Map<String, dynamic>>[];
     final serverGrants = serverPolicy['grants'];
     if (serverGrants is List) {
@@ -160,7 +190,10 @@ class PolicyPreserver {
         if (generatedGrants.any((g) => _isGrantSubsumedBy(grant, g))) {
           continue;
         }
-        extraGrants.add(grant);
+        final hybridized = hybridTagToGroup.isEmpty
+            ? grant
+            : _hybridizeRule(grant, hybridTagToGroup, isGrant: true);
+        extraGrants.add(hybridized);
       }
     }
 
@@ -183,7 +216,10 @@ class PolicyPreserver {
         if (generatedAcls.any((a) => _isAclSubsumedBy(acl, a))) {
           continue;
         }
-        extraAcls.add(acl);
+        final hybridized = hybridTagToGroup.isEmpty
+            ? acl
+            : _hybridizeRule(acl, hybridTagToGroup, isGrant: false);
+        extraAcls.add(hybridized);
       }
     }
 
@@ -306,6 +342,9 @@ class PolicyPreserver {
     bool pretty = false,
     bool preserveCustomRules = true,
     List<Map<String, dynamic>> excludedServerAcls = const [],
+    List<User> users = const [],
+    List<Node> nodes = const [],
+    bool includeUntaggedNodes = true,
   }) async {
     Map<String, dynamic>? existing = serverPolicy;
     Map<String, String> serverRuleComments = const {};
@@ -336,6 +375,9 @@ class PolicyPreserver {
       existing,
       preserveCustomRules: preserveCustomRules,
       excludedServerAcls: excludedServerAcls,
+      users: users,
+      nodes: nodes,
+      includeUntaggedNodes: includeUntaggedNodes,
     );
 
     final finalComments = <String, String>{...serverRuleComments};
@@ -570,6 +612,63 @@ class PolicyPreserver {
       final target = d.substring(0, lastColon);
       return genDst.contains('$target:*');
     });
+  }
+
+  static Map<String, String> _buildHybridTagToGroupMap({
+    required List<User> users,
+    required List<Node> nodes,
+    required Set<String>? declaredGroups,
+  }) {
+    final mapping = <String, String>{};
+    for (final user in users) {
+      final userNodes = nodes.where(
+        (n) => PolicyInfrastructureBuilder.nodeBelongsToUser(n, user),
+      );
+      if (!userNodes.any((n) => n.tags.isEmpty)) continue;
+
+      final groupName = 'group:${normalizeUserName(user.name)}';
+      if (declaredGroups != null && !declaredGroups.contains(groupName)) {
+        continue;
+      }
+
+      for (final norm
+          in PolicyInfrastructureBuilder.candidateNormalizedNames(user)) {
+        mapping['tag:$norm-client'] = groupName;
+      }
+    }
+    return mapping;
+  }
+
+  static Map<String, dynamic> _hybridizeRule(
+    Map<String, dynamic> rule,
+    Map<String, String> tagToGroup, {
+    required bool isGrant,
+  }) {
+    final copy = deepCopyMap(rule);
+
+    void expandList(dynamic listObj, {required bool hasPortSuffix}) {
+      if (listObj is! List) return;
+      final additions = <String>[];
+      for (final raw in listObj) {
+        final item = raw.toString();
+        final baseTag = hasPortSuffix ? _stripAclPort(item) : item;
+        final cleanTag = baseTag.split(';').first;
+        final group = tagToGroup[cleanTag];
+        if (group == null) continue;
+
+        final candidate = hasPortSuffix && item.length > baseTag.length
+            ? '$group${item.substring(baseTag.length)}'
+            : group;
+        if (!listObj.contains(candidate) && !additions.contains(candidate)) {
+          additions.add(candidate);
+        }
+      }
+      listObj.addAll(additions);
+    }
+
+    expandList(copy['src'], hasPortSuffix: false);
+    expandList(copy['dst'], hasPortSuffix: !isGrant);
+    return copy;
   }
 
   static String _canonicalJsonEncode(dynamic value) =>

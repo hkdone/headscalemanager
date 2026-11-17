@@ -3,6 +3,7 @@ import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/services/acl/grants_v29_generator.dart';
+import 'package:headscalemanager/services/acl/grant_composer_service.dart';
 import 'package:headscalemanager/services/acl/policy_orphan_cleaner.dart';
 import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/services/acl/taildrive_builder.dart';
@@ -423,6 +424,125 @@ void main() {
 
       expect(memberAllowed.allowed, isTrue);
       expect(taggedDenied.allowed, isFalse);
+    });
+
+    test(
+        'hybridation automatique des grants inter-utilisateurs existants (scénario dkdone sans tag sous ely vers exit node/LAN/AdGuard de jean)',
+        () {
+      final jean = _user(id: 'u1', name: 'jean@synology.me');
+      final ely = _user(
+        id: 'u4',
+        name: 'ely@synology.me',
+        email: 'jean.virassa@gmail.com',
+      );
+      final jeanRouter = _node(
+        id: 'n1',
+        name: 'nas-jean',
+        user: 'tagged-devices',
+        userId: 'u1',
+        ips: ['100.64.0.15'],
+        tags: ['tag:jean-client', 'tag:jean-exit-node', 'tag:jean-lan-sharer'],
+        sharedRoutes: ['0.0.0.0/0', '192.168.1.0/24'],
+      );
+      final dkdoneUntagged = _node(
+        id: 'n2',
+        name: 'dkdone',
+        user: 'ely@synology.me',
+        userId: 'u4',
+        ips: ['100.64.0.44'],
+        tags: const [],
+      );
+
+      final allUsers = [jean, ely];
+      final allNodes = [jeanRouter, dkdoneUntagged];
+
+      final generated = GrantsV29GeneratorService().generatePolicy(
+        users: allUsers,
+        nodes: allNodes,
+        serverVersion: '0.29.2',
+      );
+
+      // Politique serveur préalable : les 4 grants d'ely ne citaient que tag:ely-client
+      final serverPolicy = {
+        'grants': [
+          {
+            'src': ['tag:ely-client'],
+            'dst': ['tag:jean-client'],
+            'ip': ['*'],
+          },
+          {
+            'src': ['tag:ely-client'],
+            'dst': ['192.168.1.0/24'],
+            'ip': ['*'],
+            'via': ['tag:jean-lan-sharer'],
+          },
+          {
+            'src': ['tag:ely-client'],
+            'dst': ['autogroup:internet'],
+            'ip': ['*'],
+            'via': ['tag:jean-exit-node'],
+          },
+          {
+            'src': ['tag:ely-client'],
+            'dst': ['100.64.0.15'],
+            'ip': ['*'],
+            'via': ['tag:jean-lan-sharer'],
+          },
+        ],
+      };
+
+      final merged = PolicyPreserver.merge(
+        generated,
+        serverPolicy,
+        preserveCustomRules: true,
+        users: allUsers,
+        nodes: allNodes,
+        includeUntaggedNodes: true,
+      );
+
+      final mergedGrants = merged['grants'] as List<dynamic>;
+      final crossExit = mergedGrants.firstWhere(
+        (g) =>
+            (g['dst'] as List).contains('autogroup:internet') &&
+            (g['via'] as List?)?.contains('tag:jean-exit-node') == true &&
+            (g['src'] as List).contains('tag:ely-client'),
+      ) as Map<String, dynamic>;
+      expect(crossExit['src'], containsAll(['tag:ely-client', 'group:ely']));
+
+      // Simulateur : dkdone (sans tag) accède sans aucune édition manuelle JSON !
+      final parser = AclParserService(
+        aclPolicy: merged,
+        allNodes: allNodes,
+        allUsers: allUsers,
+      );
+      final exitResult = parser.simulateConnection(
+        sourceNode: dkdoneUntagged,
+        destination: 'autogroup:internet',
+      );
+      final lanResult = parser.simulateConnection(
+        sourceNode: dkdoneUntagged,
+        destination: '192.168.1.50',
+        port: '443',
+      );
+      final adguardResult = parser.simulateConnection(
+        sourceNode: dkdoneUntagged,
+        destination: '100.64.0.15',
+        port: '53',
+        protocol: 'udp',
+      );
+
+      expect(exitResult.allowed, isTrue);
+      expect(exitResult.viaTag, 'tag:jean-exit-node');
+      expect(lanResult.allowed, isTrue);
+      expect(lanResult.viaTag, 'tag:jean-lan-sharer');
+      expect(adguardResult.allowed, isTrue);
+
+      // GrantComposer propose désormais group:ely et host-ely-dkdone
+      final sources = GrantComposerService.sourceTagOptions(
+        users: allUsers,
+        nodes: allNodes,
+      ).map((o) => o.value).toList();
+      expect(sources, containsAll(['group:ely', 'host-ely-dkdone']));
     });
   });
 }

@@ -669,6 +669,9 @@ class _UserNodeCard extends StatelessWidget {
                       apiService: appProvider.apiService,
                       generatedPolicy: newPolicyMap,
                       rawServerPolicy: rawServerPolicy,
+                      users: allUsers,
+                      nodes: cleanedNodes,
+                      includeUntaggedNodes: appProvider.includeUntaggedNodes,
                     );
 
                     if (!context.mounted) return;
@@ -824,6 +827,9 @@ class _UserNodeCard extends StatelessWidget {
                       apiService: appProvider.apiService,
                       generatedPolicy: newPolicyMap,
                       rawServerPolicy: rawServerPolicy,
+                      users: allUsers,
+                      nodes: cleanedNodes,
+                      includeUntaggedNodes: appProvider.includeUntaggedNodes,
                     );
 
                     if (!context.mounted) return;

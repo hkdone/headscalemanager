@@ -247,6 +247,9 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog>
                       apiService: appProvider.apiService,
                       generatedPolicy: newPolicyMap,
                       rawServerPolicy: rawServerPolicy,
+                      users: allUsers,
+                      nodes: allNodes,
+                      includeUntaggedNodes: appProvider.includeUntaggedNodes,
                     );
                   }
                 }

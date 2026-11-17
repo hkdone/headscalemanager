@@ -143,6 +143,9 @@ class _RenameNodeDialogState extends State<RenameNodeDialog> {
                   await PolicyPreserver.applyPreservingPolicy(
                     apiService: apiService,
                     generatedPolicy: newPolicyMap,
+                    users: allUsers,
+                    nodes: allNodes,
+                    includeUntaggedNodes: appProvider.includeUntaggedNodes,
                   );
                 }
 

@@ -157,6 +157,9 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
                       apiService: appProvider.apiService,
                       generatedPolicy: newPolicyMap,
                       rawServerPolicy: rawServerPolicy,
+                      users: allUsers,
+                      nodes: allNodes,
+                      includeUntaggedNodes: appProvider.includeUntaggedNodes,
                     );
                   }
                 }
