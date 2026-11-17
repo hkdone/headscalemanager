@@ -201,6 +201,7 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
               temporaryRules: tempRules,
               taildriveShares: appProvider.taildriveShares,
               serverVersion: appProvider.serverVersion,
+              includeUntaggedNodes: appProvider.includeUntaggedNodes,
             );
 
             // S'assurer que tous les tags assignés à ce nœud sont déclarés dans tagOwners
@@ -325,6 +326,7 @@ class _EditTagsDialogState extends State<EditTagsDialog> {
             temporaryRules: tempRules,
             taildriveShares: appProvider.taildriveShares,
             serverVersion: appProvider.serverVersion,
+            includeUntaggedNodes: appProvider.includeUntaggedNodes,
           );
 
           // S'assurer que tous les tags assignés à ce nœud sont déclarés dans tagOwners

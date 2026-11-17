@@ -125,6 +125,7 @@ class StorageService {
   static const _aclEngineKey = 'ACL_ENGINE_STANDARD_ENABLED';
   static const _aclEngineModeKey = 'ACL_ENGINE_MODE';
   static const _aclEngineExplicitKey = 'ACL_ENGINE_MODE_EXPLICIT';
+  static const _includeUntaggedNodesKey = 'ACL_INCLUDE_UNTAGGED_NODES';
   static const _taildriveSharesPrefix = 'TAILDRIVE_SHARES_';
 
   Future<void> saveTaildriveShares(
@@ -207,6 +208,26 @@ class StorageService {
       return prefs.getBool('${_aclEngineExplicitKey}_$serverId') ?? false;
     }
     return prefs.getBool(_aclEngineExplicitKey) ?? false;
+  }
+
+  /// Indique si les nœuds sans tag sont inclus automatiquement dans la flotte
+  /// de leur utilisateur (mode hybride). Activé par défaut (`true`).
+  Future<bool> getIncludeUntaggedNodes({String? serverId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (serverId != null &&
+        prefs.containsKey('${_includeUntaggedNodesKey}_$serverId')) {
+      return prefs.getBool('${_includeUntaggedNodesKey}_$serverId') ?? true;
+    }
+    return prefs.getBool(_includeUntaggedNodesKey) ?? true;
+  }
+
+  Future<void> setIncludeUntaggedNodes(bool enabled, {String? serverId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (serverId != null) {
+      await prefs.setBool('${_includeUntaggedNodesKey}_$serverId', enabled);
+      return;
+    }
+    await prefs.setBool(_includeUntaggedNodesKey, enabled);
   }
 
   Future<void> setGrantsMigrationCompleted(String serverId, bool value) async {

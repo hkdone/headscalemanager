@@ -1,16 +1,29 @@
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/taildrive_share.dart';
+import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/models/version_info.dart';
+import 'package:headscalemanager/services/acl/policy_infrastructure_builder.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 
 /// Construit les blocs `nodeAttrs` et `grants` Taildrive pour Headscale >= 0.29.0.
 class TaildriveBuilder {
   static const taildriveMinVersion = '0.29.0';
 
+  static String _ownerGroupForNode(Node node, List<User> users) {
+    final owner = users.isNotEmpty
+        ? PolicyInfrastructureBuilder.findOwnerUser(node, users)
+        : null;
+    if (owner != null) {
+      return 'group:${normalizeUserName(owner.name)}';
+    }
+    return 'group:${node.getNormalizedOwner()}';
+  }
+
   /// Retourne null si version incompatible ou aucun partage configuré.
   static Map<String, dynamic>? build({
     required List<TaildriveShare> shares,
     required List<Node> nodes,
+    List<User> users = const [],
     String? serverVersion,
   }) {
     if (serverVersion == null ||
@@ -28,9 +41,8 @@ class TaildriveBuilder {
       final matchingNodes = nodes.where((n) => n.id == nodeId);
       final node = matchingNodes.isNotEmpty ? matchingNodes.first : null;
       if (node != null) {
-        final targets = node.tags.isNotEmpty
-            ? node.tags
-            : ['group:${node.getNormalizedOwner()}'];
+        final targets =
+            node.tags.isNotEmpty ? node.tags : [_ownerGroupForNode(node, users)];
         nodeAttrs.add({
           'target': targets,
           'attr': ['drive:share'],
@@ -58,7 +70,7 @@ class TaildriveBuilder {
 
       final dstTargets = sourceNode.tags.isNotEmpty
           ? sourceNode.tags
-          : ['group:${sourceNode.getNormalizedOwner()}'];
+          : [_ownerGroupForNode(sourceNode, users)];
 
       final src = share.recipient.startsWith('group:')
           ? share.recipient
@@ -87,11 +99,13 @@ class TaildriveBuilder {
     Map<String, dynamic> policy, {
     required List<TaildriveShare> shares,
     required List<Node> nodes,
+    List<User> users = const [],
     String? serverVersion,
   }) {
     final config = build(
       shares: shares,
       nodes: nodes,
+      users: users,
       serverVersion: serverVersion,
     );
     if (config == null) return;

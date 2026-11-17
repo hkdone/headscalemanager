@@ -159,6 +159,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         temporaryRules: tempRules,
         taildriveShares: provider.taildriveShares,
         serverVersion: provider.serverVersion,
+        includeUntaggedNodes: provider.includeUntaggedNodes,
       );
 
       if (result.containsKey('action')) {
@@ -902,6 +903,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         temporaryRules: tempRules,
         taildriveShares: appProvider.taildriveShares,
         serverVersion: appProvider.serverVersion,
+        includeUntaggedNodes: appProvider.includeUntaggedNodes,
       );
       await PolicyPreserver.applyPreservingPolicy(
         apiService: apiService,

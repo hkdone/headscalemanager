@@ -381,9 +381,12 @@ class PolicyPreserver {
       }
     }
     if (serverHosts is Map) {
-      // Les entrées manuelles du serveur priment sans écrasement
+      // Les entrées manuelles (non préfixées par `host-`) priment sans écrasement ;
+      // les alias `host-*` gérés par l'app sont rafraîchis depuis generatedHosts.
       for (final entry in serverHosts.entries) {
-        merged[entry.key.toString()] = _deepCopyValue(entry.value);
+        final key = entry.key.toString();
+        if (key.startsWith('host-')) continue;
+        merged[key] = _deepCopyValue(entry.value);
       }
     }
     return merged;
@@ -443,7 +446,10 @@ class PolicyPreserver {
   static bool _isTaildriveGrant(Map<String, dynamic> grant) {
     final app = grant['app'];
     if (app is! Map) return false;
-    return app.keys.any((k) => k.toString().contains('taildrive'));
+    return app.keys.any((k) {
+      final key = k.toString();
+      return key.contains('taildrive') || key.contains('/cap/drive');
+    });
   }
 
   static String _stripAclPort(String value) {

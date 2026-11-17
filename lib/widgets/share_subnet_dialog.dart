@@ -150,6 +150,7 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
                       temporaryRules: tempRules,
                       taildriveShares: appProvider.taildriveShares,
                       serverVersion: appProvider.serverVersion,
+                      includeUntaggedNodes: appProvider.includeUntaggedNodes,
                     );
 
                     await PolicyPreserver.applyPreservingPolicy(

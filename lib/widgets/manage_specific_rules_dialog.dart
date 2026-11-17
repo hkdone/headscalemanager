@@ -130,6 +130,7 @@ class _ManageSpecificRulesDialogState extends State<ManageSpecificRulesDialog> {
         temporaryRules: _temporaryRules,
         taildriveShares: appProvider.taildriveShares,
         serverVersion: appProvider.serverVersion,
+        includeUntaggedNodes: appProvider.includeUntaggedNodes,
       );
 
       await PolicyPreserver.applyPreservingPolicy(

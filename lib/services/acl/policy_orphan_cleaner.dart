@@ -1,5 +1,6 @@
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
+import 'package:headscalemanager/services/acl/policy_infrastructure_builder.dart';
 import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 
@@ -10,6 +11,7 @@ class PolicyOrphanCleaner {
   static ({
     Set<String> orphanGroups,
     Set<String> orphanTags,
+    Set<String> orphanHosts,
     bool hasOrphanReferences,
   }) inspectOrphans(
     Map<String, dynamic> policy, {
@@ -74,13 +76,31 @@ class PolicyOrphanCleaner {
       }
     }
 
+    final orphanHosts = <String>{};
+    final expectedManagedHosts = PolicyInfrastructureBuilder.buildManagedHosts(
+      users: users,
+      nodes: nodes,
+    );
+    final hostsMap = policy['hosts'];
+    if (hostsMap is Map) {
+      for (final rawKey in hostsMap.keys) {
+        final key = rawKey.toString();
+        if (key.startsWith('host-') &&
+            !expectedManagedHosts.containsKey(key)) {
+          orphanHosts.add(key);
+        }
+      }
+    }
+
     bool checkList(dynamic rawList) {
       if (rawList is! List) return false;
       for (final item in rawList) {
         final str = item.toString();
         final base = _stripPortSuffix(str);
         inspectTagCandidate(base);
-        if (orphanGroups.contains(base) || orphanTags.contains(base)) {
+        if (orphanGroups.contains(base) ||
+            orphanTags.contains(base) ||
+            orphanHosts.contains(base)) {
           return true;
         }
       }
@@ -111,19 +131,22 @@ class PolicyOrphanCleaner {
       }
     }
 
-    if (orphanGroups.isNotEmpty || orphanTags.isNotEmpty) {
+    if (orphanGroups.isNotEmpty ||
+        orphanTags.isNotEmpty ||
+        orphanHosts.isNotEmpty) {
       hasOrphanReferences = true;
     }
 
     return (
       orphanGroups: orphanGroups,
       orphanTags: orphanTags,
+      orphanHosts: orphanHosts,
       hasOrphanReferences: hasOrphanReferences,
     );
   }
 
-  /// Supprime les groupes, tags, `autoApprovers`, `acls` et `grants`
-  /// référençant des utilisateurs/nœuds supprimés.
+  /// Supprime les groupes, tags, alias `host-*` gérés, `autoApprovers`,
+  /// `acls` et `grants` référençant des utilisateurs/nœuds supprimés.
   static Map<String, dynamic> cleanOrphans(
     Map<String, dynamic> policy, {
     required List<User> users,
@@ -131,13 +154,17 @@ class PolicyOrphanCleaner {
   }) {
     final result = PolicyPreserver.deepCopyMap(policy);
     final info = inspectOrphans(result, users: users, nodes: nodes);
-    if (info.orphanGroups.isEmpty && info.orphanTags.isEmpty) {
+    if (info.orphanGroups.isEmpty &&
+        info.orphanTags.isEmpty &&
+        info.orphanHosts.isEmpty) {
       return result;
     }
 
     bool isOrphanRef(String value) {
       final base = _stripPortSuffix(value);
-      return info.orphanGroups.contains(base) || info.orphanTags.contains(base);
+      return info.orphanGroups.contains(base) ||
+          info.orphanTags.contains(base) ||
+          info.orphanHosts.contains(base);
     }
 
     // 1. groups
@@ -145,6 +172,14 @@ class PolicyOrphanCleaner {
     if (groups is Map) {
       for (final g in info.orphanGroups) {
         groups.remove(g);
+      }
+    }
+
+    // 1b. hosts (uniquement les alias gérés host-*)
+    final hosts = result['hosts'];
+    if (hosts is Map) {
+      for (final h in info.orphanHosts) {
+        hosts.remove(h);
       }
     }
 
@@ -262,9 +297,14 @@ class PolicyOrphanCleaner {
   }
 
   static String _stripPortSuffix(String value) {
-    // Ex: tag:foo-client:* ou tag:foo-client:80,443
+    // Ex: tag:foo-client:* , group:foo:443 ou host-foo-pc:443
     if (value.startsWith('tag:') || value.startsWith('group:')) {
       final colonIdx = value.indexOf(':', 4);
+      if (colonIdx != -1) {
+        return value.substring(0, colonIdx);
+      }
+    } else if (value.startsWith('host-')) {
+      final colonIdx = value.indexOf(':');
       if (colonIdx != -1) {
         return value.substring(0, colonIdx);
       }

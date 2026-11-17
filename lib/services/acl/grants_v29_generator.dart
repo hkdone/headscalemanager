@@ -3,13 +3,16 @@ import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/taildrive_share.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/services/acl/policy_infrastructure_builder.dart';
+import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/services/acl/taildrive_builder.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 
 /// Générateur ACL Headscale 0.29+ basé sur les grants avec routage `via`.
 ///
 /// Requiert le format de tags Standard (séparés). Isolation par utilisateur
-/// avec routage explicite pour exit nodes et sous-réseaux LAN partagés.
+/// avec routage explicite pour exit nodes et sous-réseaux LAN partagés,
+/// et union hybride automatique avec `group:<user>` dès qu'un nœud sans tag
+/// appartient à la flotte.
 class GrantsV29GeneratorService {
   Map<String, dynamic> generatePolicy({
     required List<User> users,
@@ -17,14 +20,21 @@ class GrantsV29GeneratorService {
     List<Map<String, dynamic>> temporaryRules = const [],
     List<TaildriveShare> taildriveShares = const [],
     String? serverVersion,
+    bool includeUntaggedNodes = true,
   }) {
     final infra = PolicyInfrastructureBuilder.buildStandard(
       users: users,
       nodes: nodes,
+      includeUntaggedNodes: includeUntaggedNodes,
+    );
+    final managedHosts = PolicyInfrastructureBuilder.buildManagedHosts(
+      users: users,
+      nodes: nodes,
+      includeUntaggedNodes: includeUntaggedNodes,
     );
 
     final tagOwners = infra.tagOwners;
-    final acls = _buildTemporaryRuleAcls(temporaryRules);
+    final acls = PolicyPreserver.compileTemporaryRulesToAcls(temporaryRules);
     final grants = <Map<String, dynamic>>[];
 
     for (var user in users) {
@@ -37,13 +47,19 @@ class GrantsV29GeneratorService {
           .where((node) =>
               PolicyInfrastructureBuilder.nodeBelongsToUser(node, user))
           .toList();
+      if (userNodes.isEmpty) continue;
 
       final activeUserTags = <String>{};
       var hasActiveExitNodes = false;
+      var hasUntaggedExitNode = false;
       String? activeExitTag;
       String? activeLanTag;
 
       for (var n in userNodes) {
+        if (n.tags.isEmpty && n.isExitNode) {
+          hasUntaggedExitNode = true;
+          hasActiveExitNodes = true;
+        }
         for (final norm in candidateNorms) {
           final stdClientTag = 'tag:$norm-client';
           final stdExitTag = 'tag:$norm-exit-node';
@@ -54,7 +70,7 @@ class GrantsV29GeneratorService {
             activeUserTags.add(stdExitTag);
             hasActiveExitNodes = true;
             activeExitTag ??= stdExitTag;
-          } else if (n.isExitNode) {
+          } else if (n.tags.isNotEmpty && n.isExitNode) {
             hasActiveExitNodes = true;
           }
           if (n.tags.contains(stdLanTag)) {
@@ -96,73 +112,96 @@ class GrantsV29GeneratorService {
         }
       }
 
-      if (activeUserTags.isEmpty) {
-        // Repli si l'utilisateur (ex: compte OIDC) possède des nœuds sans tags :
-        // préserver au minimum ses règles intra-utilisateur basées sur group:<user>.
-        if (userNodes.isEmpty) continue;
-        grants.add({
-          'src': [groupName],
-          'dst': [groupName],
-          'ip': ['*'],
-        });
-        continue;
-      }
-
       final sortedTags = activeUserTags.toList()..sort();
+      final hasUntaggedNodes = userNodes.any((n) => n.tags.isEmpty);
+      final includeGroupInFleet = includeUntaggedNodes && hasUntaggedNodes;
+      final fleetSubjects = <String>{
+        ...sortedTags,
+        if (includeGroupInFleet) groupName,
+      }.toList();
 
-      // Communication intra-flotte (directe, sans via)
+      // Si l'utilisateur n'a que des nœuds sans tags et que la quarantaine est active
+      if (fleetSubjects.isEmpty) continue;
+
+      // Communication intra-flotte (hybride : tags + group si nœuds sans tag)
       grants.add({
-        'src': sortedTags,
-        'dst': sortedTags,
+        'src': fleetSubjects,
+        'dst': fleetSubjects,
         'ip': ['*'],
       });
 
-      // Internet via exit node dédié
+      // Internet via exit node tagué (avec via)
       if (hasActiveExitNodes && activeExitTag != null) {
         grants.add({
-          'src': sortedTags,
+          'src': fleetSubjects,
           'dst': ['autogroup:internet'],
           'via': [activeExitTag],
           'ip': ['*'],
         });
       }
 
-      // Routes LAN via subnet router dédié (isolation multi-utilisateurs même CIDR)
-      final lanRoutes = <String>{};
+      // Internet via exit node sans tag (direct sans via : 0.29 interdit les groupes dans via)
+      if (hasUntaggedExitNode && includeUntaggedNodes) {
+        grants.add({
+          'src': fleetSubjects,
+          'dst': ['autogroup:internet'],
+          'ip': ['*'],
+        });
+      }
+
+      // Routes LAN partagées : avec `via` pour les routeurs tagués, direct pour ceux sans tag
+      final taggedLanRoutes = <String>{};
+      final untaggedLanRoutes = <String>{};
       for (var node in userNodes) {
         for (var route in node.sharedRoutes) {
           if (route != '0.0.0.0/0' && route != '::/0') {
-            lanRoutes.add(route);
+            if (node.tags.isEmpty) {
+              untaggedLanRoutes.add(route);
+            } else {
+              taggedLanRoutes.add(route);
+            }
           }
         }
       }
 
       if (activeLanTag != null) {
-        for (var route in lanRoutes) {
+        for (var route in taggedLanRoutes) {
           grants.add({
-            'src': sortedTags,
+            'src': fleetSubjects,
             'dst': [route],
             'via': [activeLanTag],
             'ip': ['*'],
           });
         }
       }
+      if (includeUntaggedNodes) {
+        for (var route in untaggedLanRoutes) {
+          grants.add({
+            'src': fleetSubjects,
+            'dst': [route],
+            'ip': ['*'],
+          });
+        }
+      }
 
-      // Accès groupe → flotte (SSH / gestion)
-      grants.add({
-        'src': [groupName],
-        'dst': sortedTags,
-        'ip': ['*'],
-      });
+      // Accès groupe → flotte (SSH / gestion) pour parc 100 % tagué
+      if (sortedTags.isNotEmpty && !includeGroupInFleet) {
+        grants.add({
+          'src': [groupName],
+          'dst': sortedTags,
+          'ip': ['*'],
+        });
+      }
 
       debugPrint(
-          'DEBUG GrantsV29: user $normalizedUser tags=$sortedTags exit=$activeExitTag lan=$activeLanTag routes=$lanRoutes');
+          'DEBUG GrantsV29: user $normalizedUser subjects=$fleetSubjects exit=$activeExitTag untaggedExit=$hasUntaggedExitNode lan=$activeLanTag taggedRoutes=$taggedLanRoutes untaggedRoutes=$untaggedLanRoutes');
     }
 
     // Fusion grants réseau + Taildrive
     final taildriveConfig = TaildriveBuilder.build(
       shares: taildriveShares,
       nodes: nodes,
+      users: users,
       serverVersion: serverVersion,
     );
     if (taildriveConfig != null) {
@@ -177,7 +216,7 @@ class GrantsV29GeneratorService {
       'autoApprovers': infra.autoApprovers,
       'acls': acls,
       'grants': grants,
-      'hosts': <String, dynamic>{},
+      'hosts': managedHosts,
     };
 
     final nodeAttrs =
@@ -187,55 +226,5 @@ class GrantsV29GeneratorService {
     }
 
     return policy;
-  }
-
-  List<Map<String, dynamic>> _buildTemporaryRuleAcls(
-      List<Map<String, dynamic>> temporaryRules) {
-    final acls = <Map<String, dynamic>>[];
-
-    for (var rule in temporaryRules) {
-      final src = rule['src'] as String?;
-      final dst = rule['dst'] as String?;
-      final port = rule['port'] as String?;
-      final proto = rule['proto'] as String? ?? 'any';
-
-      if (src == null || dst == null) continue;
-      final dstPort = (port != null && port.isNotEmpty) ? ':$port' : ':*';
-
-      final ruleMap = <String, dynamic>{
-        'action': 'accept',
-        'src': [src],
-      };
-
-      if (proto != 'any') {
-        ruleMap['proto'] = proto;
-      }
-
-      if (dst.startsWith('tag:')) {
-        acls.add({
-          ...ruleMap,
-          'dst': ['$dst$dstPort']
-        });
-        final reverseRuleMap = <String, dynamic>{
-          'action': 'accept',
-          'src': [dst],
-          'dst': ['$src$dstPort'],
-        };
-        if (proto != 'any') reverseRuleMap['proto'] = proto;
-        acls.add(reverseRuleMap);
-      } else {
-        final destinations = dst
-            .split(',')
-            .map((d) => d.trim())
-            .where((d) => d.isNotEmpty)
-            .map((d) => '$d$dstPort')
-            .toList();
-        if (destinations.isNotEmpty) {
-          acls.add({...ruleMap, 'dst': destinations});
-        }
-      }
-    }
-
-    return acls;
   }
 }

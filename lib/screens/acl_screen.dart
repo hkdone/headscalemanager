@@ -378,10 +378,13 @@ class _AclScreenState extends State<AclScreen> {
     );
     if (!info.hasOrphanReferences) return const SizedBox.shrink();
 
-    final count = info.orphanGroups.length + info.orphanTags.length;
+    final count = info.orphanGroups.length +
+        info.orphanTags.length +
+        info.orphanHosts.length;
     final sample = [
       ...info.orphanGroups,
       ...info.orphanTags,
+      ...info.orphanHosts,
     ].take(3).join(', ');
 
     return Container(
@@ -1600,6 +1603,7 @@ class _AclScreenState extends State<AclScreen> {
         temporaryRules: _temporaryRules,
         taildriveShares: appProvider.taildriveShares,
         serverVersion: appProvider.serverVersion,
+        includeUntaggedNodes: appProvider.includeUntaggedNodes,
       );
       final bundle =
           await PolicyPreserver.fetchServerPolicyBundleSafely(apiService);

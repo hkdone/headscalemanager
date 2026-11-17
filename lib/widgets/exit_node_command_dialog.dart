@@ -240,6 +240,7 @@ class _ExitNodeCommandDialogState extends State<ExitNodeCommandDialog>
                       temporaryRules: tempRules,
                       taildriveShares: appProvider.taildriveShares,
                       serverVersion: appProvider.serverVersion,
+                      includeUntaggedNodes: appProvider.includeUntaggedNodes,
                     );
 
                     await PolicyPreserver.applyPreservingPolicy(

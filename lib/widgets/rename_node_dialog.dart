@@ -137,6 +137,7 @@ class _RenameNodeDialogState extends State<RenameNodeDialog> {
                     temporaryRules: tempRules,
                     taildriveShares: appProvider.taildriveShares,
                     serverVersion: appProvider.serverVersion,
+                    includeUntaggedNodes: appProvider.includeUntaggedNodes,
                   );
 
                   await PolicyPreserver.applyPreservingPolicy(
