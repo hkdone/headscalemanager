@@ -396,7 +396,7 @@ routes:
                     ),
                     const SizedBox(height: 12),
                     _buildBodyText(
-                        context, '**ACL Safety & Advanced Tools (v2.3–v2.4):**',
+                        context, '**ACL Safety & Advanced Tools (v2.3–v2.5):**',
                         isBold: true),
                     const SizedBox(height: 4),
                     _buildBodyText(
@@ -404,7 +404,8 @@ routes:
                       '- **Non-destructive merge:** Preserves server blocks (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `nodeAttrs`) and custom/OIDC rules when regenerating.\n'
                       '- **HuJSON & Puzzle View:** Full support for `//` and `/* */` comments; naming a rule in Puzzle adds `// <name>` in JSON and vice-versa.\n'
                       '- **Visual Diff (+/-) & Orphans:** Colored line-by-line diff against the live server policy before every export (ACL screen & Puzzle View), plus dead-reference cleanup.\n'
-                      '- **ACL Flow Simulator & SSH Tab:** Read-only reachability tester (with optional single-port `"tests"` pinning ≥ 0.29) and visual **Tailscale SSH** rule editor.',
+                      '- **ACL Flow Simulator & SSH Tab:** Read-only reachability tester (with optional single-port `"tests"` pinning ≥ 0.29) and visual **Tailscale SSH** rule editor.\n'
+                      '- **ACL Alignment Diagnostic (v2.5):** Checks Local/OIDC identities, Policy v2 groups (`"username@"`), `tagOwners`, and DNS-1123 names per server version and engine mode, cascading fixes with Diff preview. Warns on outdated servers (`≤ 0.27`).',
                       isSmall: true,
                     ),
                     const SizedBox(height: 16),

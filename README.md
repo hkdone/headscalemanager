@@ -243,10 +243,11 @@ L'écran ACL propose **quatre onglets** :
 - La **Vue Puzzle** organise les règles en trois colonnes (`Source | Via | Destination`).
 - Tout nom donné à une règle dans le Puzzle génère un commentaire `// <nom>` juste au-dessus du bloc JSON correspondant — et inversement, tout commentaire `//` présent avant une règle sur le serveur nomme automatiquement la règle dans le Puzzle.
 
-**Sécurité des exports & Outils avancés (v2.3–v2.4) :**
+**Sécurité des exports & Outils avancés (v2.3–v2.5) :**
 - **Fusion non-destructive (`PolicyPreserver`)** : lors des régénérations automatiques, les blocs serveur manuels (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `randomizeClientPort`, `nodeAttrs` non-Taildrive) et les règles personnalisées/OIDC inter-utilisateurs sont préservés.
 - **Diff Visuel ligne-par-ligne (`PolicyDiffDialog`)** : avant chaque publication (depuis l'écran ACL ou la Vue Puzzle), un comparateur coloré (`+` vert / `-` rouge) compare votre brouillon à la politique réellement en ligne sur le serveur (avec filtre *"Afficher uniquement les différences"* et résumé par section au-delà de 1500 lignes).
 - **Simulateur de flux ACL** : vérifiez en lecture seule si une machine source peut joindre une destination/port (`AUTORISÉ` avec routeur `via` ou `BLOQUÉ`), avec possibilité facultative d'épingler l'assertion dans le bloc `"tests"` (Headscale ≥ 0.29, port numérique unique) et validation pré-export.
+- **Diagnostic & Alignement ACL (v2.5)** : inspecte les comptes Locaux/OIDC, les groupes Policy v2 (`"nom@"`), les `tagOwners`, les tags legacy/avec points et les noms DNS-1123, puis répercute les corrections en cascade dans les règles et partages (avec aperçu Diff) en tenant compte de la version serveur et du moteur actif. Un bandeau rouge d'avertissement signale également les serveurs obsolètes (`≤ 0.27`, règle $N-2$).
 - **Comptes OIDC** : prise en charge multi-identifiants (`name`, `email`, `displayName`) et repli `group:` pour les appareils OIDC non tagués.
 
 **Workflow d'utilisation de la page ACL :**
@@ -345,7 +346,7 @@ Cet écran vous permet de configurer l'application pour qu'elle se connecte à v
 - **Clé API :** Collez la clé API unique que vous avez générée depuis votre serveur Headscale. Ce champ est masqué et stocké dans le coffre sécurisé du système.
 - **Moteur ACL (isolé par serveur) :** Choix entre `Legacy`, `Standard` et `Grants V29` (si serveur ≥ 0.29), mémorisé indépendamment pour chaque serveur configuré.
 - **Migration Grants V29 / Rollback :** Wizard guidé dans la zone Danger avec détection préalable des conflits CIDR avant rollback.
-- **Maintenance — Attribuer les IPs manquantes (Backfill IPs) :** Prévisualise (`confirmed=false`) puis applique (`confirmed=true`) l'attribution des adresses IPv4/IPv6 manquantes sur les nœuds existants.
+- **Maintenance — Attribuer les IPs manquantes (Backfill IPs) :** Après confirmation explicite (`confirmed=true`), recalcule les adresses IPv4/IPv6 manquantes ou hors-plage des nœuds existants par rapport à `config.yaml` (ex: après activation d'IPv6).
 - **Sécurité de l'application (`Sécurité`) :** Code PIN à 4 ou 6 chiffres (haché en **PBKDF2-HMAC-SHA256 salé**, avec blocage anti-bruteforce après 5 échecs), déverrouillage biométrique et verrouillage automatique configurable lors du passage en arrière-plan.
 
 ### 3.11. Partages Taildrive (Headscale ≥ 0.29)
