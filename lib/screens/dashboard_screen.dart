@@ -3,10 +3,10 @@ import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
+import 'package:headscalemanager/services/acl/policy_infrastructure_builder.dart';
 import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/services/route_conflict_service.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
-import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:headscalemanager/utils/tag_capability_helper.dart';
 import 'package:headscalemanager/widgets/acl/alignment_assistant_dialog.dart';
 import 'package:headscalemanager/widgets/deprecated_server_banner.dart';
@@ -119,14 +119,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final orphanNodes = <Node>[];
 
             for (var node in filteredNodes) {
-              final owner = node.getNormalizedOwner();
-              User? matchedUser;
-              for (var u in allUsers) {
-                if (normalizeUserName(u.name) == owner) {
-                  matchedUser = u;
-                  break;
-                }
-              }
+              final matchedUser =
+                  PolicyInfrastructureBuilder.findOwnerUser(node, allUsers);
               if (matchedUser != null) {
                 (filteredNodesByUser[matchedUser.name] ??= []).add(node);
               } else {
@@ -668,11 +662,16 @@ class _UserNodeCard extends StatelessWidget {
                         nodes: cleanedNodes,
                         temporaryRules: tempRules,
                         taildriveShares: appProvider.taildriveShares,
-                        serverVersion: appProvider.serverVersion);
+                        serverVersion: appProvider.serverVersion,
+                        includeUntaggedNodes:
+                            appProvider.includeUntaggedNodes);
                     await PolicyPreserver.applyPreservingPolicy(
                       apiService: appProvider.apiService,
                       generatedPolicy: newPolicyMap,
                       rawServerPolicy: rawServerPolicy,
+                      users: allUsers,
+                      nodes: cleanedNodes,
+                      includeUntaggedNodes: appProvider.includeUntaggedNodes,
                     );
 
                     if (!context.mounted) return;
@@ -821,11 +820,16 @@ class _UserNodeCard extends StatelessWidget {
                         nodes: cleanedNodes,
                         temporaryRules: tempRules,
                         taildriveShares: appProvider.taildriveShares,
-                        serverVersion: appProvider.serverVersion);
+                        serverVersion: appProvider.serverVersion,
+                        includeUntaggedNodes:
+                            appProvider.includeUntaggedNodes);
                     await PolicyPreserver.applyPreservingPolicy(
                       apiService: appProvider.apiService,
                       generatedPolicy: newPolicyMap,
                       rawServerPolicy: rawServerPolicy,
+                      users: allUsers,
+                      nodes: cleanedNodes,
+                      includeUntaggedNodes: appProvider.includeUntaggedNodes,
                     );
 
                     if (!context.mounted) return;

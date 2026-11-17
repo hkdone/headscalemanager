@@ -158,6 +158,7 @@ class _GrantsMigrationDialogState extends State<GrantsMigrationDialog> {
         temporaryRules: tempRules,
         taildriveShares: provider.taildriveShares,
         serverVersion: provider.serverVersion,
+        includeUntaggedNodes: provider.includeUntaggedNodes,
       );
 
       _log(_isFr ? 'Envoi vers le serveur…' : 'Pushing to server…');

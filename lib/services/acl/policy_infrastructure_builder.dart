@@ -50,6 +50,84 @@ class PolicyInfrastructureBuilder {
     return false;
   }
 
+  /// Trouve l'utilisateur propriétaire de [node] parmi [users], ou `null`.
+  static User? findOwnerUser(Node node, List<User> users) {
+    for (final user in users) {
+      if (nodeBelongsToUser(node, user)) {
+        return user;
+      }
+    }
+    return null;
+  }
+
+  /// Construit la carte `hosts` gérée par l'application pour les nœuds sans tags
+  /// (`host-<normUser>-<sanitizedNodeName>: <ipv4>`).
+  ///
+  /// N'émet aucune entrée pour les nœuds tagués afin de garantir la
+  /// non-régression stricte des parcs 100 % tagués.
+  static Map<String, String> buildManagedHosts({
+    required List<User> users,
+    required List<Node> nodes,
+    bool includeUntaggedNodes = true,
+  }) {
+    if (!includeUntaggedNodes) return <String, String>{};
+
+    final managedHosts = <String, String>{};
+    final ipv4Regex = RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$');
+
+    // Ordre déterministe pour éviter que les suffixes de collision ne dérivent.
+    final sortedUntagged = nodes.where((n) => n.tags.isEmpty).toList()
+      ..sort((a, b) => a.id.compareTo(b.id));
+
+    for (final node in sortedUntagged) {
+      String? ipv4;
+      for (final rawIp in node.ipAddresses) {
+        final cleanIp = rawIp.split('/').first.trim();
+        if (ipv4Regex.hasMatch(cleanIp)) {
+          ipv4 = cleanIp;
+          break;
+        }
+      }
+      if (ipv4 == null) continue;
+
+      final ownerUser = findOwnerUser(node, users);
+      final rawOwner = ownerUser != null
+          ? normalizeUserName(ownerUser.name)
+          : node.getNormalizedOwner();
+      final normUser =
+          (rawOwner.isEmpty || rawOwner == 'tagged-devices') ? 'user' : rawOwner;
+
+      final rawNodeName = sanitizeDns1123Subdomain(
+        node.name.isNotEmpty ? node.name : node.hostname,
+      );
+      final nodeSlug = rawNodeName.isEmpty ? 'node' : rawNodeName;
+
+      var baseAlias = sanitizeDns1123Subdomain('host-$normUser-$nodeSlug');
+      if (baseAlias.isEmpty) {
+        baseAlias = 'host-$normUser-node';
+      }
+
+      var candidate = baseAlias;
+      var suffixIndex = 2;
+      while (managedHosts.containsKey(candidate)) {
+        final suffix = '-$suffixIndex';
+        final maxBaseLen = 63 - suffix.length;
+        var truncated = baseAlias.length > maxBaseLen
+            ? baseAlias.substring(0, maxBaseLen)
+            : baseAlias;
+        if (truncated.endsWith('-')) {
+          truncated = truncated.substring(0, truncated.length - 1);
+        }
+        candidate = '$truncated$suffix';
+        suffixIndex++;
+      }
+
+      managedHosts[candidate] = ipv4;
+    }
+
+    return managedHosts;
+  }
+
   static ({
     Map<String, List<String>> groups,
     Map<String, List<String>> tagOwners,
@@ -57,6 +135,7 @@ class PolicyInfrastructureBuilder {
   }) buildStandard({
     required List<User> users,
     required List<Node> nodes,
+    bool includeUntaggedNodes = true,
   }) {
     final groups = <String, List<String>>{};
     final tagOwners = <String, List<String>>{};
@@ -138,6 +217,24 @@ class PolicyInfrastructureBuilder {
               route != '::/0') {
             if (!routesMap[route]!.contains(actualLanTag)) {
               routesMap[route]!.add(actualLanTag);
+            }
+          }
+        }
+      } else if (node.tags.isEmpty &&
+          includeUntaggedNodes &&
+          node.sharedRoutes.isNotEmpty) {
+        final ownerUser = findOwnerUser(node, users);
+        final ownerSlug = ownerUser != null
+            ? normalizeUserName(ownerUser.name)
+            : normalizedUser;
+        if (ownerSlug.isNotEmpty && ownerSlug != 'tagged-devices') {
+          final ownerGroup = 'group:$ownerSlug';
+          final routesMap =
+              autoApprovers['routes'] as Map<String, List<String>>;
+          for (final route in node.sharedRoutes) {
+            routesMap.putIfAbsent(route, () => []);
+            if (!routesMap[route]!.contains(ownerGroup)) {
+              routesMap[route]!.add(ownerGroup);
             }
           }
         }

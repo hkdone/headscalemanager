@@ -378,10 +378,13 @@ class _AclScreenState extends State<AclScreen> {
     );
     if (!info.hasOrphanReferences) return const SizedBox.shrink();
 
-    final count = info.orphanGroups.length + info.orphanTags.length;
+    final count = info.orphanGroups.length +
+        info.orphanTags.length +
+        info.orphanHosts.length;
     final sample = [
       ...info.orphanGroups,
       ...info.orphanTags,
+      ...info.orphanHosts,
     ].take(3).join(', ');
 
     return Container(
@@ -1600,6 +1603,7 @@ class _AclScreenState extends State<AclScreen> {
         temporaryRules: _temporaryRules,
         taildriveShares: appProvider.taildriveShares,
         serverVersion: appProvider.serverVersion,
+        includeUntaggedNodes: appProvider.includeUntaggedNodes,
       );
       final bundle =
           await PolicyPreserver.fetchServerPolicyBundleSafely(apiService);
@@ -1624,6 +1628,9 @@ class _AclScreenState extends State<AclScreen> {
           mergedPolicy: mergedPolicy,
           serverPolicy: serverPolicy,
           askUser: showSnackbar,
+          users: users,
+          nodes: cleanedNodes,
+          includeUntaggedNodes: appProvider.includeUntaggedNodes,
         );
       }
       _currentAclPolicy = mergedPolicy;
@@ -1705,6 +1712,9 @@ class _AclScreenState extends State<AclScreen> {
     required Map<String, dynamic> mergedPolicy,
     required Map<String, dynamic> serverPolicy,
     required bool askUser,
+    required List<User> users,
+    required List<Node> nodes,
+    required bool includeUntaggedNodes,
   }) async {
     final generatedGrants = List<dynamic>.from(
       (mergedPolicy['grants'] as List?) ?? const [],
@@ -1722,6 +1732,9 @@ class _AclScreenState extends State<AclScreen> {
       generatedPolicy: mergedPolicy,
       serverPolicy: serverPolicy,
       excludedServerAcls: excludedServerAcls,
+      users: users,
+      nodes: nodes,
+      includeUntaggedNodes: includeUntaggedNodes,
     );
     final extraGrants = extra.extraGrants;
     final extraAcls = extra.extraAcls;

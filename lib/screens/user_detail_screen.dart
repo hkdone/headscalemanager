@@ -13,6 +13,7 @@ import 'package:headscalemanager/widgets/registration_dialogs.dart';
 // Dialogs for node actions
 import 'package:headscalemanager/widgets/rename_node_dialog.dart';
 import 'package:headscalemanager/widgets/move_node_dialog.dart';
+import 'package:headscalemanager/services/acl/policy_infrastructure_builder.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 import 'package:headscalemanager/models/version_info.dart';
@@ -380,10 +381,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             }
 
             final userNodes = snapshot.data!
-                .where((node) =>
-                    node.userId == widget.user.id ||
-                    node.user == widget.user.name ||
-                    node.getNormalizedOwner() == normalizeUserName(widget.user.name))
+                .where((node) => PolicyInfrastructureBuilder.nodeBelongsToUser(
+                    node, widget.user))
                 .toList();
 
             if (userNodes.isEmpty) {

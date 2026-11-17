@@ -207,6 +207,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     ),
                                   ),
                                 ),
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                secondary: const Icon(Icons.device_hub,
+                                    color: Colors.teal),
+                                title: Text(
+                                  isFr
+                                      ? 'Inclure les nœuds sans tags (Mode Hybride)'
+                                      : 'Include tagless nodes (Hybrid Mode)',
+                                ),
+                                subtitle: Text(
+                                  isFr
+                                      ? 'Relie automatiquement les appareils sans tag à leur flotte. Désactivez uniquement pour mettre ces appareils en quarantaine.'
+                                      : 'Automatically links tagless devices to their user fleet. Disable only to quarantine untagged devices.',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                                value: appProvider.includeUntaggedNodes,
+                                onChanged: (value) async {
+                                  await appProvider
+                                      .setIncludeUntaggedNodes(value);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          isFr
+                                              ? (value
+                                                  ? 'Mode Hybride sans tag activé. Régénérez les ACLs pour appliquer.'
+                                                  : 'Quarantaine sans tag activée. Régénérez les ACLs pour appliquer.')
+                                              : (value
+                                                  ? 'Tagless Hybrid Mode enabled. Regenerate ACLs to apply.'
+                                                  : 'Tagless quarantine enabled. Regenerate ACLs to apply.'),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
                               const Divider(),
                               ListTile(
                                 contentPadding: EdgeInsets.zero,

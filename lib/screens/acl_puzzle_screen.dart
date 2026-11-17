@@ -340,6 +340,7 @@ class _AclPuzzleScreenState extends State<AclPuzzleScreen> {
       nodes: cleanedNodes,
       taildriveShares: appProvider.taildriveShares,
       serverVersion: appProvider.serverVersion,
+      includeUntaggedNodes: appProvider.includeUntaggedNodes,
     );
 
     // 2. Merge with Puzzle Rules

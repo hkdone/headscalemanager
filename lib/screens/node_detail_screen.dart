@@ -159,6 +159,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         temporaryRules: tempRules,
         taildriveShares: provider.taildriveShares,
         serverVersion: provider.serverVersion,
+        includeUntaggedNodes: provider.includeUntaggedNodes,
       );
 
       if (result.containsKey('action')) {
@@ -171,6 +172,9 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         apiService: provider.apiService,
         generatedPolicy: policy,
         pretty: true,
+        users: users,
+        nodes: nodes,
+        includeUntaggedNodes: provider.includeUntaggedNodes,
       );
 
       if (context.mounted) {
@@ -902,10 +906,14 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         temporaryRules: tempRules,
         taildriveShares: appProvider.taildriveShares,
         serverVersion: appProvider.serverVersion,
+        includeUntaggedNodes: appProvider.includeUntaggedNodes,
       );
       await PolicyPreserver.applyPreservingPolicy(
         apiService: apiService,
         generatedPolicy: newPolicyMap,
+        users: allUsers,
+        nodes: cleanedNodes,
+        includeUntaggedNodes: appProvider.includeUntaggedNodes,
       );
 
       if (mounted) {

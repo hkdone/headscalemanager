@@ -501,11 +501,26 @@ class AppProvider extends ChangeNotifier {
   AclEngineMode _aclEngineMode = AclEngineMode.standard;
   AclEngineMode get aclEngineMode => _aclEngineMode;
 
+  bool _includeUntaggedNodes = true;
+  bool get includeUntaggedNodes => _includeUntaggedNodes;
+
   /// Vrai pour Standard et Grants V29 (tags séparés).
   bool get useStandardAclEngine => _aclEngineMode != AclEngineMode.legacy;
 
   Future<void> _loadAclEnginePreference() async {
     _aclEngineMode = await _storageService.getAclEngineMode(
+      serverId: _activeServer?.id,
+    );
+    _includeUntaggedNodes = await _storageService.getIncludeUntaggedNodes(
+      serverId: _activeServer?.id,
+    );
+    notifyListeners();
+  }
+
+  Future<void> setIncludeUntaggedNodes(bool enabled) async {
+    _includeUntaggedNodes = enabled;
+    await _storageService.setIncludeUntaggedNodes(
+      enabled,
       serverId: _activeServer?.id,
     );
     notifyListeners();

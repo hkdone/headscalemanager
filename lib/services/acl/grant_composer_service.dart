@@ -1,5 +1,6 @@
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
+import 'package:headscalemanager/services/acl/policy_infrastructure_builder.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 
 enum GrantComposerTemplate {
@@ -50,17 +51,52 @@ class GrantComposerService {
     required List<Node> nodes,
   }) {
     final options = <GrantComposerOption>[];
+    final seenValues = <String>{};
+
     for (var user in users) {
       final norm = normalizeUserName(user.name);
       final clientTag = clientTagForUser(user.name);
-      final hasTag = nodes.any((n) =>
-          (n.user == user.name || n.getNormalizedOwner() == norm) &&
-          n.tags.contains(clientTag));
-      if (hasTag) {
+      final groupValue = 'group:$norm';
+      final userNodes = nodes
+          .where((n) => PolicyInfrastructureBuilder.nodeBelongsToUser(n, user))
+          .toList();
+      if (userNodes.isEmpty) continue;
+
+      final candidateNorms =
+          PolicyInfrastructureBuilder.candidateNormalizedNames(user);
+      final hasTag = userNodes.any((n) => candidateNorms.any((c) {
+            final tag = 'tag:$c-client';
+            return n.tags.contains(tag) || n.tags.any((t) => t.startsWith('$tag;'));
+          }));
+      if (hasTag && seenValues.add(clientTag)) {
         options.add(GrantComposerOption(
           value: clientTag,
           label: clientTag,
           subtitle: user.name,
+        ));
+      }
+
+      final hasUntagged = userNodes.any((n) => n.tags.isEmpty);
+      if (hasUntagged && seenValues.add(groupValue)) {
+        options.add(GrantComposerOption(
+          value: groupValue,
+          label: groupValue,
+          subtitle: '${user.name} (sans tag / hybride)',
+        ));
+      }
+    }
+
+    // Ajouter les alias `host-*` gérés pour permettre un ciblage individuel sans tag
+    final managedHosts = PolicyInfrastructureBuilder.buildManagedHosts(
+      users: users,
+      nodes: nodes,
+    );
+    for (final entry in managedHosts.entries) {
+      if (seenValues.add(entry.key)) {
+        options.add(GrantComposerOption(
+          value: entry.key,
+          label: entry.key,
+          subtitle: entry.value,
         ));
       }
     }
@@ -140,18 +176,28 @@ class GrantComposerService {
     }
 
     if (template == GrantComposerTemplate.intraFleet) {
+      final seenValues = <String>{};
       for (var node in nodes) {
         final norm = node.getNormalizedOwner();
         if (restrictToOwnerNorm != null && norm != restrictToOwnerNorm) {
           continue;
         }
         final clientTag = 'tag:$norm-client';
-        if (node.tags.contains(clientTag)) {
+        if (node.tags.contains(clientTag) && seenValues.add(clientTag)) {
           options.add(GrantComposerOption(
             value: clientTag,
             label: clientTag,
             subtitle: node.name,
           ));
+        } else if (node.tags.isEmpty) {
+          final groupVal = 'group:$norm';
+          if (seenValues.add(groupVal)) {
+            options.add(GrantComposerOption(
+              value: groupVal,
+              label: groupVal,
+              subtitle: node.name,
+            ));
+          }
         }
       }
       return options;

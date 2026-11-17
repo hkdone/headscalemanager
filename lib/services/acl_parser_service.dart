@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
+import 'package:headscalemanager/services/acl/policy_infrastructure_builder.dart';
 import 'package:headscalemanager/utils/ip_utils.dart';
 import 'package:headscalemanager/utils/string_utils.dart';
 
@@ -137,22 +138,14 @@ class AclParserService {
   }
 
   void _parseAliases() {
-    if (aclPolicy.containsKey('tagOwners')) {
-      final tagOwnersRaw = aclPolicy['tagOwners'];
-      if (tagOwnersRaw is Map) {
-        tagOwnersRaw.forEach((tag, ownersRaw) {
-          final ownerAliases = _coerceStringList(ownersRaw);
-          for (var ownerAlias in ownerAliases) {
-            final user = allUsers.firstWhere((u) => u.name == ownerAlias,
-                orElse: () =>
-                    User(id: '', name: '', createdAt: DateTime.now()));
-            if (user.id.isNotEmpty) {
-              final userNodes = allNodes.where((n) =>
-                  n.user == user.name ||
-                  n.getNormalizedOwner() == normalizeUserName(user.name));
-              _aliases[tag.toString()] =
-                  userNodes.expand((n) => n.ipAddresses).toList();
-            }
+    if (aclPolicy.containsKey('hosts')) {
+      final hostsRaw = aclPolicy['hosts'];
+      if (hostsRaw is Map) {
+        hostsRaw.forEach((hostName, hostIp) {
+          final key = hostName.toString().trim();
+          final val = hostIp.toString().trim();
+          if (key.isNotEmpty && val.isNotEmpty) {
+            _aliases[key] = [val];
           }
         });
       }
@@ -165,6 +158,34 @@ class AclParserService {
         });
       }
     }
+  }
+
+  User? _findUserByAlias(String alias) {
+    final trimmed = alias.trim().toLowerCase();
+    if (trimmed.isEmpty) return null;
+
+    for (final user in allUsers) {
+      if (user.name.trim().toLowerCase() == trimmed) return user;
+      if ('${user.name.trim().toLowerCase()}@' == trimmed) return user;
+      if (user.email != null &&
+          user.email!.trim().isNotEmpty &&
+          user.email!.trim().toLowerCase() == trimmed) {
+        return user;
+      }
+      if (user.displayName != null &&
+          user.displayName!.trim().isNotEmpty &&
+          user.displayName!.trim().toLowerCase() == trimmed) {
+        return user;
+      }
+      final resolvedMembers = resolveAclGroupMembers(
+        user.name,
+        email: user.email,
+      );
+      if (resolvedMembers.any((m) => m.toLowerCase() == trimmed)) {
+        return user;
+      }
+    }
+    return null;
   }
 
   List<String> _coerceStringList(dynamic value) {
@@ -184,6 +205,18 @@ class AclParserService {
     }
     if (alias == 'autogroup:self') {
       return sourceNode.ipAddresses;
+    }
+    if (alias == 'autogroup:member') {
+      return allNodes
+          .where((n) => n.tags.isEmpty && n.user != 'tagged-devices')
+          .expand((n) => n.ipAddresses)
+          .toList();
+    }
+    if (alias == 'autogroup:tagged') {
+      return allNodes
+          .where((n) => n.tags.isNotEmpty)
+          .expand((n) => n.ipAddresses)
+          .toList();
     }
     if (_aliases.containsKey(alias)) {
       return _aliases[alias]!
@@ -211,14 +244,12 @@ class AclParserService {
         }
       }
     }
-    // Check if it's a user name
-    final user = allUsers.firstWhere((u) => u.name == alias,
-        orElse: () => User(id: '', name: '', createdAt: DateTime.now()));
-    if (user.id.isNotEmpty) {
+    // Check if it's a user identifier (Local name, "user@", or OIDC email)
+    final matchedUser = _findUserByAlias(alias);
+    if (matchedUser != null) {
       return allNodes
           .where((n) =>
-              n.user == user.name ||
-              n.getNormalizedOwner() == normalizeUserName(user.name))
+              PolicyInfrastructureBuilder.nodeBelongsToUser(n, matchedUser))
           .expand((n) => n.ipAddresses)
           .toList();
     }
@@ -887,16 +918,30 @@ class AclParserService {
 
   Node? _findTargetNode(String destination) {
     final clean = destination.trim();
+    final cleanBaseIp = clean.split('/').first.trim();
+    bool nodeHasIp(Node node, String targetIp) {
+      final base = targetIp.split('/').first.trim();
+      return node.ipAddresses.any(
+        (ip) => ip == targetIp || ip.split('/').first.trim() == base,
+      );
+    }
+
     for (final node in allNodes) {
       if (node.name == clean ||
           node.id == clean ||
-          node.ipAddresses.contains(clean)) {
+          nodeHasIp(node, cleanBaseIp)) {
         return node;
       }
     }
     final hostIp = _extractHostsMap()[clean];
-    if (hostIp != null && _nodeIpMap.containsKey(hostIp)) {
-      return _nodeIpMap[hostIp];
+    if (hostIp != null) {
+      final baseHostIp = hostIp.split('/').first.trim();
+      if (_nodeIpMap.containsKey(baseHostIp)) {
+        return _nodeIpMap[baseHostIp];
+      }
+      for (final node in allNodes) {
+        if (nodeHasIp(node, baseHostIp)) return node;
+      }
     }
     return null;
   }
@@ -945,7 +990,9 @@ class AclParserService {
   ) {
     if (expr == '*') return true;
     if (expr == 'autogroup:member') {
-      return candidateNode.user.isNotEmpty || candidateNode.tags.isEmpty;
+      return candidateNode.tags.isEmpty &&
+          candidateNode.user.isNotEmpty &&
+          candidateNode.user != 'tagged-devices';
     }
     if (expr == 'autogroup:tagged') {
       return candidateNode.tags.isNotEmpty;
@@ -977,10 +1024,15 @@ class AclParserService {
 
     final hostsMap = _extractHostsMap();
     if (hostsMap.containsKey(expr)) {
-      return candidateNode.ipAddresses.contains(hostsMap[expr]);
+      final hostIpBase = hostsMap[expr]!.split('/').first.trim();
+      return candidateNode.ipAddresses.any(
+        (ip) => ip == hostsMap[expr] || ip.split('/').first.trim() == hostIpBase,
+      );
     }
 
-    if (candidateNode.ipAddresses.contains(expr) ||
+    final exprBaseIp = expr.split('/').first.trim();
+    if (candidateNode.ipAddresses.any(
+            (ip) => ip == expr || ip.split('/').first.trim() == exprBaseIp) ||
         candidateNode.name == expr) {
       return true;
     }
@@ -989,7 +1041,15 @@ class AclParserService {
       return candidateNode.ipAddresses.any((ip) => _isIpInSubnet(ip, expr));
     }
 
-    return candidateNode.user == expr ||
+    final matchedUser = _findUserByAlias(expr);
+    if (matchedUser != null &&
+        PolicyInfrastructureBuilder.nodeBelongsToUser(
+            candidateNode, matchedUser)) {
+      return true;
+    }
+
+    return (candidateNode.user != 'tagged-devices' &&
+            candidateNode.user == expr) ||
         candidateNode.getNormalizedOwner() == normalizeUserName(expr);
   }
 
@@ -1077,7 +1137,18 @@ class AclParserService {
   }
 
   bool _isSameUser(Node a, Node b) {
-    if (a.user.isNotEmpty && a.user == b.user) return true;
+    final ownerA = PolicyInfrastructureBuilder.findOwnerUser(a, allUsers);
+    final ownerB = PolicyInfrastructureBuilder.findOwnerUser(b, allUsers);
+    if (ownerA != null && ownerB != null) {
+      return ownerA.id.isNotEmpty && ownerB.id.isNotEmpty
+          ? ownerA.id == ownerB.id
+          : ownerA.name == ownerB.name;
+    }
+    if (a.user.isNotEmpty &&
+        a.user != 'tagged-devices' &&
+        a.user == b.user) {
+      return true;
+    }
     return a.getNormalizedOwner() == b.getNormalizedOwner();
   }
 
@@ -1120,12 +1191,21 @@ class AclParserService {
     if (lastColon != -1) {
       final potentialAddr = dest.substring(0, lastColon);
       final potentialPort = dest.substring(lastColon + 1);
-      if ((potentialAddr.startsWith('[') && potentialAddr.endsWith(']')) ||
-          !potentialAddr.contains(':')) {
-        final cleanAddr =
-            potentialAddr.startsWith('[') && potentialAddr.endsWith(']')
-                ? potentialAddr.substring(1, potentialAddr.length - 1)
-                : potentialAddr;
+      final isBracketedIpv6 =
+          potentialAddr.startsWith('[') && potentialAddr.endsWith(']');
+      final isPrefixedEntityWithPort = potentialAddr.startsWith('tag:') ||
+          potentialAddr.startsWith('group:') ||
+          potentialAddr.startsWith('autogroup:');
+      final isBarePrefixWithoutPort =
+          const {'tag', 'group', 'autogroup'}.contains(potentialAddr);
+
+      if (!isBarePrefixWithoutPort &&
+          (isBracketedIpv6 ||
+              !potentialAddr.contains(':') ||
+              isPrefixedEntityWithPort)) {
+        final cleanAddr = isBracketedIpv6
+            ? potentialAddr.substring(1, potentialAddr.length - 1)
+            : potentialAddr;
         return _HostPortsPair(cleanAddr, potentialPort.split(','));
       }
     }

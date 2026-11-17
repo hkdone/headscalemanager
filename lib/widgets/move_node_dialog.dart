@@ -111,11 +111,15 @@ class _MoveNodeDialogState extends State<MoveNodeDialog> {
             temporaryRules: tempRules,
             taildriveShares: provider.taildriveShares,
             serverVersion: provider.serverVersion,
+            includeUntaggedNodes: provider.includeUntaggedNodes,
           );
           await PolicyPreserver.applyPreservingPolicy(
             apiService: provider.apiService,
             generatedPolicy: newPolicyMap,
             rawServerPolicy: rawServerPolicy,
+            users: allUsers,
+            nodes: allNodes,
+            includeUntaggedNodes: provider.includeUntaggedNodes,
           );
 
           if (!mounted) return;

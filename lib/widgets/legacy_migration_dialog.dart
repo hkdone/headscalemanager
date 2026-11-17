@@ -271,7 +271,8 @@ class _LegacyMigrationDialogState extends State<LegacyMigrationDialog> {
           nodes: freshNodes,
           temporaryRules: tempRules,
           taildriveShares: appProvider.taildriveShares,
-          serverVersion: appProvider.serverVersion);
+          serverVersion: appProvider.serverVersion,
+          includeUntaggedNodes: appProvider.includeUntaggedNodes);
 
       // 4. Push to Server (non-destructive merge)
       log("Envoi de la configuration au serveur...",
