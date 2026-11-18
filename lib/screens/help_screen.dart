@@ -109,7 +109,7 @@ class HelpScreen extends StatelessWidget {
                     const SizedBox(height: 4),
                     _buildBodyText(
                       context,
-                      '1. Dans l\'onglet "Utilisateurs", cliquez sur l\'icône de clé et créez une clé pour votre utilisateur. Même si aucune case n\'est cochée, il est nécessaire de mettre 1 jour d\'expiration de la clé pour générer une clé valide.\n'
+                      '1. Dans l\'onglet "Utilisateurs", cliquez sur l\'icône de clé et créez une clé pour votre utilisateur. Même si aucune case n\'est cochée, il est nécessaire de mettre 1 jour d\'expiration de la clé pour générer une clé valide. L\'interrupteur **Associer des tags ACL (Serveur / Infrastructure)** est désactivé par défaut afin de laisser vos appareils personnels sans tag, rattachés à l\'utilisateur humain.\n'
                       '2. Copiez la commande `tailscale up ...` fournie.\n'
                       '3. Exécutez cette commande sur l\'appareil que vous souhaitez ajouter. Il sera automatiquement enregistré et apparaîtra dans votre tableau de bord.',
                       isSmall: true,
@@ -127,16 +127,16 @@ class HelpScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     _buildSubTitle(context,
-                        'Étape 3 (Optionnel) : Renommer le nœud et ajouter des tags'),
+                        'Étape 3 (Optionnel) : Renommer le nœud et gérer ses tags'),
                     const SizedBox(height: 8),
                     _buildBodyText(context,
-                        'Une fois le nœud apparu dans le tableau de bord, vous pouvez le configurer. C\'est une étape cruciale si vous utilisez les ACLs basées sur les tags.'),
+                        'Une fois le nœud apparu dans le tableau de bord, vous pouvez le configurer. Avec le **Mode Hybride**, les tags sont optionnels pour les appareils personnels : un nœud sans tag reste rattaché à l\'utilisateur (`group:<utilisateur>`), idéal pour OIDC ou les appareils mobiles.'),
                     const SizedBox(height: 8),
                     _buildBodyText(
                       context,
                       '1. Allez dans les détails du nœud en cliquant dessus.\n'
                       '2. Utilisez le menu pour le renommer (par exemple, "mon-telephone").\n'
-                      '3. Cliquez sur l\'icône de crayon pour modifier les tags. Ajoutez les tags pertinents (par exemple, `tag:user-phone`, `tag:user-laptop`). L\'application mettra à jour les tags directement via l\'API.',
+                      '3. Si le nœud sert de serveur ou de routeur tagué, cliquez sur l\'icône de crayon pour modifier les tags ou ouvrez l\'**Assistant de bascule guidée** depuis la fiche du nœud.',
                       isSmall: true,
                     ),
                   ]),
@@ -400,15 +400,17 @@ routes:
                     ),
                     const SizedBox(height: 12),
                     _buildBodyText(
-                        context, '**Outils ACL & Sécurité (v2.3–v2.5) :**',
+                        context, '**Outils ACL & Sécurité (v2.3–v2.5.2) :**',
                         isBold: true),
                     const SizedBox(height: 4),
                     _buildBodyText(
                       context,
+                      '- **Mode Hybride Zéro-Coupure (v2.5.1) :** Relie automatiquement les appareils sans tag (OIDC/Locaux) via `group:<user>`, génère les alias `hosts` (`host-<user>-<node>`), adapte le routage `via` vs direct et hybridise les règles inter-utilisateurs (**Paramètres → Inclure les nœuds sans tags**).\n'
+                      '- **Centre d\'Assistance à la Bascule & Fin du Taggage Forcé (v2.5.2) :** Bascule guidée nœud par nœud (**Parcours A** Taggé → Sans Tag avec régénération ACL auto, **Parcours B** Sans Tag → Taggé 1-clic, **Parcours C** Serveur) accessible depuis **Paramètres**, **ACLs** et **Détails du Nœud**, avec conservation sans tag par défaut sur PreAuthKey, déplacements et approbations de routes.\n'
                       '- **Fusion non-destructive :** Préserve les blocs serveur (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `nodeAttrs`) et vos règles personnalisées/OIDC lors des régénérations.\n'
                       '- **HuJSON & Vue Puzzle :** Support complet des commentaires `//` et `/* */` ; nommer une règle dans la Vue Puzzle ajoute `// <nom>` au JSON et inversement.\n'
-                      '- **Diff Visuel (+/-) & Orphelins :** Avant chaque export (ACL ou Puzzle), un diff coloré compare votre brouillon au serveur, et les références d\'anciens nœuds/utilisateurs supprimés sont signalées.\n'
-                      '- **Simulateur de flux ACL & Onglet SSH :** Testez en lecture seule qui peut joindre qui (avec épinglage facultatif dans `"tests"` sur port unique ≥ 0.29) et gérez vos règles **Tailscale SSH**.\n'
+                      '- **Diff Visuel (+/-) & Orphelins :** Avant chaque export (ACL, Centre de bascule ou Puzzle), un diff coloré compare votre brouillon au serveur, et les références d\'anciens nœuds/utilisateurs supprimés sont signalées.\n'
+                      '- **Simulateur de flux ACL & Onglet SSH :** Testez en lecture seule qui peut joindre qui (avec résolution `hosts`/`"nom@"`/OIDC et épinglage facultatif dans `"tests"` ≥ 0.29) et gérez vos règles **Tailscale SSH**.\n'
                       '- **Diagnostic & Alignement ACL (v2.5) :** Vérifie identités Local/OIDC, groupes (`"nom@"`), `tagOwners` et noms DNS-1123 selon la version serveur et le moteur actif, avec répercussion en cascade et aperçu Diff. Alerte automatique sur serveurs obsolètes (`≤ 0.27`).',
                       isSmall: true,
                     ),
@@ -544,14 +546,14 @@ routes:
                     _buildBodyText(context,
                         'Le tableau de bord est désormais votre centre de commande pour les permissions courantes. Lorsque des nœuds demandent à partager des sous-réseaux ou à devenir un "Exit Node", des icônes d\'avertissement apparaissent.'),
                     const SizedBox(height: 8),
-                    _buildBodyText(context, '**Approbation en un clic :**',
+                    _buildBodyText(context,
+                        '**Approbation en un clic (respectueuse du sans tag) :**',
                         isBold: true),
                     _buildBodyText(
                       context,
-                      '1. **Ajoute les tags pertinents** au nœud (ex: `;lan-sharer` ou `;exit-node`).\n'
-                      '2. **Approuve les routes** demandées.\n'
-                      '3. **Régénère et applique la politique ACL complète**.\n'
-                      '*Avantage :* Plus besoin de modifier manuellement les tags et la politique ACL. Tout est fait en une seule étape.',
+                      '- **Sur un nœud déjà tagué :** ajoute le tag de capacité (`-lan-sharer` / `-exit-node`), approuve les routes et régénère la politique ACL.\n'
+                      '- **Sur un nœud sans tag :** propose par défaut **Approuver sans tag (Recommandé)** via `group:<utilisateur>` (Mode Hybride), ou **Convertir en routeur tagué** si deux utilisateurs partagent le même CIDR LAN avec `via`.\n'
+                      '*Avantage :* Vos appareils personnels ne sont plus convertis de force en `tagged-devices`.',
                       isSmall: true,
                     ),
                     const SizedBox(height: 8),

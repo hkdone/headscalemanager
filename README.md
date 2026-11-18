@@ -41,13 +41,13 @@ Il existe deux méthodes principales :
 1.  **Sur l'appareil client (iOS/Android) :** Dans l'application Tailscale, allez dans les paramètres, sélectionnez "Use alternate server", et collez l'URL de votre serveur Headscale.
 2.  **Dans l'application Headscale Manager :** Après avoir effectué l'étape 1, le client Tailscale vous fournira une URL d'enregistrement unique ainsi q'une commande contenant une clé d'enregistrement. Dans l'application Headscale Manager, collez l'URL fournie par le client ou la clé d'enregistrement seule. L'appareil sera enregistré directement via l'API.
 
-### Étape 3 (Optionnel) : Renommer le nœud et ajouter des tags
+### Étape 3 (Optionnel) : Renommer le nœud et gérer ses tags
 
-Une fois le nœud apparu dans le tableau de bord, vous pouvez le configurer. C'est une étape cruciale si vous utilisez les ACLs basées sur les tags.
+Une fois le nœud apparu dans le tableau de bord, vous pouvez le configurer. Depuis le **Mode Hybride (v2.5.1+)**, les tags ne sont plus obligatoires pour les appareils personnels : un nœud sans tag reste rattaché directement à l'utilisateur humain (`group:<utilisateur>`), ce qui est idéal pour les clients OIDC mobiles ou les postes utilisateurs. Les tags restent en revanche utiles pour les serveurs/routeurs nécessitant un routage `via` dédié.
 
 1. Allez dans les détails du nœud en cliquant dessus.
-2. Utilisez le menu pour le **renommer** (par exemple, "mon-telephone").
-3. Cliquez sur l'icône de crayon pour **modifier les tags**. Ajoutez les tags pertinents (par exemple, `tag:user-phone`, `tag:user-laptop`). L'application mettra à jour les tags directement via l'API.
+2. Utilisez le menu pour le **renommer** (par exemple, `mon-telephone`).
+3. Si vous souhaitez lui associer des tags (ex: `tag:user-client`, `tag:user-exit-node`), cliquez sur l'icône de crayon pour **modifier les tags** ou utilisez l'**Assistant de bascule guidée** depuis la fiche du nœud. L'application mettra à jour les tags et les ACLs directement via l'API.
 
 ## 1. Prérequis et Installation du Serveur Headscale
 
@@ -243,12 +243,18 @@ L'écran ACL propose **quatre onglets** :
 - La **Vue Puzzle** organise les règles en trois colonnes (`Source | Via | Destination`).
 - Tout nom donné à une règle dans le Puzzle génère un commentaire `// <nom>` juste au-dessus du bloc JSON correspondant — et inversement, tout commentaire `//` présent avant une règle sur le serveur nomme automatiquement la règle dans le Puzzle.
 
-**Sécurité des exports & Outils avancés (v2.3–v2.5) :**
-- **Fusion non-destructive (`PolicyPreserver`)** : lors des régénérations automatiques, les blocs serveur manuels (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `randomizeClientPort`, `nodeAttrs` non-Taildrive) et les règles personnalisées/OIDC inter-utilisateurs sont préservés.
-- **Diff Visuel ligne-par-ligne (`PolicyDiffDialog`)** : avant chaque publication (depuis l'écran ACL ou la Vue Puzzle), un comparateur coloré (`+` vert / `-` rouge) compare votre brouillon à la politique réellement en ligne sur le serveur (avec filtre *"Afficher uniquement les différences"* et résumé par section au-delà de 1500 lignes).
-- **Simulateur de flux ACL** : vérifiez en lecture seule si une machine source peut joindre une destination/port (`AUTORISÉ` avec routeur `via` ou `BLOQUÉ`), avec possibilité facultative d'épingler l'assertion dans le bloc `"tests"` (Headscale ≥ 0.29, port numérique unique) et validation pré-export.
-- **Diagnostic & Alignement ACL (v2.5)** : inspecte les comptes Locaux/OIDC, les groupes Policy v2 (`"nom@"`), les `tagOwners`, les tags legacy/avec points et les noms DNS-1123, puis répercute les corrections en cascade dans les règles et partages (avec aperçu Diff) en tenant compte de la version serveur et du moteur actif. Un bandeau rouge d'avertissement signale également les serveurs obsolètes (`≤ 0.27`, règle $N-2$).
-- **Comptes OIDC** : prise en charge multi-identifiants (`name`, `email`, `displayName`) et repli `group:` pour les appareils OIDC non tagués.
+**Sécurité des exports & Outils avancés (v2.3–v2.5.2) :**
+- **Mode Hybride Zéro-Coupure (v2.5.1+) :** Prise en charge simultanée des machines taguées (`tagged-devices`) et des machines sans tag (OIDC ou locales via `group:<utilisateur>`) dans `Standard` et `Grants V29`. Génère automatiquement les alias `hosts` (`host-<user>-<node>`), adapte le routage `via` (tagué) vs direct (sans tag), hybridation automatique des règles inter-utilisateurs existantes, et offre le réglage *Paramètres → Inclure les nœuds sans tags (Mode Hybride)* (activé par défaut).
+- **Centre d'Assistance à la Bascule Guidée (v2.5.2+) :** Accessible sans intrusion depuis *Paramètres → Ouvrir l'assistant de bascule guidée*, le menu `⋮` (ou la bannière moteur) de l'écran *ACLs*, et la fiche d'un Nœud (*Détails du Nœud* / *Modifier les tags*). Propose 3 parcours guidés :
+  - **Parcours A (Taggé → Sans Tag / OIDC)** en 3 étapes : préparation du filet ACL hybride, déconnexion/commande `tailscale up --force-reauth` pré-remplie (routes incluses), puis **régénération ACL automatique** et vérification en direct dans le simulateur.
+  - **Parcours B (Sans Tag → Taggé)** en 1 clic API avec préservation et régénération ACL immédiate.
+  - **Parcours C (Serveur)** : audit d'alignement et bascule `Grants V29` / `Standard` avec simulation post-bascule.
+- **Arrêt de l'auto-tagging forcé (v2.5.2+) :** Les clés PreAuthKey, enregistrements d'appareils, déplacements de nœuds et approbations de routes conservent par défaut vos appareils personnels sans tag (conversion en routeur tagué uniquement sur choix explicite).
+- **Fusion non-destructive (`PolicyPreserver`) :** lors des régénérations automatiques, les blocs serveur manuels (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `randomizeClientPort`, `nodeAttrs` non-Taildrive) et les règles personnalisées/OIDC inter-utilisateurs sont préservés.
+- **Diff Visuel ligne-par-ligne (`PolicyDiffDialog`) :** avant chaque publication (depuis l'écran ACL, le Centre de bascule ou la Vue Puzzle), un comparateur coloré (`+` vert / `-` rouge) compare votre brouillon à la politique réellement en ligne sur le serveur (avec filtre *"Afficher uniquement les différences"* et résumé par section au-delà de 1500 lignes).
+- **Simulateur de flux ACL :** vérifiez en lecture seule si une machine source peut joindre une destination/port (`AUTORISÉ` avec routeur `via` ou `BLOQUÉ`), avec résolution complète de `hosts`, `"user@"`, emails OIDC et `autogroup:member`, et épinglage facultatif dans `"tests"` (Headscale ≥ 0.29, port numérique unique + validation pré-export).
+- **Diagnostic & Alignement ACL (v2.5+) :** inspecte les comptes Locaux/OIDC, les groupes Policy v2 (`"nom@"`), les `tagOwners`, les tags legacy/avec points et les noms DNS-1123, puis répercute les corrections en cascade dans les règles et partages (avec aperçu Diff) en tenant compte de la version serveur et du moteur actif. Un bandeau rouge d'avertissement signale également les serveurs obsolètes (`≤ 0.27`, règle $N-2$).
+- **Comptes OIDC :** prise en charge multi-identifiants (`name`, `email`, `displayName`) et repli `group:` pour les appareils OIDC non tagués.
 
 **Workflow d'utilisation de la page ACL :**
 
@@ -330,8 +336,7 @@ Cet écran (accessible via le bouton `vpn_key` sur l'écran Utilisateurs) vous p
 de nouveaux appareils sans intervention manuelle sur le serveur.
 
 **Boutons et Fonctionnalités :**
-- **Créer Clé (icône '+' en bas à droite) :** Ouvre un dialogue pour créer une nouvelle clé de pré-authentification. Vous pouvez spécifier l'utilisateur, si elle est réutilisable, éphémère
-et sa durée d'expiration en jours. Après création, une commande `tailscale up` est affichée pour enregistrer un client.
+- **Créer Clé (icône '+' en bas à droite) :** Ouvre un dialogue pour créer une nouvelle clé de pré-authentification. Vous pouvez spécifier l'utilisateur, si elle est réutilisable, éphémère, sa durée d'expiration en jours, ainsi que l'interrupteur optionnel **« Associer des tags ACL (Serveur / Infrastructure) »** (désactivé par défaut pour laisser l'appareil rattaché à l'utilisateur humain sans tag). Après création, une commande `tailscale up` est affichée pour enregistrer un client.
 - **Expirer Clé (icône de poubelle à côté de chaque clé) :** Fait expirer une clé de pré-authentification existante après confirmation.
 - **Expirer toutes les clés (icône 'delete_sweep' en bas à droite) :** Fait expirer toutes les clés de pré-authentification existantes après confirmation.
 
@@ -345,6 +350,9 @@ Cet écran vous permet de configurer l'application pour qu'elle se connecte à v
 - **URL du Serveur :** Entrez l'adresse publique (FQDN) de votre serveur Headscale (ex: `https://headscale.mondomaine.com`). Une alerte s'affiche si une URL `http://` non chiffrée est utilisée hors réseau local.
 - **Clé API :** Collez la clé API unique que vous avez générée depuis votre serveur Headscale. Ce champ est masqué et stocké dans le coffre sécurisé du système.
 - **Moteur ACL (isolé par serveur) :** Choix entre `Legacy`, `Standard` et `Grants V29` (si serveur ≥ 0.29), mémorisé indépendamment pour chaque serveur configuré.
+- **Inclure les nœuds sans tags (Mode Hybride) :** Relie automatiquement les appareils personnels sans tag à leur flotte utilisateur via `group:<utilisateur>` (activé par défaut ; désactivez uniquement pour mettre ces nœuds en quarantaine).
+- **Ouvrir l'assistant de bascule guidée :** Accède au Centre d'Assistance nœud par nœud (Taggé ↔ Sans tag / OIDC) avec test en direct.
+- **Diagnostic & Alignement ACL :** Inspecte identités Local/OIDC, groupes (`"nom@"`), `tagOwners` et noms DNS-1123 avec aperçu Diff.
 - **Migration Grants V29 / Rollback :** Wizard guidé dans la zone Danger avec détection préalable des conflits CIDR avant rollback.
 - **Maintenance — Attribuer les IPs manquantes (Backfill IPs) :** Après confirmation explicite (`confirmed=true`), recalcule les adresses IPv4/IPv6 manquantes ou hors-plage des nœuds existants par rapport à `config.yaml` (ex: après activation d'IPv6).
 - **Sécurité de l'application (`Sécurité`) :** Code PIN à 4 ou 6 chiffres (haché en **PBKDF2-HMAC-SHA256 salé**, avec blocage anti-bruteforce après 5 échecs), déverrouillage biométrique et verrouillage automatique configurable lors du passage en arrière-plan.
@@ -354,7 +362,7 @@ Cet écran vous permet de configurer l'application pour qu'elle se connecte à v
 - Gérez vos partages de dossiers WebDAV entre nœuds depuis le menu de l'écran ACL (**Partages Taildrive**).
 - L'application injecte automatiquement les blocs `nodeAttrs` (`cap:taildrive`) et `grants` (`tailscale.com/cap/drive`) nécessaires sans écraser les autres attributs de nœuds présents sur le serveur.
 
-### 3.11. Gestion des clés API
+### 3.12. Gestion des clés API
 
 Cet écran (accessible via le bouton `api` sur l'écran du tableau de bord) vous permet de visualiser, créer, et supprimer des clés d'API. Ces clés sont utilisées pour authentifier les requêtes à l'API de Headscale.
 
@@ -375,12 +383,10 @@ Headscale Manager introduit plusieurs mécanismes pour rendre la gestion des lis
 
 Le tableau de bord est désormais votre centre de commande pour les permissions courantes. Lorsque des nœuds demandent à partager des sous-réseaux ou à devenir un "Exit Node", des icônes d'avertissement apparaissent.
 
-*   **Approbation en un clic :**
-    *   **Ce que ça fait :** En cliquant sur le bouton d'approbation (icône d'avertissement orange), l'application effectue trois actions automatiquement :
-        1.  **Ajoute les tags pertinents** au nœud (ex: `;lan-sharer` ou `;exit-node` sont ajoutés au tag `*-client` existant).
-        2.  **Approuve les routes** demandées par le nœud.
-        3.  **Régénère et applique la politique ACL complète** sur votre serveur Headscale.
-    *   **Avantage :** Vous n'avez plus besoin de modifier manuellement les tags, puis d'aller sur la page ACL pour régénérer la politique. Tout est fait en une seule étape, garantissant que les permissions sont accordées immédiatement et correctement.
+*   **Approbation en un clic (respectueuse des appareils sans tag) :**
+    *   **Sur un nœud déjà tagué :** l'application ajoute la capacité demandée (`-lan-sharer` / `-exit-node`), approuve les routes et régénère automatiquement la politique ACL.
+    *   **Sur un nœud sans tag :** une boîte de dialogue vous propose par défaut **« Approuver sans tag (Recommandé) »** (approbation via `group:<utilisateur>` en Mode Hybride) ou **« Convertir en routeur tagué »** (uniquement nécessaire si deux utilisateurs partagent exactement le même CIDR LAN avec `via`).
+    *   **Avantage :** Plus besoin de modifier manuellement les tags ou de convertir vos appareils personnels en `tagged-devices` : tout reste synchronisé et sécurisé en une seule action.
 
 *   **Nettoyage intelligent :**
     *   **Ce que ça fait :** Si un client désactive le partage de route ou la fonction d'exit node, une icône d'avertissement bleue apparaît. Le bouton de nettoyage permet de :

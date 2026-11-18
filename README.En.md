@@ -41,13 +41,13 @@ There are two main methods:
 1.  **On the client device (iOS/Android):** In the Tailscale application, go to settings, select "Use alternate server", and paste the URL of your Headscale server.
 2.  **In the Headscale Manager application:** After completing step 1, the Tailscale client will provide you with a unique registration URL as well as a command containing a registration key. In the Headscale Manager application, paste the URL provided by the client or the registration key alone. The device will be registered directly via the API.
 
-### Step 3 (Optional): Rename the node and add tags
+### Step 3 (Optional): Rename the node and manage tags
 
-Once the node appears on the dashboard, you can configure it. This is a crucial step if you use tag-based ACLs.
+Once the node appears on the dashboard, you can configure it. Since **Hybrid Mode (v2.5.1+)**, tags are optional for personal devices: a tagless node remains owned directly by the human user (`group:<user>`), which is ideal for OIDC mobile clients or personal workstations. Tags remain useful for servers/routers requiring dedicated `via` routing.
 
 1. Go to the node details by clicking on it.
 2. Use the menu to **renommer** (rename) it (for example, "my-phone").
-3. Click on the pencil icon to **modifier les tags** (edit tags). Add the relevant tags (e.g., `tag:user-phone`, `tag:user-laptop`). The application will update the tags directly via the API.
+3. If you want to attach tags (e.g., `tag:user-client`, `tag:user-exit-node`), click the pencil icon to **modifier les tags** (edit tags) or open the **Guided Migration Assistant** directly from the node details screen. The application will update tags and ACLs via the API.
 
 ## 1. Prerequisites and Headscale Server Installation
 
@@ -241,11 +241,17 @@ The ACL screen has **four tabs**:
 - The ACL Puzzle shows three columns: `Source | Via | Destination`.
 - Naming a rule in Puzzle writes a `// <name>` comment directly above that rule in JSON, and existing `//` comments on the server automatically hydrate rule names in Puzzle.
 
-**Export Safety & Advanced Tools (v2.3–v2.5):**
+**Export Safety & Advanced Tools (v2.3–v2.5.2):**
+- **Zero-Downtime Hybrid Mode (v2.5.1+):** Simultaneous support for tagged nodes (`tagged-devices`) and tagless devices (OIDC/Local via `group:<user>`) in both `Standard` and `Grants V29`. Automatically generates managed `hosts` aliases (`host-<user>-<node>`), chooses `via` (tagged router) vs direct routing (tagless router), auto-hybridizes cross-user custom rules, and provides the *Settings → Include tagless nodes (Hybrid Mode)* toggle (enabled by default).
+- **Guided ACL Migration Center (v2.5.2+):** Non-intrusively accessible from *Settings → Open Guided Migration Assistant*, the *ACLs* `⋮` menu (or engine banner), and *Node Details* / *Edit Tags*. Features 3 guided workflows:
+  - **Path A (Tagged → Tagless / OIDC)** in 3 steps: hybrid ACL net preparation, pre-filled `tailscale up --force-reauth` command (preserving advertised routes), then **automatic ACL regeneration** and live simulator verification.
+  - **Path B (Tagless → Tagged)** in 1 API click with rule preservation and immediate ACL regeneration.
+  - **Path C (Server)**: alignment audit and `Grants V29` / `Standard` switch with post-switch user simulation.
+- **No Forced Auto-Tagging (v2.5.2+):** Creating a PreAuthKey (opt-in *"Attach ACL tags"* switch, off by default), registering a device, moving a node, and approving routes keep personal devices tagless by default unless explicitly requested.
 - **Non-Destructive Merge (`PolicyPreserver`)**: preserves manual server blocks (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `randomizeClientPort`, non-Taildrive `nodeAttrs`) and custom/cross-user OIDC rules during regeneration.
-- **Line-by-Line Visual Diff (`PolicyDiffDialog`)**: colored `+`/`-` diff against the live server policy (with *"Show differences only"* filter and >1500-line section fallback) before exporting from both the ACL screen and Puzzle View.
-- **ACL Flow Simulator**: read-only reachability check (`ALLOWED` with `via` router or `BLOCKED`), plus optional non-regression `"tests"` pinning (Headscale ≥ 0.29, single numeric port required + pre-export validation).
-- **ACL Alignment Diagnostic (v2.5)**: audits Local/OIDC profiles, Policy v2 groups (`"username@"`), `tagOwners`, legacy/dotted tags, and DNS-1123 node names, cascading fixes across all rules and shares (with Diff preview) according to the active server version and ACL engine. Also shows a red deprecation banner for outdated servers (`≤ 0.27`, $N-2$ rule).
+- **Line-by-Line Visual Diff (`PolicyDiffDialog`)**: colored `+`/`-` diff against the live server policy (with *"Show differences only"* filter and >1500-line section fallback) before exporting from the ACL screen, Migration Center, or Puzzle View.
+- **ACL Flow Simulator**: read-only reachability check (`ALLOWED` with `via` router or `BLOCKED`), full resolution of `hosts`, `"username@"`, OIDC emails, and `autogroup:member`, plus optional non-regression `"tests"` pinning (Headscale ≥ 0.29, single numeric port required + pre-export validation).
+- **ACL Alignment Diagnostic (v2.5+)**: audits Local/OIDC profiles, Policy v2 groups (`"username@"`), `tagOwners`, legacy/dotted tags, and DNS-1123 node names, cascading fixes across all rules and shares (with Diff preview) according to the active server version and ACL engine. Also shows a red deprecation banner for outdated servers (`≤ 0.27`, $N-2$ rule).
 - **OIDC Multi-Identifier Support**: matches OIDC users across `name`, `email`, and `displayName` with `group:` fallback for untagged nodes.
 
 **ACL page workflow:**
@@ -300,12 +306,10 @@ Headscale Manager introduces several mechanisms to make Access Control List (ACL
 
 The dashboard is now your command center for common permissions. When nodes request to share subnets or become an "Exit Node", warning icons appear.
 
-*   **One-Click Approval:**
-    *   **What it does:** By clicking the approval button (orange warning icon), the application automatically performs three actions:
-        1.  **Adds the relevant tags** to the node (e.g., `;lan-sharer` or `;exit-node` are added to the existing `*-client` tag).
-        2.  **Approves the routes** requested by the node.
-        3.  **Regenerates and applies the full ACL policy** to your Headscale server.
-    *   **Benefit:** You no longer need to manually edit tags and then go to the ACL page to regenerate the policy. Everything is done in a single step, ensuring permissions are granted immediately and correctly.
+*   **One-Click Approval (tagless-safe):**
+    *   **On an already tagged node:** adds the requested capability tag (`-lan-sharer` / `-exit-node`), approves the routes, and automatically regenerates and applies the ACL policy.
+    *   **On a tagless node:** opens a choice dialog defaulting to **"Approve tagless (Recommended)"** (approves routes via `group:<user>` in Hybrid Mode) or **"Convert to tagged router"** (only needed if two users share the exact same LAN CIDR with `via`).
+    *   **Benefit:** No need to manually edit tags or force personal devices into `tagged-devices`; everything stays synchronized in a single action.
 
 *   **Smart Cleanup:**
     *   **What it does:** If a client disables route sharing or the exit node function, a blue warning icon appears. The cleanup button allows you to:
@@ -356,4 +360,5 @@ If you have critical devices (a server, a gateway, etc.), you can be specificall
 - **Network Hardening:** 20-second API timeouts, strict URL parameter encoding (`Uri.encodeComponent`), cleartext HTTP warning outside local networks, and opt-in Internet exit diagnostics.
 - **Node Session Expiration (`expireNode`):** Disconnect a node from **Node Details** or **User Details** without deleting it or losing its tags/routes (`tailscale up` re-authenticates it).
 - **Backfill IPs (`Settings`):** After explicit confirmation (`confirmed=true`), reconciles missing or out-of-range IPv4/IPv6 addresses for existing nodes against `config.yaml` prefixes (e.g. after enabling IPv6).
-- **Taildrive Shares (Headscale ≥ 0.29) & PreAuthKey v0.28+:** Manage WebDAV folder shares non-destructively and expire PreAuthKeys using v0.28+ IDs/names safely.
+- **Taildrive Shares (Headscale ≥ 0.29) & PreAuthKey v0.28+:** Manage WebDAV folder shares non-destructively and expire PreAuthKeys using v0.28+ IDs/names safely. PreAuthKey creation keeps ACL tagging opt-in (off by default) so personal devices stay tagless unless needed.
+- **Hybrid Mode & Guided Migration Assistant (`Settings`):** Toggle *Include tagless nodes (Hybrid Mode)* per server and launch the *Guided Migration Assistant* to switch individual nodes cleanly between Tagged and Tagless/OIDC modes.

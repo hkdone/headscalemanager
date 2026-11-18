@@ -107,7 +107,7 @@ class HelpScreenEn extends StatelessWidget {
                     const SizedBox(height: 4),
                     _buildBodyText(
                       context,
-                      '1. In the "Users" tab, click the key icon and create a key for your user. Even if no boxes are checked, it is necessary to set a 1-day expiration for the key to generate a valid key.\n'
+                      '1. In the "Users" tab, click the key icon and create a key for your user. Even if no boxes are checked, it is necessary to set a 1-day expiration for the key to generate a valid key. The **Attach ACL tags (Server / Infrastructure mode)** switch is disabled by default so personal devices remain tagless and owned by the human user.\n'
                       '2. Copy the provided `tailscale up ...` command.\n'
                       '3. Run this command on the device you want to add. It will be automatically registered and will appear on your dashboard.',
                       isSmall: true,
@@ -125,16 +125,16 @@ class HelpScreenEn extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     _buildSubTitle(context,
-                        'Step 3 (Optional): Rename the node and add tags'),
+                        'Step 3 (Optional): Rename the node and manage tags'),
                     const SizedBox(height: 8),
                     _buildBodyText(context,
-                        'Once the node appears on the dashboard, you can configure it. This is a crucial step if you use tag-based ACLs.'),
+                        'Once the node appears on the dashboard, you can configure it. With **Hybrid Mode**, tags are optional for personal devices: a tagless node stays linked to its human user (`group:<user>`), ideal for OIDC or mobile devices.'),
                     const SizedBox(height: 8),
                     _buildBodyText(
                       context,
                       '1. Go to the node details by clicking on it.\n'
                       '2. Use the menu to rename it (e.g., "my-phone").\n'
-                      '3. Click the pencil icon to edit the tags. Add the relevant tags (e.g., `tag:user-phone`, `tag:user-laptop`). The application will update the tags directly via the API.',
+                      '3. If the node acts as a tagged server/router, click the pencil icon to edit its tags or open the **Guided Migration Assistant** from the node details screen.',
                       isSmall: true,
                     ),
                   ]),
@@ -396,15 +396,17 @@ routes:
                     ),
                     const SizedBox(height: 12),
                     _buildBodyText(
-                        context, '**ACL Safety & Advanced Tools (v2.3–v2.5):**',
+                        context, '**ACL Safety & Advanced Tools (v2.3–v2.5.2):**',
                         isBold: true),
                     const SizedBox(height: 4),
                     _buildBodyText(
                       context,
-                      '- **Non-destructive merge:** Preserves server blocks (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `nodeAttrs`) and custom/OIDC rules when regenerating.\n'
+                      '- **Zero-Downtime Hybrid Mode (v2.5.1):** Automatically links tagless devices (OIDC/Local) via `group:<user>`, generates managed `hosts` aliases (`host-<user>-<node>`), picks `via` vs direct routing, and auto-hybridizes cross-user rules (**Settings → Include tagless nodes**).\n'
+                      '- **Guided Migration Center & No Forced Auto-Tagging (v2.5.2):** Node-by-node guided switching (**Path A** Tagged → Tagless with automatic ACL regeneration, **Path B** Tagless → Tagged in 1 click, **Path C** Server) accessible from **Settings**, **ACLs**, and **Node Details**, plus tagless-by-default PreAuthKeys, moves, and route approvals.\n'
+                      '- **Non-destructive merge:** Preserves server blocks (`ssh`, `tests`, `hosts`, `ipsets`, `derpMap`, `nodeAttrs`) and your custom/OIDC rules when regenerating.\n'
                       '- **HuJSON & Puzzle View:** Full support for `//` and `/* */` comments; naming a rule in Puzzle adds `// <name>` in JSON and vice-versa.\n'
-                      '- **Visual Diff (+/-) & Orphans:** Colored line-by-line diff against the live server policy before every export (ACL screen & Puzzle View), plus dead-reference cleanup.\n'
-                      '- **ACL Flow Simulator & SSH Tab:** Read-only reachability tester (with optional single-port `"tests"` pinning ≥ 0.29) and visual **Tailscale SSH** rule editor.\n'
+                      '- **Visual Diff (+/-) & Orphans:** Colored line-by-line diff against the live server policy before every export (ACL screen, Migration Center & Puzzle View), plus dead-reference cleanup.\n'
+                      '- **ACL Flow Simulator & SSH Tab:** Read-only reachability tester (resolving `hosts`/`"username@"`/OIDC with optional single-port `"tests"` pinning ≥ 0.29) and visual **Tailscale SSH** rule editor.\n'
                       '- **ACL Alignment Diagnostic (v2.5):** Checks Local/OIDC identities, Policy v2 groups (`"username@"`), `tagOwners`, and DNS-1123 names per server version and engine mode, cascading fixes with Diff preview. Warns on outdated servers (`≤ 0.27`).',
                       isSmall: true,
                     ),
@@ -536,14 +538,14 @@ routes:
                     _buildBodyText(context,
                         'The dashboard is now your command center for common permissions. When nodes request to share subnets or become an "Exit Node", warning icons appear.'),
                     const SizedBox(height: 8),
-                    _buildBodyText(context, '**One-Click Approval:**',
+                    _buildBodyText(context,
+                        '**One-Click Approval (tagless-safe):**',
                         isBold: true),
                     _buildBodyText(
                       context,
-                      '1. **Adds the relevant tags** to the node (e.g., `;lan-sharer` or `;exit-node`).\n'
-                      '2. **Approves the requested routes**.\n'
-                      '3. **Regenerates and applies the full ACL policy**.\n'
-                      '*Benefit:* No more need to manually edit tags and the ACL policy. Everything is done in a single step.',
+                      '- **On an already tagged node:** adds the capability tag (`-lan-sharer` / `-exit-node`), approves the routes, and regenerates the ACL policy.\n'
+                      '- **On a tagless node:** defaults to **Approve tagless (Recommended)** via `group:<user>` (Hybrid Mode), or **Convert to tagged router** if two users share the same LAN CIDR with `via`.\n'
+                      '*Benefit:* Personal devices are no longer forced into `tagged-devices`.',
                       isSmall: true,
                     ),
                     const SizedBox(height: 8),

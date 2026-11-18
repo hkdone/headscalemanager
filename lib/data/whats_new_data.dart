@@ -19,8 +19,8 @@ class WhatsNewVersion {
             ? 'Release 2.5.2 — Centre d\'Assistance à la Bascule & Fin du Taggage Forcé'
             : 'Release 2.5.2 — ACL Migration Center & No Forced Auto-Tagging',
         description: isFr
-            ? 'Nouveau Centre d\'Assistance à la Bascule nœud par nœud (Taggé ↔ Sans tag / OIDC) avec préparation du filet ACL, commande CLI/OIDC pré-remplie et vérification en direct dans le simulateur, plus protection anti-tagging forcé sur les clés PreAuthKey, déplacements et approbations de routes.'
-            : 'New node-by-node ACL Migration Center (Tagged ↔ Tagless / OIDC) with ACL net prep, pre-filled CLI/OIDC instructions, and live simulator validation, plus opt-in tagging on PreAuthKeys, moves, and route approvals.',
+            ? 'Nouveau Centre d\'Assistance à la Bascule nœud par nœud (Taggé ↔ Sans tag / OIDC) avec préparation du filet ACL, commande CLI/OIDC pré-remplie, régénération ACL automatique en fin de bascule et vérification en direct dans le simulateur, plus conservation sans tag par défaut sur PreAuthKey, déplacements et approbations de routes (Flutter 3.50 & aide mise à jour).'
+            : 'New node-by-node ACL Migration Center (Tagged ↔ Tagless / OIDC) with ACL net prep, pre-filled CLI/OIDC instructions, automatic ACL regeneration after switching, and live simulator validation, plus opt-in tagging on PreAuthKeys, moves, and route approvals (Flutter 3.50 & updated help guide).',
         verification: isFr
             ? 'Paramètres > Assistant de bascule guidée • ACLs > menu ⋮ • Fiche Nœud'
             : 'Settings > Guided Migration Assistant • ACLs > ⋮ menu • Node Details',
