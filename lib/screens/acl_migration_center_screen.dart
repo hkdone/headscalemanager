@@ -62,6 +62,7 @@ class _AclMigrationCenterScreenState extends State<AclMigrationCenterScreen>
   bool _useCliMethod = false;
   bool _step1Prepared = false;
   bool _step2ReauthTriggered = false;
+  bool _step3AclAutoApplied = false;
   TaglessTransitionReport? _step3Report;
 
   // Parcours B (Sans Tag -> Taggé)
@@ -188,6 +189,11 @@ class _AclMigrationCenterScreenState extends State<AclMigrationCenterScreen>
         _selectedTaggedNode = initialTagged;
         _targetOwnerForTagless = targetOwner;
         _selectedUntaggedNode = initialUntagged;
+        if (initialUntagged != null) {
+          _addExitNodeCap = initialUntagged.isExitNode;
+          _addLanSharerCap = initialUntagged.sharedRoutes
+              .any((r) => r != '0.0.0.0/0' && r != '::/0');
+        }
         _diagnosticReport = diagReport;
         _step1Prepared = isStep1Done;
         _loading = false;
@@ -330,20 +336,66 @@ class _AclMigrationCenterScreenState extends State<AclMigrationCenterScreen>
     final targetUser = _targetOwnerForTagless;
     if (orig == null || targetUser == null) return;
 
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _step3AclAutoApplied = false;
+    });
     try {
       final provider = context.read<AppProvider>();
       final api = provider.apiService;
       final latestUsers = await api.getUsers();
       final latestNodes = await api.getNodes();
-      final bundle = await PolicyPreserver.fetchServerPolicyBundleSafely(api);
+      var bundle = await PolicyPreserver.fetchServerPolicyBundleSafely(api);
+
+      final reconnected = AclMigrationAssistantService.findReconnectedNode(
+        originalTaggedNode: orig,
+        latestNodes: latestNodes,
+      );
+
+      Map<String, dynamic> effectivePolicy = bundle.policy ?? const {};
+      var autoApplied = false;
+
+      // Si le nœud est bien revenu sans tag, régénérer et appliquer
+      // automatiquement l'ACL complète (host-*, union hybride, règles custom)
+      if (reconnected != null && reconnected.tags.isEmpty) {
+        final serverId = provider.activeServer?.id;
+        final tempRules = serverId != null
+            ? await provider.storageService.getTemporaryRules(serverId)
+            : const <Map<String, dynamic>>[];
+
+        final freshPolicy = AclPolicyOrchestrator().generatePolicy(
+          engineMode: provider.aclEngineMode,
+          users: latestUsers,
+          nodes: latestNodes,
+          temporaryRules: tempRules,
+          taildriveShares: provider.taildriveShares,
+          serverVersion: provider.serverVersion,
+          includeUntaggedNodes: provider.includeUntaggedNodes,
+        );
+
+        effectivePolicy = await PolicyPreserver.applyPreservingPolicy(
+          apiService: api,
+          generatedPolicy: freshPolicy,
+          serverPolicy: bundle.policy,
+          rawServerPolicy:
+              bundle.rawText.isNotEmpty ? bundle.rawText : null,
+          pretty: true,
+          preserveCustomRules: true,
+          users: latestUsers,
+          nodes: latestNodes,
+          includeUntaggedNodes: provider.includeUntaggedNodes,
+        );
+        bundle = await PolicyPreserver.fetchServerPolicyBundleSafely(api);
+        effectivePolicy = bundle.policy ?? effectivePolicy;
+        autoApplied = true;
+      }
 
       final report = AclMigrationAssistantService.verifyTaglessTransition(
         originalTaggedNode: orig,
         targetUser: targetUser,
         latestNodes: latestNodes,
         latestUsers: latestUsers,
-        serverPolicy: bundle.policy ?? const {},
+        serverPolicy: effectivePolicy,
         isFr: isFr,
       );
 
@@ -351,8 +403,9 @@ class _AclMigrationCenterScreenState extends State<AclMigrationCenterScreen>
       setState(() {
         _users = latestUsers;
         _nodes = latestNodes;
-        _serverPolicy = bundle.policy;
+        _serverPolicy = effectivePolicy;
         _serverRawPolicy = bundle.rawText;
+        _step3AclAutoApplied = autoApplied;
         _step3Report = report;
       });
     } catch (e) {
@@ -408,12 +461,21 @@ class _AclMigrationCenterScreenState extends State<AclMigrationCenterScreen>
       final ownerNorm = ownerUser != null
           ? normalizeUserName(ownerUser.name)
           : node.getNormalizedOwner();
+      final wasAllTagless = ownerUser == null
+          ? !_nodes.any((n) => n.tags.isNotEmpty)
+          : !_nodes.any((n) =>
+              n.tags.isNotEmpty &&
+              PolicyInfrastructureBuilder.nodeBelongsToUser(n, ownerUser));
 
       final newTags = TagCapabilityHelper.buildInitialTags(
         engineMode: provider.aclEngineMode,
         normalizedUser: ownerNorm,
         isExitNode: _addExitNodeCap,
         isLanSharer: _addLanSharerCap,
+      );
+      final clientTag = newTags.firstWhere(
+        (t) => t.contains('-client'),
+        orElse: () => 'tag:$ownerNorm-client',
       );
 
       final updatedNodes = _nodes
@@ -424,7 +486,21 @@ class _AclMigrationCenterScreenState extends State<AclMigrationCenterScreen>
           ? await provider.storageService.getTemporaryRules(serverId)
           : const <Map<String, dynamic>>[];
 
-      // 1. Pousser tagOwners à jour en préservant toutes les règles custom
+      final initialBundle =
+          await PolicyPreserver.fetchServerPolicyBundleSafely(api);
+      final migratedServerPolicy = initialBundle.policy != null
+          ? AclMigrationAssistantService.migrateRulesForNewlyTaggedNode(
+              policy: initialBundle.policy!,
+              untaggedNodeBeforeTagging: node,
+              ownerNorm: ownerNorm,
+              clientTag: clientTag,
+              wasAllTagless: wasAllTagless,
+              users: _users,
+              nodesBeforeTagging: _nodes,
+            )
+          : null;
+
+      // 1. Pousser tagOwners à jour en préservant et adaptant les règles custom
       final prepPolicy = AclPolicyOrchestrator().generatePolicy(
         engineMode: provider.aclEngineMode,
         users: _users,
@@ -437,6 +513,7 @@ class _AclMigrationCenterScreenState extends State<AclMigrationCenterScreen>
       await PolicyPreserver.applyPreservingPolicy(
         apiService: api,
         generatedPolicy: prepPolicy,
+        serverPolicy: migratedServerPolicy,
         pretty: true,
         preserveCustomRules: true,
         users: _users,
@@ -447,16 +524,35 @@ class _AclMigrationCenterScreenState extends State<AclMigrationCenterScreen>
       // 2. Appliquer les tags via API
       await api.setTags(node.id, newTags);
 
-      // 3. Recharger et vérifier dans le simulateur
+      // 3. Recharger l'état réel post-tag et resynchroniser l'ACL finale sur le serveur
       final latestNodes = await api.getNodes();
       final latestUsers = await api.getUsers();
+      final syncedPolicy = AclPolicyOrchestrator().generatePolicy(
+        engineMode: provider.aclEngineMode,
+        users: latestUsers,
+        nodes: latestNodes,
+        temporaryRules: tempRules,
+        taildriveShares: provider.taildriveShares,
+        serverVersion: provider.serverVersion,
+        includeUntaggedNodes: provider.includeUntaggedNodes,
+      );
+      await PolicyPreserver.applyPreservingPolicy(
+        apiService: api,
+        generatedPolicy: syncedPolicy,
+        pretty: true,
+        preserveCustomRules: true,
+        users: latestUsers,
+        nodes: latestNodes,
+        includeUntaggedNodes: provider.includeUntaggedNodes,
+      );
+
       final bundle = await PolicyPreserver.fetchServerPolicyBundleSafely(api);
       final taggedNode = latestNodes.firstWhere(
         (n) => n.id == node.id,
         orElse: () => node.copyWith(tags: newTags),
       );
       final parser = AclParserService(
-        aclPolicy: bundle.policy ?? prepPolicy,
+        aclPolicy: bundle.policy ?? syncedPolicy,
         allNodes: latestNodes,
         allUsers: latestUsers,
       );
@@ -478,12 +574,26 @@ class _AclMigrationCenterScreenState extends State<AclMigrationCenterScreen>
           allowedPeers++;
         }
       }
+      final hasExitCheck =
+          latestNodes.any((n) => n.isExitNode || n.tags.any((t) => t.contains('exit-node')));
+      final exitAllowed = hasExitCheck &&
+          parser
+              .simulateConnection(
+                sourceNode: taggedNode,
+                destination: 'autogroup:internet',
+              )
+              .allowed;
 
       if (!mounted) return;
       setState(() {
+        final exitSummary = hasExitCheck
+            ? (exitAllowed
+                ? (isFr ? ' • Exit Node : ALLOW' : ' • Exit Node: ALLOW')
+                : (isFr ? ' • Exit Node : Bloqué/N/A' : ' • Exit Node: N/A'))
+            : '';
         _parcoursBResult = isFr
-            ? '✅ Tags appliqués (${newTags.join(', ')}) et ACL régénérée. Flux validé avec $allowedPeers/${peers.length} appareil(s).'
-            : '✅ Tags applied (${newTags.join(', ')}) and ACL regenerated. Flows verified with $allowedPeers/${peers.length} device(s).';
+            ? '✅ Tags appliqués (${newTags.join(', ')}) et ACL régénérée automatiquement. Flux validé avec $allowedPeers/${peers.length} appareil(s)$exitSummary.'
+            : '✅ Tags applied (${newTags.join(', ')}) and ACL auto-regenerated. Flows verified with $allowedPeers/${peers.length} device(s)$exitSummary.';
       });
       await _refreshState();
     } catch (e) {
@@ -941,6 +1051,18 @@ class _AclMigrationCenterScreenState extends State<AclMigrationCenterScreen>
                     : '⚠️ Partial check / action needed:'),
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
+          if (_step3AclAutoApplied) ...[
+            const SizedBox(height: 4),
+            Text(
+              isFr
+                  ? '✅ Politique ACL régénérée et appliquée automatiquement sur le serveur (avec vos règles personnalisées).'
+                  : '✅ ACL policy auto-regenerated and applied on server (preserving custom rules).',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green[800],
+                  ),
+            ),
+          ],
           if (report.found) ...[
             const SizedBox(height: 4),
             Text(
@@ -1016,6 +1138,10 @@ class _AclMigrationCenterScreenState extends State<AclMigrationCenterScreen>
                   .toList(),
               onChanged: (node) => setState(() {
                 _selectedUntaggedNode = node;
+                _addExitNodeCap = node?.isExitNode ?? false;
+                _addLanSharerCap = node?.sharedRoutes
+                        .any((r) => r != '0.0.0.0/0' && r != '::/0') ??
+                    false;
                 _parcoursBResult = null;
               }),
             ),

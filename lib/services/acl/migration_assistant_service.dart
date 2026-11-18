@@ -131,11 +131,40 @@ class AclMigrationAssistantService {
     String? serverVersion,
     bool includeUntaggedNodes = true,
   }) {
+    final planningNodes = List<Node>.from(nodes);
+    final hasTargetUntagged = nodes.any((n) =>
+        n.tags.isEmpty &&
+        PolicyInfrastructureBuilder.nodeBelongsToUser(n, targetUser));
+    if (includeUntaggedNodes && !hasTargetUntagged) {
+      // Nœud virtuel sans IP : déclenche l'union hybride et l'extension des
+      // règles tierces dès l'étape 1 avant la reconnexion réelle, sans créer de host factice.
+      planningNodes.add(
+        Node(
+          id: '__welcome_${normalizeUserName(targetUser.name)}__',
+          machineKey: '',
+          hostname: 'welcome-placeholder',
+          name: 'welcome-placeholder',
+          user: targetUser.name,
+          userId: targetUser.id,
+          ipAddresses: const [],
+          online: false,
+          lastSeen: DateTime.now(),
+          sharedRoutes: const [],
+          availableRoutes: const [],
+          isExitNode: false,
+          isLanSharer: false,
+          tags: const [],
+          baseDomain: nodes.isNotEmpty ? nodes.first.baseDomain : 'local',
+          endpoint: '',
+        ),
+      );
+    }
+
     final orchestrator = AclPolicyOrchestrator();
     final generated = orchestrator.generatePolicy(
       engineMode: engineMode,
       users: users,
-      nodes: nodes,
+      nodes: planningNodes,
       temporaryRules: temporaryRules,
       taildriveShares: taildriveShares,
       serverVersion: serverVersion,
@@ -147,7 +176,7 @@ class AclMigrationAssistantService {
       serverPolicy,
       preserveCustomRules: true,
       users: users,
-      nodes: nodes,
+      nodes: planningNodes,
       includeUntaggedNodes: includeUntaggedNodes,
     );
 
@@ -189,6 +218,33 @@ class AclMigrationAssistantService {
     return merged;
   }
 
+  /// Retrouve le nœud correspondant dans [latestNodes] après reconnexion
+  /// (priorité au nœud sans tag partageant l'ID, `machineKey`, hostname ou nom).
+  static Node? findReconnectedNode({
+    required Node originalTaggedNode,
+    required List<Node> latestNodes,
+  }) {
+    final untaggedCandidates = latestNodes.where((n) => n.tags.isEmpty).toList();
+    for (final n in untaggedCandidates) {
+      if (n.id == originalTaggedNode.id ||
+          (n.machineKey.isNotEmpty &&
+              n.machineKey == originalTaggedNode.machineKey) ||
+          n.hostname.toLowerCase() ==
+              originalTaggedNode.hostname.toLowerCase() ||
+          n.name.toLowerCase() == originalTaggedNode.name.toLowerCase()) {
+        return n;
+      }
+    }
+    return latestNodes.cast<Node?>().firstWhere(
+          (n) =>
+              n!.id == originalTaggedNode.id ||
+              n.hostname.toLowerCase() ==
+                  originalTaggedNode.hostname.toLowerCase() ||
+              n.name.toLowerCase() == originalTaggedNode.name.toLowerCase(),
+          orElse: () => null,
+        );
+  }
+
   /// Retrouve le nœud après reconnexion sans tag et valide son état API + ses flux ACL.
   static TaglessTransitionReport verifyTaglessTransition({
     required Node originalTaggedNode,
@@ -201,27 +257,10 @@ class AclMigrationAssistantService {
     final messages = <String>[];
 
     // 1. Retrouver le nœud (priorité : nœud sans tag au même nom/hostname/id)
-    Node? matched;
-    final untaggedCandidates = latestNodes.where((n) => n.tags.isEmpty).toList();
-    for (final n in untaggedCandidates) {
-      if (n.id == originalTaggedNode.id ||
-          (n.machineKey.isNotEmpty &&
-              n.machineKey == originalTaggedNode.machineKey) ||
-          n.hostname.toLowerCase() ==
-              originalTaggedNode.hostname.toLowerCase() ||
-          n.name.toLowerCase() == originalTaggedNode.name.toLowerCase()) {
-        matched = n;
-        break;
-      }
-    }
-    matched ??= latestNodes.cast<Node?>().firstWhere(
-          (n) =>
-              n!.id == originalTaggedNode.id ||
-              n.hostname.toLowerCase() ==
-                  originalTaggedNode.hostname.toLowerCase() ||
-              n.name.toLowerCase() == originalTaggedNode.name.toLowerCase(),
-          orElse: () => null,
-        );
+    final matched = findReconnectedNode(
+      originalTaggedNode: originalTaggedNode,
+      latestNodes: latestNodes,
+    );
 
     if (matched == null) {
       return TaglessTransitionReport(
@@ -380,5 +419,111 @@ class AclMigrationAssistantService {
     }
 
     return results;
+  }
+
+  /// Adapte les règles personnalisées (`grants` et `acls`) lorsqu'un nœud sans
+  /// tag passe au format tagué (`Parcours B`) afin que toute règle ciblant son
+  /// alias `host-*` (ou `group:<user>` si l'utilisateur était 100 % sans tag)
+  /// continue de fonctionner après l'attribution de `tag:<user>-client`.
+  static Map<String, dynamic> migrateRulesForNewlyTaggedNode({
+    required Map<String, dynamic> policy,
+    required Node untaggedNodeBeforeTagging,
+    required String ownerNorm,
+    required String clientTag,
+    required bool wasAllTagless,
+    List<User> users = const [],
+    List<Node> nodesBeforeTagging = const [],
+  }) {
+    final result = PolicyPreserver.deepCopyMap(policy);
+    final groupName = 'group:$ownerNorm';
+
+    String? nodeHostAlias;
+    if (nodesBeforeTagging.isNotEmpty) {
+      final managedHosts = PolicyInfrastructureBuilder.buildManagedHosts(
+        users: users,
+        nodes: nodesBeforeTagging,
+      );
+      final cleanNodeIp = untaggedNodeBeforeTagging.ipAddresses.isNotEmpty
+          ? untaggedNodeBeforeTagging.ipAddresses.first.split('/').first.trim()
+          : null;
+      if (cleanNodeIp != null) {
+        for (final entry in managedHosts.entries) {
+          if (entry.value == cleanNodeIp &&
+              entry.key.startsWith('host-$ownerNorm-')) {
+            nodeHostAlias = entry.key;
+            break;
+          }
+        }
+      }
+    }
+    nodeHostAlias ??= sanitizeDns1123Subdomain(
+      'host-$ownerNorm-${untaggedNodeBeforeTagging.name.isNotEmpty ? untaggedNodeBeforeTagging.name : untaggedNodeBeforeTagging.hostname}',
+    );
+
+    void expandField(dynamic listObj, {required bool isAclDst}) {
+      if (listObj is! List) return;
+      final additions = <String>[];
+      final removals = <String>[];
+
+      for (final raw in listObj) {
+        final item = raw.toString();
+        if (item == nodeHostAlias) {
+          removals.add(item);
+          if (!listObj.contains(clientTag) && !additions.contains(clientTag)) {
+            additions.add(clientTag);
+          }
+          continue;
+        }
+        if (isAclDst && item.startsWith('$nodeHostAlias:')) {
+          removals.add(item);
+          final suffix = item.substring(nodeHostAlias!.length);
+          final candidate = '$clientTag$suffix';
+          if (!listObj.contains(candidate) && !additions.contains(candidate)) {
+            additions.add(candidate);
+          }
+          continue;
+        }
+
+        if (wasAllTagless) {
+          if (item == groupName &&
+              !listObj.contains(clientTag) &&
+              !additions.contains(clientTag)) {
+            additions.add(clientTag);
+          } else if (isAclDst && item.startsWith('$groupName:')) {
+            final suffix = item.substring(groupName.length);
+            final candidate = '$clientTag$suffix';
+            if (!listObj.contains(candidate) &&
+                !additions.contains(candidate)) {
+              additions.add(candidate);
+            }
+          }
+        }
+      }
+
+      listObj.removeWhere(removals.contains);
+      listObj.addAll(additions);
+    }
+
+    final grants = result['grants'];
+    if (grants is List) {
+      for (final g in grants) {
+        if (g is Map) {
+          expandField(g['src'], isAclDst: false);
+          expandField(g['dst'], isAclDst: false);
+        }
+      }
+    }
+
+    final acls = result['acls'];
+    if (acls is List) {
+      for (final a in acls) {
+        if (a is Map) {
+          expandField(a['src'], isAclDst: false);
+          expandField(a['dst'], isAclDst: true);
+        }
+      }
+    }
+
+    return result;
   }
 }

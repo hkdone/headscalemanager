@@ -210,5 +210,85 @@ void main() {
       expect(report.missingRoutes, ['192.168.10.0/24']);
       expect(report.isFullyValidated, isFalse);
     });
+
+    test('buildPreparedWelcomePolicy pré-hybride déjà les règles tierces en Étape 1', () {
+      final jean = _user('u1', 'jean@synology.me');
+      final ely = _user('u2', 'ely@synology.me', email: 'jean.virassa@gmail.com');
+      final elyTagged = _node(
+        id: 'n2',
+        name: 'dkdone',
+        user: 'tagged-devices',
+        userId: 'u2',
+        ips: ['100.64.0.20'],
+        tags: ['tag:ely-client'],
+      );
+      final serverBefore = {
+        'grants': [
+          {
+            'src': ['tag:ely-client'],
+            'dst': ['autogroup:internet'],
+            'via': ['tag:jean-exit-node'],
+            'ip': ['*'],
+          },
+        ],
+      };
+
+      final prepared = AclMigrationAssistantService.buildPreparedWelcomePolicy(
+        engineMode: AclEngineMode.grantsV29,
+        users: [jean, ely],
+        nodes: [elyTagged],
+        serverPolicy: serverBefore,
+        targetUser: ely,
+        serverVersion: '0.29.2',
+      );
+
+      expect(prepared['hosts'], isEmpty);
+      final grants = prepared['grants'] as List<dynamic>;
+      final crossExit = grants.firstWhere(
+        (g) => (g['dst'] as List).contains('autogroup:internet'),
+      ) as Map<String, dynamic>;
+      expect(crossExit['src'], containsAll(['tag:ely-client', 'group:ely']));
+    });
+
+    test('Parcours B : migrateRulesForNewlyTaggedNode conserve les règles host-* et group: lors du passage vers tagué', () {
+      final paul = _user('u3', 'paul');
+      final gwUntagged = _node(
+        id: 'n10',
+        name: 'gw-paul',
+        user: 'paul',
+        userId: 'u3',
+        ips: ['100.64.0.60'],
+        tags: const [],
+      );
+      final policyBefore = {
+        'grants': [
+          {
+            'src': ['host-paul-gw-paul'],
+            'dst': ['100.64.0.15'],
+            'ip': ['*'],
+          },
+          {
+            'src': ['group:paul'],
+            'dst': ['autogroup:internet'],
+            'via': ['tag:jean-exit-node'],
+            'ip': ['*'],
+          },
+        ],
+      };
+
+      final migrated = AclMigrationAssistantService.migrateRulesForNewlyTaggedNode(
+        policy: policyBefore,
+        untaggedNodeBeforeTagging: gwUntagged,
+        ownerNorm: 'paul',
+        clientTag: 'tag:paul-client',
+        wasAllTagless: true,
+        users: [paul],
+        nodesBeforeTagging: [gwUntagged],
+      );
+
+      final grants = migrated['grants'] as List<dynamic>;
+      expect((grants[0] as Map)['src'], ['tag:paul-client']);
+      expect((grants[1] as Map)['src'], containsAll(['group:paul', 'tag:paul-client']));
+    });
   });
 }
