@@ -1,7 +1,7 @@
 # Suivi d'Implémentation — Ordre Logique & Graduel (du moins risqué au plus risqué)
 
-**Branche de référence (stable) :** `master` *(version publiée : `2.5.1+166`)*  
-**Dernière mise à jour :** 17 novembre 2026  
+**Branche de référence (stable) :** `master` *(version publiée : `2.5.2+168`)*  
+**Dernière mise à jour :** 18 novembre 2026  
 **Registre de dépréciation :** [REGISTRE_DEPRECATION_HEADSCALE.md](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/REGISTRE_DEPRECATION_HEADSCALE.md)
 
 ---
@@ -47,7 +47,7 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 | **3** | [Plan 11 — Diff, Simulateur, SSH & API](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_11_v2.5.0_simulateur_diff_ssh_et_api.md) | `2.4.0+161` | `feat/acl-simulator-diff-ssh-api` | Plan 08 | 🟢 Très Faible | ✅ Validé, Mergé & Publié |
 | **4.0** | [Sous-Plan 09-0 — Dépréciation $N-2$ & Diagnostic d'Alignement](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_0_deprecation_audit_et_alignement.md) | `2.5.0+165` | `feat/acl-09-0-deprecation-and-alignment` | Plan 11 | 🟢 Très Faible | ✅ Validé, Mergé & Test interne OK |
 | **4.A** | [Sous-Plan 09-A — Cœur Hybride & Résolution Simulateur/Graphe](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_A_coeur_hybride_et_groupes.md) | `2.5.1+166` | `feat/acl-09-a-hybrid-core` | Sous-Plan 09-0 | 🟢 Faible | ✅ Validé & Mergé |
-| **4.B** | [Sous-Plan 09-B — Stop Auto-Tagging & Centre de Bascule Guidée](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_B_arret_autotagging_et_assistant_bascule.md) | `2.5.2+167` | `feat/acl-09-b-stop-autotag-and-wizard` | Sous-Plan 09-A | 🟡 Faible-Moyen | 🧪 En test interne |
+| **4.B** | [Sous-Plan 09-B — Stop Auto-Tagging & Centre de Bascule Guidée](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_B_arret_autotagging_et_assistant_bascule.md) | `2.5.2+168` | `feat/acl-09-b-stop-autotag-and-wizard` | Sous-Plan 09-A | 🟡 Faible-Moyen | ✅ Validé & Mergé |
 | **4.C** | [Sous-Plan 09-C — Moteur `Sans Tags` & Constructeurs Manuels](file:///c:/Users/jeanv/Desktop/Projets/StudioProjects/headscaleManager/plan_action_09_C_moteur_tagless_et_constructeurs.md) | `2.6.0+168` | `feat/acl-09-c-tagless-and-builders` | Sous-Plan 09-B | 🟡 Moyen | ⬜ À faire |
 
 **Légende des statuts :** `⬜ À faire` • `🔄 En cours` • `🧪 En test interne` • `✅ Validé & Mergé` • `⏪ Rollback effectué`
@@ -82,11 +82,11 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 - [x] **09-A.3** `AclParserService` : résolution de `aclPolicy['hosts']`, `"user@"`, emails OIDC, `autogroup:member` et ports `tag:`/`group:`/`autogroup:` dans le Simulateur de flux et le Graphe Visuel ACL + rattachement `nodeBelongsToUser` dans `DashboardScreen`, `UserDetailScreen` et `TaildriveBuilder`
 - [x] **Point de contrôle 4.A (Validation avant merge)** : `flutter analyze` (0 issue) ✅ • Tests unitaires parc 100% tagué, 100% sans tag, mixte, hybridation auto des règles inter-utilisateurs et Simulateur ✅ (79/79) • Test réel validé sur serveur `0.29.2` (`dkdone` basculé sans tag sous `ely@synology.me` vers `jean`) ✅ • Mergé dans `master` (`2.5.1+166`) ✅
 
-### Étape 4.B — Sous-Plan 09-B (`feat/acl-09-b-stop-autotag-and-wizard` → `2.5.2+167`)
+### Étape 4.B — Sous-Plan 09-B (`feat/acl-09-b-stop-autotag-and-wizard` → `2.5.2+168`)
 - [x] **09-B.1** Arrêt de l'auto-tagging forcé dans `CreatePreAuthKeyDialog` (interrupteur optionnel), `registration_dialogs.dart`, `DashboardScreen`, `NodeDetailScreen`, `ExitNodeCommandDialog`, `ShareSubnetDialog` et `MoveNodeDialog`
 - [x] **09-B.2** Création du Centre d'Assistance à la Bascule (`AclMigrationCenterScreen`) accessible sans intrusion depuis Paramètres, le menu `⋮` ACL, `AclEngineBanner` et la fiche d'un Nœud (`NodeDetailScreen` / `EditTagsDialog`)
-- [x] **09-B.3** Parcours guidés nœud par nœud (Parcours A : Taggé $\rightarrow$ Sans Tag / OIDC en 3 étapes ; Parcours B : Sans Tag $\rightarrow$ Taggé en 1 clic API ; Parcours C : Bascule serveur Grants V29 / Hybride) avec **bouton de validation de fonctionnement en direct** (vérification API + simulation automatique des flux du nœud)
-- [ ] **Point de contrôle 4.B (Validation avant merge)** : `flutter analyze` (0 issue) • Test PreAuthKey sans tag • Test du Centre d'Assistance à la Bascule et de la validation en direct sur un nœud
+- [x] **09-B.3** Parcours guidés nœud par nœud (Parcours A : Taggé $\rightarrow$ Sans Tag / OIDC en 3 étapes avec régénération ACL auto à l'étape 3 ; Parcours B : Sans Tag $\rightarrow$ Taggé en 1 clic API avec préservation & régénération ACL ; Parcours C : Bascule serveur Grants V29 / Hybride) avec **bouton de validation de fonctionnement en direct** (vérification API + simulation automatique des flux du nœud)
+- [x] **Point de contrôle 4.B (Validation avant merge)** : `flutter analyze` (0 issue) ✅ • Tests unitaires (84/84) ✅ • Migration Flutter `3.50.0` (`material_ui`/`cupertino_ui`, Gradle `9.5.0`, AGP `9.1.1`, Kotlin `2.4.20`, `.aab` `2.5.2+168`) ✅ • Tests réels sur appareil validés (Parcours A & B Taggé $\leftrightarrow$ Sans Tag avec l'assistant ; PreAuthKey sans tag à vérifier ultérieurement en marge de 09-C) ✅ • Mergé dans `master` (`2.5.2+168`) ✅
 
 ### Étape 4.C — Sous-Plan 09-C (`feat/acl-09-c-tagless-and-builders` → `2.6.0+165`)
 - [ ] **09-C.1** Ajout de `AclEngineMode.tagless` + `TaglessAclGeneratorService` (`grants` sur $\ge 0.29$, `acls` sur $< 0.29$, `hosts`, tolérance hybride) + blocage de la popup auto `Grants V29` en mode `tagless`
@@ -111,6 +111,7 @@ L'ordre ci-dessous classe les plans **du risque de casse en production le plus f
 | 2026-11-17 | Découpage Plan 09 | `master` | Création de `REGISTRE_DEPRECATION_HEADSCALE.md` et découpage du Plan 09 en 4 sous-plans atomiques (`09-0`, `09-A`, `09-B`, `09-C`) avec branches dédiées. |
 | 2026-11-17 | Étape 4.0 — Sous-Plan 09-0 | `feat/acl-09-0-deprecation-and-alignment` | Bandeau rouge $N-2$ ($\le 0.27$), alignement Policy v2 (`"nom@"`), `AlignmentDiagnosticService` sensible à la version/moteur avec répercussion en cascade (`groups`, `tagOwners`, `grants`, `acls`, `ssh`, `nodeAttrs`, `tests`, commentaires HuJSON, règles locales, Taildrive), fix Backfill IPs (confirmation directe `?confirmed=true`) & normalisation `(v0.29.2)`. `flutter analyze` (0 issue), 70/70 tests passés (`2.5.0+162`). Validé et mergé dans `master`. |
 | 2026-11-17 | Étape 4.A — Sous-Plan 09-A | `feat/acl-09-a-hybrid-core` | Correctif préservation globale `grants`/`acls` dans `PolicyPreserver` (`EditTagsDialog` & co.), union hybride `[...tags, group]` dans `GrantsV29` & `Standard`, `autoApprovers` + `hosts` gérés (`host-*`), résolution `hosts`/`user@`/OIDC/`autogroup:member` dans `AclParserService`, hybridation automatique des règles inter-utilisateurs existantes et options `group:`/`host-` dans `GrantComposerService`. `flutter analyze` (0 issue), 79/79 tests passés, test réel validé (`dkdone` sans tag sous `ely@synology.me`). Mergé dans `master` (`2.5.1+166`). |
+| 2026-11-18 | Étape 4.B — Sous-Plan 09-B | `feat/acl-09-b-stop-autotag-and-wizard` | Arrêt de l'auto-tagging forcé, `showTaglessRouteChoiceDialog`, Centre d'Assistance `AclMigrationCenterScreen` (Parcours A/B/C avec régénération ACL auto en fin de Parcours A et en Parcours B), migration Flutter `3.50.0` (`material_ui`/`cupertino_ui`, Gradle `9.5.0`, AGP `9.1.1`, Kotlin `2.4.20`). `flutter analyze` (0 issue), 84/84 tests passés, `.aab` `2.5.2+168` généré et testé sur appareil (Parcours A & B validés). Mergé dans `master` (`2.5.2+168`). |
 
 ---
 
