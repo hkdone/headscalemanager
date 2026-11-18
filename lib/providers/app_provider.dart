@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:headscalemanager/api/headscale_api_service.dart';
 import 'package:headscalemanager/models/server.dart';
 import 'package:headscalemanager/models/taildrive_share.dart';

@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui'; // Pour PathMetric et l'animation
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:graphview/GraphView.dart';
 import 'package:headscalemanager/models/node.dart' as headscale_node;
 import 'package:headscalemanager/models/user.dart';

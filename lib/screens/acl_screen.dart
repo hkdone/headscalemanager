@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/screens/acl_manager_screen.dart';
+import 'package:headscalemanager/screens/acl_migration_center_screen.dart';
 import 'package:headscalemanager/screens/taildrive_manager_screen.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -354,7 +355,9 @@ class _AclScreenState extends State<AclScreen> {
                 nodes: _allNodes,
                 isFr: isFr,
                 compact: true,
+                includeUntaggedNodes: appProvider.includeUntaggedNodes,
                 onOpenDiagnostic: _openAlignmentDiagnostic,
+                onOpenMigrationCenter: _openMigrationCenter,
               ),
             ),
             if (_isLocalDraft) AclWorkflowGuide(isFr: isFr),
@@ -592,6 +595,17 @@ class _AclScreenState extends State<AclScreen> {
   Future<void> _openAlignmentDiagnostic() async {
     final changed = await AlignmentAssistantDialog.show(context);
     if (changed && mounted) {
+      await _loadInitialData();
+    }
+  }
+
+  Future<void> _openMigrationCenter() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const AclMigrationCenterScreen(),
+      ),
+    );
+    if (mounted) {
       await _loadInitialData();
     }
   }
@@ -841,7 +855,8 @@ class _AclScreenState extends State<AclScreen> {
               ),
             ),
       floatingActionButton: SpeedDial(
-        animatedIcon: AnimatedIcons.menu_close,
+        icon: Icons.menu,
+        activeIcon: Icons.close,
         backgroundColor: Theme.of(context).colorScheme.primary,
         children: [
           SpeedDialChild(
@@ -930,6 +945,9 @@ class _AclScreenState extends State<AclScreen> {
           case 'diagnostic':
             _openAlignmentDiagnostic();
             break;
+          case 'migration_center':
+            _openMigrationCenter();
+            break;
           case 'backup':
             _exportPolicyBackup();
             break;
@@ -972,6 +990,14 @@ class _AclScreenState extends State<AclScreen> {
               title: Text(isFr
                   ? 'Diagnostic & Alignement ACL'
                   : 'ACL Alignment Diagnostic')),
+        ),
+        PopupMenuItem<String>(
+          value: 'migration_center',
+          child: ListTile(
+              leading: const Icon(Icons.explore_outlined, color: Colors.indigo),
+              title: Text(isFr
+                  ? 'Assistant de bascule & migration'
+                  : 'ACL Transition & Migration Center')),
         ),
         const PopupMenuDivider(),
         PopupMenuItem<String>(

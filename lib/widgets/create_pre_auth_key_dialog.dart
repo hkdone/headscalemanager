@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:headscalemanager/models/user.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
@@ -20,6 +20,7 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
   User? _selectedUser;
   bool _isReusable = false;
   bool _isEphemeral = false;
+  bool _attachAclTags = false;
   bool _isExitNode = false;
   bool _isLanSharer = false;
   final TextEditingController _expirationController = TextEditingController();
@@ -109,32 +110,57 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 16),
-            Text(isFr ? 'Tags ACL (Nouveau)' : 'ACL Tags (New)',
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-            CheckboxListTile(
-              title: const Text('Exit Node'),
-              subtitle: Text(isFr
-                  ? 'Autoriser ce nœud à être une sortie internet.'
-                  : 'Allow this node to be an internet exit.'),
-              value: _isExitNode,
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                isFr
+                    ? 'Associer des tags ACL (Serveur / Infrastructure)'
+                    : 'Attach ACL tags (Server / Infrastructure mode)',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                isFr
+                    ? 'Désactivé par défaut : l\'appareil reste rattaché à l\'utilisateur humain (sans tag).'
+                    : 'Disabled by default: the device remains owned by the human user (tagless).',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              value: _attachAclTags,
               onChanged: (value) {
                 setState(() {
-                  _isExitNode = value!;
+                  _attachAclTags = value;
+                  if (!value) {
+                    _isExitNode = false;
+                    _isLanSharer = false;
+                  }
                 });
               },
             ),
-            CheckboxListTile(
-              title: const Text('LAN Sharer'),
-              subtitle: Text(isFr
-                  ? 'Autoriser ce nœud à partager son réseau local.'
-                  : 'Allow this node to share its local network.'),
-              value: _isLanSharer,
-              onChanged: (value) {
-                setState(() {
-                  _isLanSharer = value!;
-                });
-              },
-            ),
+            if (_attachAclTags) ...[
+              CheckboxListTile(
+                title: const Text('Exit Node'),
+                subtitle: Text(isFr
+                    ? 'Autoriser ce nœud à être une sortie internet.'
+                    : 'Allow this node to be an internet exit.'),
+                value: _isExitNode,
+                onChanged: (value) {
+                  setState(() {
+                    _isExitNode = value!;
+                  });
+                },
+              ),
+              CheckboxListTile(
+                title: const Text('LAN Sharer'),
+                subtitle: Text(isFr
+                    ? 'Autoriser ce nœud à partager son réseau local.'
+                    : 'Allow this node to share its local network.'),
+                value: _isLanSharer,
+                onChanged: (value) {
+                  setState(() {
+                    _isLanSharer = value!;
+                  });
+                },
+              ),
+            ],
           ],
         ),
       ),
@@ -160,13 +186,15 @@ class _CreatePreAuthKeyDialogState extends State<CreatePreAuthKeyDialog> {
               final expiration =
                   DateTime.now().add(Duration(days: expirationDays));
 
-              // Construction des tags ACL selon le moteur actif
-              final List<String> aclTags = TagCapabilityHelper.buildInitialTags(
-                engineMode: provider.aclEngineMode,
-                normalizedUser: normalizeUserName(_selectedUser!.name),
-                isExitNode: _isExitNode,
-                isLanSharer: _isLanSharer,
-              );
+              // Construction des tags ACL uniquement si explicitement demandé
+              final List<String>? aclTags = _attachAclTags
+                  ? TagCapabilityHelper.buildInitialTags(
+                      engineMode: provider.aclEngineMode,
+                      normalizedUser: normalizeUserName(_selectedUser!.name),
+                      isExitNode: _isExitNode,
+                      isLanSharer: _isLanSharer,
+                    )
+                  : null;
 
               try {
                 final key = await provider.apiService.createPreAuthKey(

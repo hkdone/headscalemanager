@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
 import 'package:headscalemanager/services/acl/acl_policy_orchestrator.dart';
 import 'package:headscalemanager/services/acl/policy_preserver.dart';
 import 'package:headscalemanager/utils/snack_bar_utils.dart';
 import 'package:headscalemanager/utils/tag_capability_helper.dart';
+import 'package:headscalemanager/widgets/acl/tagless_route_choice_dialog.dart';
 import 'package:provider/provider.dart';
 // For debugPrint
 import 'package:headscalemanager/widgets/subnet_command_dialog.dart'; // Import the new dialog
@@ -94,19 +95,37 @@ class _ShareSubnetDialogState extends State<ShareSubnetDialog> {
               final String newSubnet = _subnetController.text;
 
               try {
-                // 1. Update Tags (add lan-sharer capability)
+                // 1. Update Tags (uniquement si le nœud est déjà tagué ou si l'admin choisit la conversion)
                 final List<String> currentTags = List.from(widget.node.tags);
-                final List<String> newTags = TagCapabilityHelper.addCapabilities(
-                  currentTags,
-                  engineMode: appProvider.aclEngineMode,
-                  normalizedUser: widget.node.getNormalizedOwner(),
-                  addLanSharer: true,
-                );
+                bool shouldTag = currentTags.isNotEmpty;
+                if (currentTags.isEmpty) {
+                  final choice = await showTaglessRouteChoiceDialog(
+                    context,
+                    node: widget.node,
+                    isFr: isFr,
+                    isExitNode: false,
+                    isLanSharer: true,
+                  );
+                  if (choice == TaglessRouteApprovalChoice.cancel) return;
+                  shouldTag =
+                      choice == TaglessRouteApprovalChoice.convertToTaggedRouter;
+                }
 
-                if (newTags.length != currentTags.length ||
-                    !newTags.asMap().entries.every(
-                        (e) => currentTags[e.key] == e.value)) {
-                  await appProvider.apiService.setTags(widget.node.id, newTags);
+                if (shouldTag) {
+                  final List<String> newTags =
+                      TagCapabilityHelper.addCapabilities(
+                    currentTags,
+                    engineMode: appProvider.aclEngineMode,
+                    normalizedUser: widget.node.getNormalizedOwner(),
+                    addLanSharer: true,
+                  );
+
+                  if (newTags.length != currentTags.length ||
+                      !newTags.asMap().entries.every(
+                          (e) => currentTags[e.key] == e.value)) {
+                    await appProvider.apiService
+                        .setTags(widget.node.id, newTags);
+                  }
                 }
 
                 // 2. Set Routes

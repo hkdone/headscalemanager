@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/user.dart';
@@ -12,7 +12,9 @@ class AclEngineBanner extends StatelessWidget {
   final List<Node> nodes;
   final bool isFr;
   final bool compact;
+  final bool includeUntaggedNodes;
   final VoidCallback? onOpenDiagnostic;
+  final VoidCallback? onOpenMigrationCenter;
 
   const AclEngineBanner({
     super.key,
@@ -22,7 +24,9 @@ class AclEngineBanner extends StatelessWidget {
     required this.nodes,
     required this.isFr,
     this.compact = false,
+    this.includeUntaggedNodes = true,
     this.onOpenDiagnostic,
+    this.onOpenMigrationCenter,
   });
 
   List<String> _usersWithoutTaggedNodes() {
@@ -101,8 +105,18 @@ class AclEngineBanner extends StatelessWidget {
                   style: TextStyle(color: Colors.orange[800], fontSize: 11),
                 ),
               ),
-            ] else if (onOpenDiagnostic != null)
+            ] else if (onOpenDiagnostic != null || onOpenMigrationCenter != null)
               const Spacer(),
+            if (onOpenMigrationCenter != null)
+              IconButton(
+                icon: const Icon(Icons.explore_outlined,
+                    size: 20, color: Colors.indigo),
+                tooltip: isFr
+                    ? 'Assistant de bascule (Taggé ↔ Sans tag)'
+                    : 'Migration & Switch Assistant (Tagged ↔ Tagless)',
+                visualDensity: VisualDensity.compact,
+                onPressed: onOpenMigrationCenter,
+              ),
             if (onOpenDiagnostic != null)
               IconButton(
                 icon: const Icon(Icons.health_and_safety_outlined,
@@ -155,7 +169,7 @@ class AclEngineBanner extends StatelessWidget {
                   style: TextStyle(color: Colors.orange[800], fontSize: 12),
                 ),
               ),
-            if (untagged.isNotEmpty)
+            if (untagged.isNotEmpty && !includeUntaggedNodes)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Row(
@@ -167,8 +181,8 @@ class AclEngineBanner extends StatelessWidget {
                     Expanded(
                       child: Text(
                         isFr
-                            ? 'Utilisateurs sans nœud tagué (aucune règle auto) : ${untagged.join(", ")}'
-                            : 'Users without tagged nodes (no auto rules): ${untagged.join(", ")}',
+                            ? 'Utilisateurs sans nœud tagué (quarantaine active) : ${untagged.join(", ")}'
+                            : 'Users without tagged nodes (quarantine active): ${untagged.join(", ")}',
                         style: TextStyle(
                             color: Colors.amber[900], fontSize: 12),
                       ),

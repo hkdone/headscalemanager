@@ -56,7 +56,7 @@ void callbackDispatcher() {
 
         if (servers.isEmpty || activeServerId == null) {
           // print("No active server configured. Exiting background task.");
-          return Future.value(true);
+          return true;
         }
 
         final activeServer = servers.firstWhere((s) => s.id == activeServerId);

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/models/taildrive_share.dart';
@@ -254,7 +254,6 @@ class _TaildriveManagerScreenState extends State<TaildriveManagerScreen> {
                                         context: context,
                                         text: clientUrl,
                                         isFr: isFr,
-                                        isLink: true,
                                         snackbarMsg: isFr 
                                             ? 'URL de connexion WebDAV copiée !' 
                                             : 'WebDAV connection URL copied!',
@@ -383,7 +382,6 @@ class _TaildriveManagerScreenState extends State<TaildriveManagerScreen> {
     required String text,
     required bool isFr,
     required String snackbarMsg,
-    bool isLink = false,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

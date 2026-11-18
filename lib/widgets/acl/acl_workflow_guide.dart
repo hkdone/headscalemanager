@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Indicateur compact + aide contextuelle pour le mode brouillon local.
 class AclWorkflowGuide extends StatelessWidget {
