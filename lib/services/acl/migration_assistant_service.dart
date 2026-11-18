@@ -300,7 +300,7 @@ class AclMigrationAssistantService {
     }
 
     final missingRoutes = originalTaggedNode.sharedRoutes
-        .where((r) => !matched!.sharedRoutes.contains(r))
+        .where((r) => !matched.sharedRoutes.contains(r))
         .toList();
     if (missingRoutes.isNotEmpty) {
       messages.add(
@@ -319,7 +319,7 @@ class AclMigrationAssistantService {
 
     final userPeers = latestNodes
         .where((n) =>
-            n.id != matched!.id &&
+            n.id != matched.id &&
             PolicyInfrastructureBuilder.nodeBelongsToUser(n, targetUser) &&
             n.ipAddresses.isNotEmpty)
         .toList();
