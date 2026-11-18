@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:headscalemanager/utils/json_diff_utils.dart';
 
 /// Dialogue d'aperçu des changements avant export vers Headscale.

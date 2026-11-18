@@ -41,6 +41,8 @@ dependencies:
   local_auth: ^3.0.0
   crypto: ^3.0.7
   uuid: ^4.5.2
+  cupertino_ui: any
+  material_ui: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

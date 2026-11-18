@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:headscalemanager/models/acl_engine_mode.dart';
 import 'package:headscalemanager/models/node.dart';
 import 'package:headscalemanager/providers/app_provider.dart';
@@ -855,7 +855,8 @@ class _AclScreenState extends State<AclScreen> {
               ),
             ),
       floatingActionButton: SpeedDial(
-        animatedIcon: AnimatedIcons.menu_close,
+        icon: Icons.menu,
+        activeIcon: Icons.close,
         backgroundColor: Theme.of(context).colorScheme.primary,
         children: [
           SpeedDialChild(

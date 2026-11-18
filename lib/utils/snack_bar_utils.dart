@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Fonction utilitaire pour afficher un SnackBar en toute sécurité.
 ///

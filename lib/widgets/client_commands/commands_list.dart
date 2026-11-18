@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:headscalemanager/models/client_command.dart';
 import 'package:headscalemanager/widgets/client_commands/command_card.dart';
 
