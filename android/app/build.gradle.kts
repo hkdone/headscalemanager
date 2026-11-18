@@ -25,10 +25,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-
     defaultConfig {
         applicationId = "com.dkstudio.headscalemanager"
         minSdk = flutter.minSdkVersion
@@ -37,7 +33,7 @@ android {
         versionName = flutter.versionName
     }
 
-    packagingOptions {
+    packaging {
         jniLibs {
             useLegacyPackaging = false
         }
@@ -58,6 +54,12 @@ android {
             isShrinkResources = false
             signingConfig = signingConfigs.getByName("release")
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
     }
 }
 
